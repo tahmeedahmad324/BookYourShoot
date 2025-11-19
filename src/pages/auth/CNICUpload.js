@@ -30,9 +30,9 @@ const CNICUpload = () => {
     setLoading(true);
     // Simulate API call
     await new Promise(resolve => setTimeout(resolve, 2000));
-    
-    // Redirect to OTP verification
-    navigate('/verify-otp');
+
+    // Redirect to photographer dashboard after CNIC upload
+    navigate('/photographer/dashboard');
   };
 
   return (
