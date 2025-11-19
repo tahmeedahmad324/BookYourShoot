@@ -138,12 +138,17 @@ const OTPVerification = () => {
                   </div>
                   <h2 className="fw-bold">Verify Your Email</h2>
                   <p className="text-muted">
-                    We've sent a 6-digit verification code to your email
+                    We've sent a 6-digit verification code to your email address
                   </p>
                   {user?.email && (
                     <p className="text-primary fw-semibold">
                       {user.email}
                     </p>
+                  )}
+                  {user?.role === 'photographer' && (
+                    <div className="alert alert-info small">
+                      <strong>Next Step:</strong> After email verification, you'll need to upload your CNIC for identity verification.
+                    </div>
                   )}
                 </div>
 
