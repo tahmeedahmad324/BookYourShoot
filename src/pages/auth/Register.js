@@ -118,23 +118,25 @@ const Register = () => {
               <p className="text-muted">Choose your role and start your photography journey</p>
               
               <div className="row g-3 mt-2">
-                {Object.entries(roleDescriptions).map(([role, desc]) => (
+                {Object.entries(roleDescriptions).map(([role, desc]) => {
+                  const cardClass = 'card h-100 border-2 ' + (selectedRole === role ? ('border-' + desc.color + ' bg-light') : 'border-soft-gray');
+                  const borderCol = selectedRole === role
+                    ? ('var(--' + (desc.color === 'primary' ? 'primary-blue' : (desc.color === 'secondary' ? 'primary-orange' : 'dark-neutral')) + ')')
+                    : 'var(--soft-gray)';
+
+                  return (
                   <div className="col-md-4" key={role}>
                     <div 
-                      className={`card h-100 border-2 ${
-                        selectedRole === role 
-                          ? `border-${desc.color} bg-light` 
-                          : 'border-soft-gray'
-                      }`}
+                      className={cardClass}
                       style={{ 
                         cursor: 'pointer',
                         borderWidth: selectedRole === role ? '2px' : '1px',
-                        borderColor: selectedRole === role ? `var(--${desc.color === 'primary' ? 'primary-blue' : desc.color === 'secondary' ? 'primary-orange' : 'dark-neutral'})' : 'var(--soft-gray)'
+                        borderColor: borderCol
                       }}
                       onClick={() => handleRoleSelect(role)}
                     >
                       <div className="card-body text-center p-3">
-                        <div className={`text-${desc.color} mb-2`} style={{ fontSize: '2rem' }}>
+                        <div className={'text-' + desc.color + ' mb-2'} style={{ fontSize: '2rem' }}>
                           {desc.icon}
                         </div>
                         <h6 className="fw-bold mb-1">{desc.title}</h6>
@@ -142,7 +144,8 @@ const Register = () => {
                       </div>
                     </div>
                   </div>
-                ))}
+                  );
+                })}
               </div>
               {errors.role && (
                 <div className="text-danger small mt-2">{errors.role.message}</div>
