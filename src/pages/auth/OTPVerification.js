@@ -75,10 +75,11 @@ const OTPVerification = () => {
       // Mock OTP verification - accept any 6-digit code for demo
       if (otpValue.length === 6) {
         // Redirect based on user role
-        if (user?.role === 'client') {
+        if (user?.role === 'photographer') {
+          // Photographers need CNIC verification first
+          navigate('/register/cnic');
+        } else if (user?.role === 'client') {
           navigate('/client/dashboard');
-        } else if (user?.role === 'photographer') {
-          navigate('/photographer/dashboard');
         } else if (user?.role === 'admin') {
           navigate('/admin/dashboard');
         } else {
