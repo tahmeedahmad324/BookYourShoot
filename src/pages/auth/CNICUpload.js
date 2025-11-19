@@ -151,9 +151,9 @@ const CNICUpload = () => {
 
                 {/* Skip for Demo */}
                 <div className="text-center mt-3">
-                  <button 
+                  <button
                     className="btn btn-outline-secondary"
-                    onClick={() => navigate('/verify-otp')}
+                    onClick={() => navigate('/photographer/dashboard')}
                   >
                     Skip for Demo →
                   </button>
