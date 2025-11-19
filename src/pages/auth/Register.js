@@ -74,18 +74,11 @@ const Register = () => {
         verified: data.role === 'admin' // Admins are auto-verified
       };
 
-      // Auto-login after registration
+      // Auto-login after registration but require OTP verification first
       login(userData, 'mock-jwt-token-new-user');
 
-      // Redirect based on role
-      if (data.role === 'client') {
-        navigate('/client/dashboard');
-      } else if (data.role === 'photographer') {
-        // Photographers need to upload CNIC
-        navigate('/register/cnic');
-      } else if (data.role === 'admin') {
-        navigate('/admin/dashboard');
-      }
+      // Redirect to OTP verification for all users
+      navigate('/verify-otp');
     } catch (error) {
       setServerError('Registration failed. Please try again.');
     } finally {
