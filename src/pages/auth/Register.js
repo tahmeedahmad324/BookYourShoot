@@ -348,7 +348,12 @@ const Register = () => {
                   {/* Role-specific messages */}
                   {selectedRole === 'photographer' && (
                     <div className="alert alert-info" role="alert">
-                      <strong>Note:</strong> After registration, you'll need to upload your CNIC for verification before you can start accepting bookings.
+                      <strong>Photographer Registration:</strong> After email verification, you'll need to upload your CNIC for identity verification before accepting bookings.
+                    </div>
+                  )}
+                  {selectedRole !== 'photographer' && (
+                    <div className="alert alert-success" role="alert">
+                      <strong>Quick Registration:</strong> After email verification, you'll have immediate access to your dashboard.
                     </div>
                   )}
 
