@@ -6,6 +6,8 @@ import ProtectedRoute from './components/common/ProtectedRoute';
 
 // Public Pages
 import LandingPage from './pages/public/LandingPage';
+import Landing from './pages/Landing';
+import SearchResults from './pages/SearchResults';
 import Login from './pages/auth/Login';
 import Register from './pages/auth/Register';
 import CNICUpload from './pages/auth/CNICUpload';
