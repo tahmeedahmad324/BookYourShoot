@@ -46,7 +46,8 @@ function App() {
           <main className="min-vh-100">
             <Routes>
               {/* Public Routes */}
-              <Route path="/" element={<LandingPage />} />
+              <Route path="/" element={<Landing />} />
+              <Route path="/landing-old" element={<LandingPage />} />
               <Route path="/login" element={<Login />} />
               <Route path="/register" element={<Register />} />
               <Route path="/register/cnic" element={<CNICUpload />} />
