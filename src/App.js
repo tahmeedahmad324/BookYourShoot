@@ -53,6 +53,7 @@ function App() {
               <Route path="/register/cnic" element={<CNICUpload />} />
               <Route path="/verify-otp" element={<OTPVerification />} />
               <Route path="/search" element={<PhotographerSearch />} />
+              <Route path="/search-results" element={<SearchResults />} />
 
               {/* Protected Client Routes */}
               <Route path="/client/dashboard" element={
