@@ -40,9 +40,9 @@ const SearchForm = ({ searchData, setSearchData }) => {
   const handleCityChange = (e) => {
     const value = e.target.value;
     setSearchData(prev => ({ ...prev, city: value }));
-    
+
     if (value.length > 1) {
-      const filtered = citiesData.filter(city => 
+      const filtered = citiesData.cities.filter(city =>
         city.name.toLowerCase().includes(value.toLowerCase())
       ).slice(0, 5);
       setSuggestedCities(filtered);
