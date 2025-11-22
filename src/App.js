@@ -6,6 +6,8 @@ import ProtectedRoute from './components/common/ProtectedRoute';
 
 // Public Pages
 import LandingPage from './pages/public/LandingPage';
+import Landing from './pages/Landing';
+import SearchResults from './pages/SearchResults';
 import Login from './pages/auth/Login';
 import Register from './pages/auth/Register';
 import CNICUpload from './pages/auth/CNICUpload';
@@ -44,12 +46,14 @@ function App() {
           <main className="min-vh-100">
             <Routes>
               {/* Public Routes */}
-              <Route path="/" element={<LandingPage />} />
+              <Route path="/" element={<Landing />} />
+              <Route path="/landing-old" element={<LandingPage />} />
               <Route path="/login" element={<Login />} />
               <Route path="/register" element={<Register />} />
               <Route path="/register/cnic" element={<CNICUpload />} />
               <Route path="/verify-otp" element={<OTPVerification />} />
               <Route path="/search" element={<PhotographerSearch />} />
+              <Route path="/search-results" element={<SearchResults />} />
 
               {/* Protected Client Routes */}
               <Route path="/client/dashboard" element={
