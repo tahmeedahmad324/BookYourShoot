@@ -76,8 +76,8 @@ const SearchForm = ({ searchData, setSearchData }) => {
         city: searchData.city,
         service: searchData.service
       });
-      
-      navigate(`/search?${queryParams.toString()}`);
+
+      navigate(`/search-results?${queryParams.toString()}`);
     } catch (error) {
       console.error('Search error:', error);
       alert('Search failed. Please try again.');
