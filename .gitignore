@@ -1,1 +1,5 @@
 node_modules
+backend/Include
+backend/Lib
+backend/Scripts
+backend/pyvenv.cfg
