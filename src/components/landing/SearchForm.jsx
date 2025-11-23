@@ -1,96 +1,97 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
-import citiesData from '../../data/cities.json';
-import { searchPhotographers } from '../../services/mockAPI';
+"use client"
+
+import { useState, useEffect, useRef } from "react"
+import { useNavigate } from "react-router-dom"
+import citiesData from "../../data/cities.json"
 
 const SearchForm = ({ searchData, setSearchData }) => {
-  const [showCitySuggestions, setShowCitySuggestions] = useState(false);
-  const [suggestedCities, setSuggestedCities] = useState([]);
-  const [suggestedPrice, setSuggestedPrice] = useState(null);
-  const [isSearching, setIsSearching] = useState(false);
-  const navigate = useNavigate();
-  const cityInputRef = useRef(null);
+  const [showCitySuggestions, setShowCitySuggestions] = useState(false)
+  const [suggestedCities, setSuggestedCities] = useState([])
+  const [suggestedPrice, setSuggestedPrice] = useState(null)
+  const [isSearching, setIsSearching] = useState(false)
+  const navigate = useNavigate()
+  const cityInputRef = useRef(null)
 
   const services = [
-    { value: 'all', label: 'All Services' },
-    { value: 'wedding', label: 'Wedding Photography' },
-    { value: 'portrait', label: 'Portrait Photography' },
-    { value: 'event', label: 'Event Photography' },
-    { value: 'product', label: 'Product Photography' }
-  ];
+    { value: "all", label: "All Services" },
+    { value: "wedding", label: "Wedding Photography" },
+    { value: "portrait", label: "Portrait Photography" },
+    { value: "event", label: "Event Photography" },
+    { value: "product", label: "Product Photography" },
+  ]
 
   const basePrices = {
     wedding: { min: 15000, max: 50000 },
     portrait: { min: 3000, max: 15000 },
     event: { min: 8000, max: 30000 },
-    product: { min: 5000, max: 20000 }
-  };
+    product: { min: 5000, max: 20000 },
+  }
 
   useEffect(() => {
     // Calculate suggested price when city or service changes
-    if (searchData.city && searchData.service !== 'all') {
-      const priceRange = basePrices[searchData.service];
-      const avgPrice = Math.floor((priceRange.min + priceRange.max) / 2);
-      setSuggestedPrice(avgPrice);
+    if (searchData.city && searchData.service !== "all") {
+      const priceRange = basePrices[searchData.service]
+      const avgPrice = Math.floor((priceRange.min + priceRange.max) / 2)
+      setSuggestedPrice(avgPrice)
     } else {
-      setSuggestedPrice(null);
+      setSuggestedPrice(null)
     }
-  }, [searchData.city, searchData.service]);
+  }, [searchData.city, searchData.service])
 
   const handleCityChange = (e) => {
-    const value = e.target.value;
-    setSearchData(prev => ({ ...prev, city: value }));
+    const value = e.target.value
+    setSearchData((prev) => ({ ...prev, city: value }))
 
     if (value.length > 1) {
-      const filtered = citiesData.cities.filter(city =>
-        city.name.toLowerCase().includes(value.toLowerCase())
-      ).slice(0, 5);
-      setSuggestedCities(filtered);
-      setShowCitySuggestions(true);
+      const filtered = citiesData.cities
+        .filter((city) => city.name.toLowerCase().includes(value.toLowerCase()))
+        .slice(0, 5)
+      setSuggestedCities(filtered)
+      setShowCitySuggestions(true)
     } else {
-      setShowCitySuggestions(false);
+      setShowCitySuggestions(false)
     }
-  };
+  }
 
   const handleCitySelect = (city) => {
-    setSearchData(prev => ({ ...prev, city: city.name }));
-    setShowCitySuggestions(false);
-    cityInputRef.current?.blur();
-  };
+    setSearchData((prev) => ({ ...prev, city: city.name }))
+    setShowCitySuggestions(false)
+    cityInputRef.current?.blur()
+  }
 
   const handleServiceChange = (e) => {
-    setSearchData(prev => ({ ...prev, service: e.target.value }));
-  };
+    setSearchData((prev) => ({ ...prev, service: e.target.value }))
+  }
 
   const handleSearch = async () => {
     if (!searchData.city) {
-      alert('Please enter a city to search');
-      return;
+      alert("Please enter a city to search")
+      return
     }
 
-    setIsSearching(true);
-    
+    setIsSearching(true)
+
     try {
       // Navigate to search results with query parameters
       const queryParams = new URLSearchParams({
         city: searchData.city,
-        service: searchData.service
-      });
+        service: searchData.service,
+      })
 
-      navigate(`/search-results?${queryParams.toString()}`);
+      navigate(`/search-results?${queryParams.toString()}`)
     } catch (error) {
-      console.error('Search error:', error);
-      alert('Search failed. Please try again.');
+      console.error("Search error:", error)
+      alert("Search failed. Please try again.")
     } finally {
-      setIsSearching(false);
+      setIsSearching(false)
     }
-  };
+  }
 
   const handleKeyPress = (e) => {
-    if (e.key === 'Enter') {
-      handleSearch();
+    if (e.key === "Enter") {
+      handleSearch()
     }
-  };
+  }
 
   return (
     <div className="search-form-container">
@@ -113,15 +114,9 @@ const SearchForm = ({ searchData, setSearchData }) => {
             {showCitySuggestions && suggestedCities.length > 0 && (
               <div className="city-suggestions">
                 {suggestedCities.map((city, index) => (
-                  <div
-                    key={index}
-                    className="suggestion-item"
-                    onClick={() => handleCitySelect(city)}
-                  >
+                  <div key={index} className="suggestion-item" onClick={() => handleCitySelect(city)}>
                     <span className="city-name">{city.name}</span>
-                    {city.province && (
-                      <span className="city-province">{city.province}</span>
-                    )}
+                    {city.province && <span className="city-province">{city.province}</span>}
                   </div>
                 ))}
               </div>
@@ -133,12 +128,8 @@ const SearchForm = ({ searchData, setSearchData }) => {
         <div className="search-input-group">
           <div className="input-wrapper">
             <span className="input-icon">📸</span>
-            <select
-              className="form-select search-input"
-              value={searchData.service}
-              onChange={handleServiceChange}
-            >
-              {services.map(service => (
+            <select className="form-select search-input" value={searchData.service} onChange={handleServiceChange}>
+              {services.map((service) => (
                 <option key={service.value} value={service.value}>
                   {service.label}
                 </option>
@@ -148,7 +139,7 @@ const SearchForm = ({ searchData, setSearchData }) => {
         </div>
 
         {/* Search button */}
-        <button 
+        <button
           className="btn btn-primary search-button"
           onClick={handleSearch}
           disabled={isSearching || !searchData.city}
@@ -159,7 +150,7 @@ const SearchForm = ({ searchData, setSearchData }) => {
               Searching...
             </>
           ) : (
-            'Find Photographers'
+            "Find Photographers"
           )}
         </button>
       </div>
@@ -168,11 +159,11 @@ const SearchForm = ({ searchData, setSearchData }) => {
       {suggestedPrice && (
         <div className="suggested-price">
           <span className="price-label">Starting from</span>
-          <span className="price-amount">Rs. {suggestedPrice.toLocaleString()}</span>
+          <span className="price-amount">PKR {suggestedPrice.toLocaleString()}</span>
         </div>
       )}
     </div>
-  );
-};
+  )
+}
 
-export default SearchForm;
+export default SearchForm

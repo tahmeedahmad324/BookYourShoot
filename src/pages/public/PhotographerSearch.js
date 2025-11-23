@@ -1,224 +1,226 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
-import photographersData from '../../data/photographers.json';
-import citiesData from '../../data/cities.json';
+"use client"
+
+import { useState, useEffect, useRef } from "react"
+import { Link, useSearchParams } from "react-router-dom"
+import photographersData from "../../data/photographers.json"
+import citiesData from "../../data/cities.json"
 
 const PhotographerSearch = () => {
-  const [searchParams, setSearchParams] = useSearchParams();
-  const [searchTerm, setSearchTerm] = useState(searchParams.get('search') || '');
-  const [location, setLocation] = useState(searchParams.get('location') || '');
-  const [service, setService] = useState(searchParams.get('service') || '');
-  const [priceRange, setPriceRange] = useState([searchParams.get('minPrice') || 0, searchParams.get('maxPrice') || 10000]);
-  const [sortBy, setSortBy] = useState(searchParams.get('sort') || 'rating');
-  const [showFilters, setShowFilters] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [filteredPhotographers, setFilteredPhotographers] = useState(photographersData.photographers);
+  const [searchParams, setSearchParams] = useSearchParams()
+  const [searchTerm, setSearchTerm] = useState(searchParams.get("search") || "")
+  const [location, setLocation] = useState(searchParams.get("location") || "")
+  const [service, setService] = useState(searchParams.get("service") || "")
+  const [priceRange, setPriceRange] = useState([
+    searchParams.get("minPrice") || 0,
+    searchParams.get("maxPrice") || 10000,
+  ])
+  const [sortBy, setSortBy] = useState(searchParams.get("sort") || "rating")
+  const [showFilters, setShowFilters] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const [filteredPhotographers, setFilteredPhotographers] = useState(photographersData.photographers)
 
   // Auto-complete state
-  const [showSuggestions, setShowSuggestions] = useState(false);
-  const [suggestions, setSuggestions] = useState([]);
-  const [selectedSuggestionIndex, setSelectedSuggestionIndex] = useState(-1);
-  const searchInputRef = useRef(null);
+  const [showSuggestions, setShowSuggestions] = useState(false)
+  const [suggestions, setSuggestions] = useState([])
+  const [selectedSuggestionIndex, setSelectedSuggestionIndex] = useState(-1)
+  const searchInputRef = useRef(null)
 
-  const photographers = photographersData.photographers;
-  const cities = citiesData.cities;
-  const services = citiesData.services;
+  const photographers = photographersData.photographers
+  const cities = citiesData.cities
+  const services = citiesData.services
 
   useEffect(() => {
-    filterPhotographers();
-  }, [searchTerm, location, service, priceRange, sortBy]);
+    filterPhotographers()
+  }, [searchTerm, location, service, priceRange, sortBy])
 
   // Auto-complete functions
   const generateSuggestions = (input) => {
     if (!input || input.length < 2) {
-      setSuggestions([]);
-      setShowSuggestions(false);
-      return;
+      setSuggestions([])
+      setShowSuggestions(false)
+      return
     }
 
-    const inputLower = input.toLowerCase();
-    const newSuggestions = [];
+    const inputLower = input.toLowerCase()
+    const newSuggestions = []
 
     // Add photographer name suggestions
     const photographerMatches = photographers
-      .filter(p => p.name.toLowerCase().includes(inputLower))
+      .filter((p) => p.name.toLowerCase().includes(inputLower))
       .slice(0, 3)
-      .map(p => ({
-        type: 'photographer',
+      .map((p) => ({
+        type: "photographer",
         value: p.name,
         display: p.name,
-        subtitle: `${p.location} • ${p.specialty.join(', ')}`
-      }));
+        subtitle: `${p.location} • ${p.specialty.join(", ")}`,
+      }))
 
     // Add specialty/service suggestions
-    const specialtyMatches = [...new Set(photographers.flatMap(p => p.specialty))]
-      .filter(specialty => specialty.toLowerCase().includes(inputLower))
+    const specialtyMatches = [...new Set(photographers.flatMap((p) => p.specialty))]
+      .filter((specialty) => specialty.toLowerCase().includes(inputLower))
       .slice(0, 3)
-      .map(specialty => ({
-        type: 'specialty',
+      .map((specialty) => ({
+        type: "specialty",
         value: specialty,
         display: specialty,
-        subtitle: 'Service type'
-      }));
+        subtitle: "Service type",
+      }))
 
     // Add city suggestions
     const cityMatches = cities
-      .filter(city => city.name.toLowerCase().includes(inputLower))
+      .filter((city) => city.name.toLowerCase().includes(inputLower))
       .slice(0, 2)
-      .map(city => ({
-        type: 'city',
+      .map((city) => ({
+        type: "city",
         value: city.name,
         display: city.name,
-        subtitle: city.province ? `${city.province}` : 'Location'
-      }));
+        subtitle: city.province ? `${city.province}` : "Location",
+      }))
 
-    newSuggestions.push(...photographerMatches, ...specialtyMatches, ...cityMatches);
-    setSuggestions(newSuggestions.slice(0, 8)); // Limit to 8 suggestions
-    setShowSuggestions(true);
-    setSelectedSuggestionIndex(-1);
-  };
+    newSuggestions.push(...photographerMatches, ...specialtyMatches, ...cityMatches)
+    setSuggestions(newSuggestions.slice(0, 8)) // Limit to 8 suggestions
+    setShowSuggestions(true)
+    setSelectedSuggestionIndex(-1)
+  }
 
   const handleSearchChange = (e) => {
-    const value = e.target.value;
-    setSearchTerm(value);
-    generateSuggestions(value);
-  };
+    const value = e.target.value
+    setSearchTerm(value)
+    generateSuggestions(value)
+  }
 
   const handleSuggestionClick = (suggestion) => {
-    setSearchTerm(suggestion.display);
-    setShowSuggestions(false);
-    setSelectedSuggestionIndex(-1);
-    searchInputRef.current?.focus();
-  };
+    setSearchTerm(suggestion.display)
+    setShowSuggestions(false)
+    setSelectedSuggestionIndex(-1)
+    searchInputRef.current?.focus()
+  }
 
   const handleKeyDown = (e) => {
     if (!showSuggestions || suggestions.length === 0) {
-      if (e.key === 'Enter') {
-        handleSearch();
+      if (e.key === "Enter") {
+        handleSearch()
       }
-      return;
+      return
     }
 
     switch (e.key) {
-      case 'ArrowDown':
-        e.preventDefault();
-        setSelectedSuggestionIndex(prev =>
-          prev < suggestions.length - 1 ? prev + 1 : 0
-        );
-        break;
-      case 'ArrowUp':
-        e.preventDefault();
-        setSelectedSuggestionIndex(prev =>
-          prev > 0 ? prev - 1 : suggestions.length - 1
-        );
-        break;
-      case 'Enter':
-        e.preventDefault();
+      case "ArrowDown":
+        e.preventDefault()
+        setSelectedSuggestionIndex((prev) => (prev < suggestions.length - 1 ? prev + 1 : 0))
+        break
+      case "ArrowUp":
+        e.preventDefault()
+        setSelectedSuggestionIndex((prev) => (prev > 0 ? prev - 1 : suggestions.length - 1))
+        break
+      case "Enter":
+        e.preventDefault()
         if (selectedSuggestionIndex >= 0) {
-          handleSuggestionClick(suggestions[selectedSuggestionIndex]);
+          handleSuggestionClick(suggestions[selectedSuggestionIndex])
         } else {
-          handleSearch();
+          handleSearch()
         }
-        break;
-      case 'Escape':
-        setShowSuggestions(false);
-        setSelectedSuggestionIndex(-1);
-        break;
+        break
+      case "Escape":
+        setShowSuggestions(false)
+        setSelectedSuggestionIndex(-1)
+        break
     }
-  };
+  }
 
   // Close suggestions when clicking outside
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (searchInputRef.current && !searchInputRef.current.contains(event.target)) {
-        setShowSuggestions(false);
-        setSelectedSuggestionIndex(-1);
+        setShowSuggestions(false)
+        setSelectedSuggestionIndex(-1)
       }
-    };
+    }
 
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
+    document.addEventListener("mousedown", handleClickOutside)
+    return () => document.removeEventListener("mousedown", handleClickOutside)
+  }, [])
 
   const filterPhotographers = () => {
-    setLoading(true);
-    
+    setLoading(true)
+
     // Simulate API delay
     setTimeout(() => {
-      let filtered = photographers.filter(photographer => {
-        const matchesSearch = !searchTerm || 
+      const filtered = photographers.filter((photographer) => {
+        const matchesSearch =
+          !searchTerm ||
           photographer.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          photographer.specialty.some(spec => spec.toLowerCase().includes(searchTerm.toLowerCase()));
-        
-        const matchesLocation = !location || photographer.location.toLowerCase().includes(location.toLowerCase());
-        
-        const matchesService = !service || 
-          photographer.specialty.some(spec => spec.toLowerCase().includes(service.toLowerCase()));
-        
-        const matchesPrice = photographer.hourly_rate >= priceRange[0] && photographer.hourly_rate <= priceRange[1];
-        
-        return matchesSearch && matchesLocation && matchesService && matchesPrice;
-      });
+          photographer.specialty.some((spec) => spec.toLowerCase().includes(searchTerm.toLowerCase()))
+
+        const matchesLocation = !location || photographer.location.toLowerCase().includes(location.toLowerCase())
+
+        const matchesService =
+          !service || photographer.specialty.some((spec) => spec.toLowerCase().includes(service.toLowerCase()))
+
+        const matchesPrice = photographer.hourly_rate >= priceRange[0] && photographer.hourly_rate <= priceRange[1]
+
+        return matchesSearch && matchesLocation && matchesService && matchesPrice
+      })
 
       // Sort photographers
       filtered.sort((a, b) => {
         switch (sortBy) {
-          case 'rating':
-            return b.rating - a.rating;
-          case 'price_low':
-            return a.hourly_rate - b.hourly_rate;
-          case 'price_high':
-            return b.hourly_rate - a.hourly_rate;
-          case 'experience':
-            return b.experience - a.experience;
-          case 'reviews':
-            return b.reviews_count - a.reviews_count;
+          case "rating":
+            return b.rating - a.rating
+          case "price_low":
+            return a.hourly_rate - b.hourly_rate
+          case "price_high":
+            return b.hourly_rate - a.hourly_rate
+          case "experience":
+            return b.experience - a.experience
+          case "reviews":
+            return b.reviews_count - a.reviews_count
           default:
-            return 0;
+            return 0
         }
-      });
+      })
 
-      setFilteredPhotographers(filtered);
-      setLoading(false);
-    }, 300);
-  };
+      setFilteredPhotographers(filtered)
+      setLoading(false)
+    }, 300)
+  }
 
   const handleSearch = () => {
-    const params = new URLSearchParams();
-    if (searchTerm) params.set('search', searchTerm);
-    if (location) params.set('location', location);
-    if (service) params.set('service', service);
-    if (priceRange[0] > 0) params.set('minPrice', priceRange[0]);
-    if (priceRange[1] < 10000) params.set('maxPrice', priceRange[1]);
-    params.set('sort', sortBy);
-    setSearchParams(params);
-  };
+    const params = new URLSearchParams()
+    if (searchTerm) params.set("search", searchTerm)
+    if (location) params.set("location", location)
+    if (service) params.set("service", service)
+    if (priceRange[0] > 0) params.set("minPrice", priceRange[0])
+    if (priceRange[1] < 10000) params.set("maxPrice", priceRange[1])
+    params.set("sort", sortBy)
+    setSearchParams(params)
+  }
 
   const clearFilters = () => {
-    setSearchTerm('');
-    setLocation('');
-    setService('');
-    setPriceRange([0, 10000]);
-    setSortBy('rating');
-    setSearchParams({});
-  };
+    setSearchTerm("")
+    setLocation("")
+    setService("")
+    setPriceRange([0, 10000])
+    setSortBy("rating")
+    setSearchParams({})
+  }
 
   const getStarRating = (rating) => {
-    const stars = [];
-    const fullStars = Math.floor(rating);
-    const hasHalfStar = rating % 1 !== 0;
-    
+    const stars = []
+    const fullStars = Math.floor(rating)
+    const hasHalfStar = rating % 1 !== 0
+
     for (let i = 0; i < fullStars; i++) {
-      stars.push('⭐');
+      stars.push("⭐")
     }
     if (hasHalfStar) {
-      stars.push('⭐');
+      stars.push("⭐")
     }
     for (let i = stars.length; i < 5; i++) {
-      stars.push('☆');
+      stars.push("☆")
     }
-    return stars.join('');
-  };
+    return stars.join("")
+  }
 
   return (
     <div className="photographer-search py-4">
@@ -229,7 +231,7 @@ const PhotographerSearch = () => {
             <div className="gradient-header rounded-3 p-4">
               <h1 className="fw-bold mb-3">Find Professional Photographers</h1>
               <p className="lead mb-4">Discover talented photographers for your special moments</p>
-              
+
               {/* Main Search Bar */}
               <div className="row g-2">
                 <div className="col-md-4">
@@ -248,13 +250,13 @@ const PhotographerSearch = () => {
                     {showSuggestions && suggestions.length > 0 && (
                       <div
                         className="position-absolute w-100 bg-white border border-top-0 rounded-bottom shadow-sm"
-                        style={{ top: '100%', zIndex: 1000, maxHeight: '320px', overflowY: 'auto' }}
+                        style={{ top: "100%", zIndex: 1000, maxHeight: "320px", overflowY: "auto" }}
                       >
                         {suggestions.map((suggestion, index) => (
                           <div
                             key={index}
-                            className={`px-3 py-2 cursor-pointer border-bottom ${index === selectedSuggestionIndex ? 'bg-light' : ''}`}
-                            style={{ fontSize: '0.875rem' }}
+                            className={`px-3 py-2 cursor-pointer border-bottom ${index === selectedSuggestionIndex ? "bg-light" : ""}`}
+                            style={{ fontSize: "0.875rem" }}
                             onClick={() => handleSuggestionClick(suggestion)}
                             onMouseEnter={() => setSelectedSuggestionIndex(index)}
                           >
@@ -264,9 +266,9 @@ const PhotographerSearch = () => {
                                 <div className="text-muted small">{suggestion.subtitle}</div>
                               </div>
                               <div className="text-muted small">
-                                {suggestion.type === 'photographer' && '📸'}
-                                {suggestion.type === 'specialty' && '🎯'}
-                                {suggestion.type === 'city' && '📍'}
+                                {suggestion.type === "photographer" && "📸"}
+                                {suggestion.type === "specialty" && "🎯"}
+                                {suggestion.type === "city" && "📍"}
                               </div>
                             </div>
                           </div>
@@ -278,14 +280,12 @@ const PhotographerSearch = () => {
                 <div className="col-md-3">
                   <div className="input-group">
                     <span className="input-group-text">📍</span>
-                    <select 
-                      className="form-select"
-                      value={location}
-                      onChange={(e) => setLocation(e.target.value)}
-                    >
+                    <select className="form-select" value={location} onChange={(e) => setLocation(e.target.value)}>
                       <option value="">All Cities</option>
-                      {cities.map(city => (
-                        <option key={city.id} value={city.name}>{city.name}</option>
+                      {cities.map((city) => (
+                        <option key={city.id} value={city.name}>
+                          {city.name}
+                        </option>
                       ))}
                     </select>
                   </div>
@@ -293,41 +293,30 @@ const PhotographerSearch = () => {
                 <div className="col-md-3">
                   <div className="input-group">
                     <span className="input-group-text">📸</span>
-                    <select 
-                      className="form-select"
-                      value={service}
-                      onChange={(e) => setService(e.target.value)}
-                    >
+                    <select className="form-select" value={service} onChange={(e) => setService(e.target.value)}>
                       <option value="">All Services</option>
-                      {services.map(srv => (
-                        <option key={srv} value={srv}>{srv}</option>
+                      {services.map((srv) => (
+                        <option key={srv} value={srv}>
+                          {srv}
+                        </option>
                       ))}
                     </select>
                   </div>
                 </div>
                 <div className="col-md-2">
-                  <button 
-                    className="btn btn-primary w-100"
-                    onClick={handleSearch}
-                  >
+                  <button className="btn btn-primary w-100" onClick={handleSearch}>
                     Search
                   </button>
                 </div>
               </div>
-              
+
               {/* Filter Toggle */}
               <div className="mt-3">
-                <button 
-                  className="btn btn-outline-light btn-sm"
-                  onClick={() => setShowFilters(!showFilters)}
-                >
-                  {showFilters ? 'Hide Filters' : 'Show Advanced Filters'}
+                <button className="btn btn-outline-light btn-sm" onClick={() => setShowFilters(!showFilters)}>
+                  {showFilters ? "Hide Filters" : "Show Advanced Filters"}
                 </button>
                 {(searchTerm || location || service || priceRange[0] > 0 || priceRange[1] < 10000) && (
-                  <button 
-                    className="btn btn-outline-light btn-sm ms-2"
-                    onClick={clearFilters}
-                  >
+                  <button className="btn btn-outline-light btn-sm ms-2" onClick={clearFilters}>
                     Clear Filters
                   </button>
                 )}
@@ -340,7 +329,7 @@ const PhotographerSearch = () => {
           {/* Filters Sidebar */}
           {showFilters && (
             <div className="col-lg-3 mb-4">
-              <div className="card border-0 shadow-sm sticky-top" style={{ top: '20px' }}>
+              <div className="card border-0 shadow-sm sticky-top" style={{ top: "20px" }}>
                 <div className="card-header bg-white border-0 pt-4 pb-3">
                   <h5 className="fw-bold mb-0">🔍 Advanced Filters</h5>
                 </div>
@@ -349,8 +338,8 @@ const PhotographerSearch = () => {
                   <div className="mb-4">
                     <label className="form-label fw-semibold">Price Range (per hour)</label>
                     <div className="d-flex justify-content-between mb-2">
-                      <span>₹{priceRange[0]}</span>
-                      <span>₹{priceRange[1]}</span>
+                      <span>PKR {priceRange[0]}</span>
+                      <span>PKR {priceRange[1]}</span>
                     </div>
                     <input
                       type="range"
@@ -359,21 +348,17 @@ const PhotographerSearch = () => {
                       max="10000"
                       step="500"
                       value={priceRange[1]}
-                      onChange={(e) => setPriceRange([priceRange[0], parseInt(e.target.value)])}
+                      onChange={(e) => setPriceRange([priceRange[0], Number.parseInt(e.target.value)])}
                     />
                     <div className="mt-2">
-                      <small className="text-muted">Max: ₹{priceRange[1]}</small>
+                      <small className="text-muted">Max: PKR {priceRange[1]}</small>
                     </div>
                   </div>
 
                   {/* Sort By */}
                   <div className="mb-4">
                     <label className="form-label fw-semibold">Sort By</label>
-                    <select 
-                      className="form-select"
-                      value={sortBy}
-                      onChange={(e) => setSortBy(e.target.value)}
-                    >
+                    <select className="form-select" value={sortBy} onChange={(e) => setSortBy(e.target.value)}>
                       <option value="rating">Highest Rated</option>
                       <option value="price_low">Lowest Price</option>
                       <option value="price_high">Highest Price</option>
@@ -431,16 +416,14 @@ const PhotographerSearch = () => {
           )}
 
           {/* Results Section */}
-          <div className={showFilters ? 'col-lg-9' : 'col-12'}>
+          <div className={showFilters ? "col-lg-9" : "col-12"}>
             {/* Results Header */}
             <div className="d-flex justify-content-between align-items-center mb-4">
               <h4 className="fw-bold mb-0">
-                {loading ? 'Searching...' : `${filteredPhotographers.length} Photographers Found`}
+                {loading ? "Searching..." : `${filteredPhotographers.length} Photographers Found`}
               </h4>
               <div className="d-flex gap-2">
-                <span className="badge bg-light text-dark">
-                  {searchTerm && `"${searchTerm}"`}
-                </span>
+                <span className="badge bg-light text-dark">{searchTerm && `"${searchTerm}"`}</span>
                 {location && <span className="badge bg-light text-dark">📍 {location}</span>}
                 {service && <span className="badge bg-light text-dark">📸 {service}</span>}
               </div>
@@ -465,8 +448,10 @@ const PhotographerSearch = () => {
                       <div className="card-body p-4">
                         <div className="row align-items-start">
                           <div className="col-auto">
-                            <div className="rounded-circle bg-light d-flex align-items-center justify-content-center" 
-                                 style={{ width: '80px', height: '80px', fontSize: '2rem' }}>
+                            <div
+                              className="rounded-circle bg-light d-flex align-items-center justify-content-center"
+                              style={{ width: "80px", height: "80px", fontSize: "2rem" }}
+                            >
                               📸
                             </div>
                           </div>
@@ -475,22 +460,16 @@ const PhotographerSearch = () => {
                               <div>
                                 <h5 className="fw-bold mb-1">{photographer.name}</h5>
                                 <div className="d-flex align-items-center gap-2 mb-2">
-                                  <span className="text-warning small">
-                                    {getStarRating(photographer.rating)}
-                                  </span>
-                                  <span className="text-muted small">
-                                    ({photographer.reviews_count} reviews)
-                                  </span>
+                                  <span className="text-warning small">{getStarRating(photographer.rating)}</span>
+                                  <span className="text-muted small">({photographer.reviews_count} reviews)</span>
                                 </div>
                               </div>
                               <div className="text-end">
-                                <div className="text-primary fw-bold">₹{photographer.hourly_rate}/hr</div>
-                                {photographer.verified && (
-                                  <span className="badge bg-success small">✓ Verified</span>
-                                )}
+                                <div className="text-primary fw-bold">PKR {photographer.hourly_rate}/hr</div>
+                                {photographer.verified && <span className="badge bg-success small">✓ Verified</span>}
                               </div>
                             </div>
-                            
+
                             <div className="mb-3">
                               <p className="text-muted small mb-2">
                                 📍 {photographer.location} • {photographer.experience} years experience
@@ -503,33 +482,28 @@ const PhotographerSearch = () => {
                                 ))}
                               </div>
                             </div>
-                            
+
                             <div className="d-flex justify-content-between align-items-center">
                               <div className="small text-muted">
                                 {photographer.completed_bookings} bookings completed
                               </div>
                               <div className="d-flex gap-2">
-                                <Link 
-                                  to={`/photographer/${photographer.id}`} 
+                                <Link
+                                  to={`/photographer/${photographer.id}`}
                                   className="btn btn-outline-primary btn-sm"
                                 >
                                   View Profile
                                 </Link>
-                                <Link 
-                                  to={`/booking/request/${photographer.id}`} 
-                                  className="btn btn-primary btn-sm"
-                                >
+                                <Link to={`/booking/request/${photographer.id}`} className="btn btn-primary btn-sm">
                                   Book Now
                                 </Link>
                               </div>
                             </div>
-                            
+
                             {photographer.availability ? (
                               <div className="mt-2">
                                 <span className="status-badge status-available">Available</span>
-                                <span className="text-muted small ms-2">
-                                  Responds in {photographer.response_time}
-                                </span>
+                                <span className="text-muted small ms-2">Responds in {photographer.response_time}</span>
                               </div>
                             ) : (
                               <div className="mt-2">
@@ -548,11 +522,11 @@ const PhotographerSearch = () => {
             {/* No Results */}
             {!loading && filteredPhotographers.length === 0 && (
               <div className="text-center py-5">
-                <div className="mb-4" style={{ fontSize: '4rem' }}>🔍</div>
+                <div className="mb-4" style={{ fontSize: "4rem" }}>
+                  🔍
+                </div>
                 <h4 className="fw-bold mb-3">No photographers found</h4>
-                <p className="text-muted mb-4">
-                  Try adjusting your filters or search terms
-                </p>
+                <p className="text-muted mb-4">Try adjusting your filters or search terms</p>
                 <button className="btn btn-outline-primary" onClick={clearFilters}>
                   Clear All Filters
                 </button>
@@ -562,7 +536,7 @@ const PhotographerSearch = () => {
         </div>
       </div>
     </div>
-  );
-};
+  )
+}
 
-export default PhotographerSearch;
+export default PhotographerSearch

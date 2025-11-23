@@ -1,18 +1,20 @@
-import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
-import { useAuth } from '../../context/AuthContext';
-import photographersData from '../../data/photographers.json';
+"use client"
+
+import { useState, useEffect } from "react"
+import { Link } from "react-router-dom"
+import { useAuth } from "../../context/AuthContext"
+import photographersData from "../../data/photographers.json"
 
 const ClientDashboard = () => {
-  const { user } = useAuth();
-  const [recentBookings, setRecentBookings] = useState([]);
-  const [recommendedPhotographers, setRecommendedPhotographers] = useState([]);
+  const { user } = useAuth()
+  const [recentBookings, setRecentBookings] = useState([])
+  const [recommendedPhotographers, setRecommendedPhotographers] = useState([])
   const [stats, setStats] = useState({
     totalBookings: 0,
     upcomingBookings: 0,
     completedBookings: 0,
-    totalSpent: 0
-  });
+    totalSpent: 0,
+  })
 
   useEffect(() => {
     // Mock data for client bookings
@@ -27,7 +29,7 @@ const ClientDashboard = () => {
         service: "Wedding Photography",
         status: "upcoming",
         amount: 15000,
-        image: "/images/photographer1.jpg"
+        image: "/images/photographer1.jpg",
       },
       {
         id: 2,
@@ -39,7 +41,7 @@ const ClientDashboard = () => {
         service: "Portrait Photography",
         status: "completed",
         amount: 8000,
-        image: "/images/photographer2.jpg"
+        image: "/images/photographer2.jpg",
       },
       {
         id: 3,
@@ -51,43 +53,43 @@ const ClientDashboard = () => {
         service: "Product Photography",
         status: "upcoming",
         amount: 12000,
-        image: "/images/photographer4.jpg"
-      }
-    ];
+        image: "/images/photographer4.jpg",
+      },
+    ]
 
-    setRecentBookings(mockBookings.slice(0, 3));
-    setRecommendedPhotographers(photographersData.photographers.slice(0, 4));
-    
-    const upcoming = mockBookings.filter(b => b.status === 'upcoming').length;
-    const completed = mockBookings.filter(b => b.status === 'completed').length;
-    const totalSpent = mockBookings.reduce((sum, b) => sum + b.amount, 0);
+    setRecentBookings(mockBookings.slice(0, 3))
+    setRecommendedPhotographers(photographersData.photographers.slice(0, 4))
+
+    const upcoming = mockBookings.filter((b) => b.status === "upcoming").length
+    const completed = mockBookings.filter((b) => b.status === "completed").length
+    const totalSpent = mockBookings.reduce((sum, b) => sum + b.amount, 0)
 
     setStats({
       totalBookings: mockBookings.length,
       upcomingBookings: upcoming,
       completedBookings: completed,
-      totalSpent: totalSpent
-    });
-  }, []);
+      totalSpent: totalSpent,
+    })
+  }, [])
 
   const getStatusBadge = (status) => {
     const statusClasses = {
-      upcoming: 'status-available',
-      completed: 'status-premium',
-      cancelled: 'status-unavailable'
-    };
-    return statusClasses[status] || 'status-unavailable';
-  };
+      upcoming: "status-available",
+      completed: "status-premium",
+      cancelled: "status-unavailable",
+    }
+    return statusClasses[status] || "status-unavailable"
+  }
 
   const formatDate = (dateStr) => {
-    const date = new Date(dateStr);
-    return date.toLocaleDateString('en-US', { 
-      weekday: 'short', 
-      year: 'numeric', 
-      month: 'short', 
-      day: 'numeric' 
-    });
-  };
+    const date = new Date(dateStr)
+    return date.toLocaleDateString("en-US", {
+      weekday: "short",
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+    })
+  }
 
   return (
     <div className="client-dashboard py-4">
@@ -96,7 +98,7 @@ const ClientDashboard = () => {
         <div className="row mb-4">
           <div className="col-12">
             <div className="gradient-header rounded-3 p-4">
-              <h2 className="fw-bold mb-2">Welcome back, {user?.name || 'Client'}! 👋</h2>
+              <h2 className="fw-bold mb-2">Welcome back, {user?.name || "Client"}! 👋</h2>
               <p className="mb-0">Manage your bookings and discover talented photographers</p>
             </div>
           </div>
@@ -112,7 +114,7 @@ const ClientDashboard = () => {
                     <h6 className="text-muted mb-2">Total Bookings</h6>
                     <h3 className="fw-bold mb-0">{stats.totalBookings}</h3>
                   </div>
-                  <div className="text-primary" style={{ fontSize: '2rem' }}>
+                  <div className="text-primary" style={{ fontSize: "2rem" }}>
                     📅
                   </div>
                 </div>
@@ -127,7 +129,7 @@ const ClientDashboard = () => {
                     <h6 className="text-muted mb-2">Upcoming</h6>
                     <h3 className="fw-bold mb-0 text-success">{stats.upcomingBookings}</h3>
                   </div>
-                  <div className="text-primary" style={{ fontSize: '2rem' }}>
+                  <div className="text-primary" style={{ fontSize: "2rem" }}>
                     ⏰
                   </div>
                 </div>
@@ -142,7 +144,7 @@ const ClientDashboard = () => {
                     <h6 className="text-muted mb-2">Completed</h6>
                     <h3 className="fw-bold mb-0 text-info">{stats.completedBookings}</h3>
                   </div>
-                  <div className="text-primary" style={{ fontSize: '2rem' }}>
+                  <div className="text-primary" style={{ fontSize: "2rem" }}>
                     ✅
                   </div>
                 </div>
@@ -155,9 +157,9 @@ const ClientDashboard = () => {
                 <div className="d-flex justify-content-between align-items-center">
                   <div>
                     <h6 className="text-muted mb-2">Total Spent</h6>
-                    <h3 className="fw-bold mb-0">₹{stats.totalSpent.toLocaleString()}</h3>
+                    <h3 className="fw-bold mb-0">PKR {stats.totalSpent.toLocaleString()}</h3>
                   </div>
-                  <div className="text-primary" style={{ fontSize: '2rem' }}>
+                  <div className="text-primary" style={{ fontSize: "2rem" }}>
                     💰
                   </div>
                 </div>
@@ -197,8 +199,10 @@ const ClientDashboard = () => {
                           <tr key={booking.id}>
                             <td>
                               <div className="d-flex align-items-center">
-                                <div className="rounded-circle bg-light d-flex align-items-center justify-content-center me-3" 
-                                     style={{ width: '40px', height: '40px' }}>
+                                <div
+                                  className="rounded-circle bg-light d-flex align-items-center justify-content-center me-3"
+                                  style={{ width: "40px", height: "40px" }}
+                                >
                                   <span>📸</span>
                                 </div>
                                 <div>
@@ -212,19 +216,25 @@ const ClientDashboard = () => {
                               <small className="text-muted">{booking.time}</small>
                             </td>
                             <td>{booking.service}</td>
-                            <td className="fw-semibold">₹{booking.amount.toLocaleString()}</td>
+                            <td className="fw-semibold">PKR {booking.amount.toLocaleString()}</td>
                             <td>
                               <span className={`status-badge ${getStatusBadge(booking.status)}`}>
                                 {booking.status.charAt(0).toUpperCase() + booking.status.slice(1)}
                               </span>
                             </td>
                             <td>
-                              {booking.status === 'upcoming' ? (
-                                <Link to={`/client/chat/${booking.photographerId}`} className="btn btn-sm btn-outline-primary">
+                              {booking.status === "upcoming" ? (
+                                <Link
+                                  to={`/client/chat/${booking.photographerId}`}
+                                  className="btn btn-sm btn-outline-primary"
+                                >
                                   💬 Chat
                                 </Link>
                               ) : (
-                                <Link to={`/client/review/${booking.photographerId}`} className="btn btn-sm btn-outline-secondary">
+                                <Link
+                                  to={`/client/review/${booking.photographerId}`}
+                                  className="btn btn-sm btn-outline-secondary"
+                                >
                                   ⭐ Review
                                 </Link>
                               )}
@@ -236,7 +246,9 @@ const ClientDashboard = () => {
                   </div>
                 ) : (
                   <div className="text-center py-5">
-                    <div className="mb-3" style={{ fontSize: '3rem' }}>📸</div>
+                    <div className="mb-3" style={{ fontSize: "3rem" }}>
+                      📸
+                    </div>
                     <h6 className="text-muted">No bookings yet</h6>
                     <p className="text-muted mb-4">Book your first photographer to get started</p>
                     <Link to="/search" className="btn btn-primary">
@@ -285,8 +297,10 @@ const ClientDashboard = () => {
                 <div className="space-y-3">
                   {recommendedPhotographers.slice(0, 3).map((photographer) => (
                     <div key={photographer.id} className="d-flex align-items-center pb-3 border-bottom">
-                      <div className="rounded-circle bg-light d-flex align-items-center justify-content-center me-3" 
-                           style={{ width: '45px', height: '45px' }}>
+                      <div
+                        className="rounded-circle bg-light d-flex align-items-center justify-content-center me-3"
+                        style={{ width: "45px", height: "45px" }}
+                      >
                         <span>📸</span>
                       </div>
                       <div className="flex-grow-1">
@@ -296,13 +310,8 @@ const ClientDashboard = () => {
                         </div>
                       </div>
                       <div className="text-end">
-                        <div className="small text-primary fw-semibold">
-                          ₹{photographer.hourly_rate}/hr
-                        </div>
-                        <Link 
-                          to={`/photographer/${photographer.id}`} 
-                          className="btn btn-sm btn-outline-primary mt-1"
-                        >
+                        <div className="small text-primary fw-semibold">PKR {photographer.hourly_rate}/hr</div>
+                        <Link to={`/photographer/${photographer.id}`} className="btn btn-sm btn-outline-primary mt-1">
                           View
                         </Link>
                       </div>
@@ -318,7 +327,7 @@ const ClientDashboard = () => {
         </div>
       </div>
     </div>
-  );
-};
+  )
+}
 
-export default ClientDashboard;
+export default ClientDashboard

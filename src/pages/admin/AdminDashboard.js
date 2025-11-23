@@ -1,19 +1,21 @@
-import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
-import { useAuth } from '../../context/AuthContext';
-import photographersData from '../../data/photographers.json';
+"use client"
+
+import { useState, useEffect } from "react"
+import { Link } from "react-router-dom"
+import { useAuth } from "../../context/AuthContext"
+import photographersData from "../../data/photographers.json"
 
 const AdminDashboard = () => {
-  const { user } = useAuth();
+  const { user } = useAuth()
   const [stats, setStats] = useState({
     totalPhotographers: 0,
     totalClients: 0,
     totalBookings: 0,
     totalRevenue: 0,
-    pendingVerifications: 0
-  });
-  const [pendingPhotographers, setPendingPhotographers] = useState([]);
-  const [recentComplaints, setRecentComplaints] = useState([]);
+    pendingVerifications: 0,
+  })
+  const [pendingPhotographers, setPendingPhotographers] = useState([])
+  const [recentComplaints, setRecentComplaints] = useState([])
 
   useEffect(() => {
     // Mock admin data
@@ -29,7 +31,7 @@ const AdminDashboard = () => {
         hourly_rate: 4500,
         registrationDate: "2024-11-18",
         cnicUploaded: true,
-        cnicStatus: "pending"
+        cnicStatus: "pending",
       },
       {
         id: 8,
@@ -42,9 +44,9 @@ const AdminDashboard = () => {
         hourly_rate: 3500,
         registrationDate: "2024-11-19",
         cnicUploaded: true,
-        cnicStatus: "pending"
-      }
-    ];
+        cnicStatus: "pending",
+      },
+    ]
 
     const mockComplaints = [
       {
@@ -55,7 +57,7 @@ const AdminDashboard = () => {
         description: "Photographer was not responding to messages",
         status: "open",
         date: "2024-11-18",
-        severity: "medium"
+        severity: "medium",
       },
       {
         id: 2,
@@ -65,7 +67,7 @@ const AdminDashboard = () => {
         description: "Photos were not as expected, poor quality",
         status: "resolved",
         date: "2024-11-15",
-        severity: "high"
+        severity: "high",
       },
       {
         id: 3,
@@ -75,52 +77,52 @@ const AdminDashboard = () => {
         description: "Photos delivered 2 weeks after promised date",
         status: "in-progress",
         date: "2024-11-20",
-        severity: "low"
-      }
-    ];
+        severity: "low",
+      },
+    ]
 
-    setPendingPhotographers(mockPendingPhotographers);
-    setRecentComplaints(mockComplaints);
+    setPendingPhotographers(mockPendingPhotographers)
+    setRecentComplaints(mockComplaints)
 
     // Calculate stats
-    const verifiedPhotographers = photographersData.photographers.filter(p => p.verified);
-    const pendingVerifications = mockPendingPhotographers.length;
+    const verifiedPhotographers = photographersData.photographers.filter((p) => p.verified)
+    const pendingVerifications = mockPendingPhotographers.length
 
     setStats({
       totalPhotographers: photographersData.photographers.length + mockPendingPhotographers.length,
       totalClients: 1247, // Mock number
       totalBookings: 892, // Mock number
       totalRevenue: 2456000, // Mock number in PKR
-      pendingVerifications: pendingVerifications
-    });
-  }, []);
+      pendingVerifications: pendingVerifications,
+    })
+  }, [])
 
   const formatDate = (dateStr) => {
-    const date = new Date(dateStr);
-    return date.toLocaleDateString('en-US', { 
-      year: 'numeric', 
-      month: 'short', 
-      day: 'numeric' 
-    });
-  };
+    const date = new Date(dateStr)
+    return date.toLocaleDateString("en-US", {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+    })
+  }
 
   const getSeverityBadge = (severity) => {
     const severityClasses = {
-      high: 'bg-danger text-white',
-      medium: 'bg-warning text-dark',
-      low: 'bg-info text-white'
-    };
-    return severityClasses[severity] || 'bg-secondary text-white';
-  };
+      high: "bg-danger text-white",
+      medium: "bg-warning text-dark",
+      low: "bg-info text-white",
+    }
+    return severityClasses[severity] || "bg-secondary text-white"
+  }
 
   const getStatusBadge = (status) => {
     const statusClasses = {
-      open: 'status-premium',
-      in_progress: 'status-available',
-      resolved: 'status-unavailable'
-    };
-    return statusClasses[status] || 'status-unavailable';
-  };
+      open: "status-premium",
+      in_progress: "status-available",
+      resolved: "status-unavailable",
+    }
+    return statusClasses[status] || "status-unavailable"
+  }
 
   return (
     <div className="admin-dashboard py-4">
@@ -139,9 +141,7 @@ const AdminDashboard = () => {
                     <span className="badge bg-success me-2">✓ Admin</span>
                     <span className="badge bg-light text-dark">🔐 Full Access</span>
                   </div>
-                  <div className="text-white-50 small">
-                    Last login: Today, {new Date().toLocaleTimeString()}
-                  </div>
+                  <div className="text-white-50 small">Last login: Today, {new Date().toLocaleTimeString()}</div>
                 </div>
               </div>
             </div>
@@ -158,7 +158,7 @@ const AdminDashboard = () => {
                     <h6 className="text-muted mb-2">Total Photographers</h6>
                     <h3 className="fw-bold mb-0">{stats.totalPhotographers}</h3>
                   </div>
-                  <div className="text-primary" style={{ fontSize: '2rem' }}>
+                  <div className="text-primary" style={{ fontSize: "2rem" }}>
                     📸
                   </div>
                 </div>
@@ -173,7 +173,7 @@ const AdminDashboard = () => {
                     <h6 className="text-muted mb-2">Total Clients</h6>
                     <h3 className="fw-bold mb-0">{stats.totalClients.toLocaleString()}</h3>
                   </div>
-                  <div className="text-primary" style={{ fontSize: '2rem' }}>
+                  <div className="text-primary" style={{ fontSize: "2rem" }}>
                     👥
                   </div>
                 </div>
@@ -188,7 +188,7 @@ const AdminDashboard = () => {
                     <h6 className="text-muted mb-2">Total Bookings</h6>
                     <h3 className="fw-bold mb-0">{stats.totalBookings.toLocaleString()}</h3>
                   </div>
-                  <div className="text-primary" style={{ fontSize: '2rem' }}>
+                  <div className="text-primary" style={{ fontSize: "2rem" }}>
                     📅
                   </div>
                 </div>
@@ -201,9 +201,9 @@ const AdminDashboard = () => {
                 <div className="d-flex justify-content-between align-items-center">
                   <div>
                     <h6 className="text-muted mb-2">Total Revenue</h6>
-                    <h3 className="fw-bold mb-0 text-success">₹{(stats.totalRevenue / 1000000).toFixed(1)}M</h3>
+                    <h3 className="fw-bold mb-0 text-success">PKR {(stats.totalRevenue / 1000000).toFixed(1)}M</h3>
                   </div>
-                  <div className="text-primary" style={{ fontSize: '2rem' }}>
+                  <div className="text-primary" style={{ fontSize: "2rem" }}>
                     💰
                   </div>
                 </div>
@@ -219,7 +219,7 @@ const AdminDashboard = () => {
               <div className="card-header bg-white border-0 pt-4 pb-3">
                 <div className="d-flex justify-content-between align-items-center">
                   <h5 className="fw-bold mb-0">
-                    Pending Photographer Verifications 
+                    Pending Photographer Verifications
                     {stats.pendingVerifications > 0 && (
                       <span className="badge bg-warning ms-2">{stats.pendingVerifications}</span>
                     )}
@@ -248,8 +248,10 @@ const AdminDashboard = () => {
                           <tr key={photographer.id}>
                             <td>
                               <div className="d-flex align-items-center">
-                                <div className="rounded-circle bg-light d-flex align-items-center justify-content-center me-3" 
-                                     style={{ width: '40px', height: '40px' }}>
+                                <div
+                                  className="rounded-circle bg-light d-flex align-items-center justify-content-center me-3"
+                                  style={{ width: "40px", height: "40px" }}
+                                >
                                   <span>📸</span>
                                 </div>
                                 <div>
@@ -275,7 +277,7 @@ const AdminDashboard = () => {
                             </td>
                             <td>
                               <span className="status-badge status-premium">
-                                {photographer.cnicUploaded ? '✓ Uploaded' : 'Not Uploaded'}
+                                {photographer.cnicUploaded ? "✓ Uploaded" : "Not Uploaded"}
                               </span>
                             </td>
                             <td>
@@ -283,12 +285,8 @@ const AdminDashboard = () => {
                                 <Link to={`/admin/verify/${photographer.id}`} className="btn btn-outline-primary">
                                   👁️ Review
                                 </Link>
-                                <button className="btn btn-outline-success">
-                                  ✓ Approve
-                                </button>
-                                <button className="btn btn-outline-danger">
-                                  ✗ Reject
-                                </button>
+                                <button className="btn btn-outline-success">✓ Approve</button>
+                                <button className="btn btn-outline-danger">✗ Reject</button>
                               </div>
                             </td>
                           </tr>
@@ -298,7 +296,9 @@ const AdminDashboard = () => {
                   </div>
                 ) : (
                   <div className="text-center py-5">
-                    <div className="mb-3" style={{ fontSize: '3rem' }}>✅</div>
+                    <div className="mb-3" style={{ fontSize: "3rem" }}>
+                      ✅
+                    </div>
                     <h6 className="text-muted">All photographers verified</h6>
                     <p className="text-muted mb-4">No pending verification requests</p>
                   </div>
@@ -319,18 +319,10 @@ const AdminDashboard = () => {
                   <Link to="/admin/verifications" className="btn btn-primary text-start">
                     🔍 Photographer Verifications
                   </Link>
-                  <button className="btn btn-outline-primary text-start">
-                    👥 User Management
-                  </button>
-                  <button className="btn btn-outline-primary text-start">
-                    📊 Analytics & Reports
-                  </button>
-                  <button className="btn btn-outline-primary text-start">
-                    💰 Financial Overview
-                  </button>
-                  <button className="btn btn-outline-primary text-start">
-                    ⚙️ Platform Settings
-                  </button>
+                  <button className="btn btn-outline-primary text-start">👥 User Management</button>
+                  <button className="btn btn-outline-primary text-start">📊 Analytics & Reports</button>
+                  <button className="btn btn-outline-primary text-start">💰 Financial Overview</button>
+                  <button className="btn btn-outline-primary text-start">⚙️ Platform Settings</button>
                 </div>
               </div>
             </div>
@@ -340,9 +332,9 @@ const AdminDashboard = () => {
               <div className="card-header bg-white border-0 pt-4 pb-3">
                 <h5 className="fw-bold mb-0">
                   Recent Complaints
-                  {recentComplaints.filter(c => c.status === 'open').length > 0 && (
+                  {recentComplaints.filter((c) => c.status === "open").length > 0 && (
                     <span className="badge bg-danger ms-2">
-                      {recentComplaints.filter(c => c.status === 'open').length}
+                      {recentComplaints.filter((c) => c.status === "open").length}
                     </span>
                   )}
                 </h5>
@@ -353,19 +345,15 @@ const AdminDashboard = () => {
                     <div key={complaint.id} className="border-bottom pb-3">
                       <div className="d-flex justify-content-between align-items-start mb-2">
                         <div className="fw-semibold">{complaint.subject}</div>
-                        <span className={`badge ${getSeverityBadge(complaint.severity)}`}>
-                          {complaint.severity}
-                        </span>
+                        <span className={`badge ${getSeverityBadge(complaint.severity)}`}>{complaint.severity}</span>
                       </div>
                       <div className="small text-muted mb-1">
                         {complaint.clientName} vs {complaint.photographerName}
                       </div>
-                      <div className="small text-muted mb-2">
-                        📅 {formatDate(complaint.date)}
-                      </div>
+                      <div className="small text-muted mb-2">📅 {formatDate(complaint.date)}</div>
                       <div className="d-flex justify-content-between align-items-center">
                         <span className={`status-badge ${getStatusBadge(complaint.status)}`}>
-                          {complaint.status.replace('-', ' ').toUpperCase()}
+                          {complaint.status.replace("-", " ").toUpperCase()}
                         </span>
                         <Link to={`/admin/complaints/${complaint.id}`} className="btn btn-sm btn-outline-primary">
                           Review
@@ -383,7 +371,7 @@ const AdminDashboard = () => {
         </div>
       </div>
     </div>
-  );
-};
+  )
+}
 
-export default AdminDashboard;
+export default AdminDashboard

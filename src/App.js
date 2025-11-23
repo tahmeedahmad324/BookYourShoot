@@ -1,41 +1,47 @@
-import React from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import Navbar from './components/common/Navbar';
-import Footer from './components/common/Footer';
-import ProtectedRoute from './components/common/ProtectedRoute';
+import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom"
+import Navbar from "./components/common/Navbar"
+import Footer from "./components/common/Footer"
+import ProtectedRoute from "./components/common/ProtectedRoute"
 
 // Public Pages
-import LandingPage from './pages/public/LandingPage';
-import Landing from './pages/Landing';
-import SearchResults from './pages/SearchResults';
-import Login from './pages/auth/Login';
-import Register from './pages/auth/Register';
-import CNICUpload from './pages/auth/CNICUpload';
-import OTPVerification from './pages/auth/OTPVerification';
-import PhotographerSearch from './pages/public/PhotographerSearch';
+import LandingPage from "./pages/public/LandingPage"
+import Landing from "./pages/Landing"
+import SearchResults from "./pages/SearchResults"
+import Login from "./pages/auth/Login"
+import Register from "./pages/auth/Register"
+import CNICUpload from "./pages/auth/CNICUpload"
+import OTPVerification from "./pages/auth/OTPVerification"
+import PhotographerSearch from "./pages/public/PhotographerSearch"
+import ForgotPassword from "./pages/auth/ForgotPassword"
+import TermsAndConditions from "./pages/legal/TermsAndConditions"
+import PrivacyPolicy from "./pages/legal/PrivacyPolicy"
+import Support from "./pages/help/Support"
+import Contact from "./pages/help/Contact"
 
 // Client Pages
-import ClientDashboard from './pages/client/ClientDashboard';
-import PhotographerProfile from './pages/client/PhotographerProfile';
-import BookingRequest from './pages/client/BookingRequest';
-import ClientBookings from './pages/client/ClientBookings';
-import ClientChat from './pages/client/ClientChat';
-import ReviewSubmission from './pages/client/ReviewSubmission';
-import AlbumBuilder from './pages/client/AlbumBuilder';
-import ReelGenerator from './pages/client/ReelGenerator';
-import MusicSuggestion from './pages/client/MusicSuggestion';
+import ClientDashboard from "./pages/client/ClientDashboard"
+import PhotographerProfile from "./pages/client/PhotographerProfile"
+import BookingRequest from "./pages/client/BookingRequest"
+import ClientBookings from "./pages/client/ClientBookings"
+import ClientChat from "./pages/client/ClientChat"
+import ReviewSubmission from "./pages/client/ReviewSubmission"
+import AlbumBuilder from "./pages/client/AlbumBuilder"
+import ReelGenerator from "./pages/client/ReelGenerator"
+import MusicSuggestion from "./pages/client/MusicSuggestion"
 
 // Photographer Pages
-import PhotographerDashboard from './pages/photographer/PhotographerDashboard';
-import BookingRequests from './pages/photographer/BookingRequests';
-import EquipmentList from './pages/photographer/EquipmentList';
-import TravelEstimator from './pages/photographer/TravelEstimator';
+import PhotographerDashboard from "./pages/photographer/PhotographerDashboard"
+import BookingRequests from "./pages/photographer/BookingRequests"
+import EquipmentList from "./pages/photographer/EquipmentList"
+import TravelEstimator from "./pages/photographer/TravelEstimator"
 
 // Admin Pages
-import AdminDashboard from './pages/admin/AdminDashboard';
+import AdminDashboard from "./pages/admin/AdminDashboard"
+import AdminVerifications from "./pages/admin/AdminVerifications"
+import AdminComplaints from "./pages/admin/AdminComplaints"
 
 // Context Providers
-import { AuthProvider } from './context/AuthContext';
+import { AuthProvider } from "./context/AuthContext"
 
 function App() {
   return (
@@ -52,90 +58,153 @@ function App() {
               <Route path="/register" element={<Register />} />
               <Route path="/register/cnic" element={<CNICUpload />} />
               <Route path="/verify-otp" element={<OTPVerification />} />
+              <Route path="/forgot-password" element={<ForgotPassword />} />
               <Route path="/search" element={<PhotographerSearch />} />
               <Route path="/search-results" element={<SearchResults />} />
+              <Route path="/terms" element={<TermsAndConditions />} />
+              <Route path="/privacy" element={<PrivacyPolicy />} />
+              <Route path="/support" element={<Support />} />
+              <Route path="/contact" element={<Contact />} />
 
               {/* Protected Client Routes */}
-              <Route path="/client/dashboard" element={
-                <ProtectedRoute allowedRoles={['client']}>
-                  <ClientDashboard />
-                </ProtectedRoute>
-              } />
-              <Route path="/photographer/:id" element={
-                <ProtectedRoute allowedRoles={['client']}>
-                  <PhotographerProfile />
-                </ProtectedRoute>
-              } />
-              <Route path="/booking/request/:id" element={
-                <ProtectedRoute allowedRoles={['client']}>
-                  <BookingRequest />
-                </ProtectedRoute>
-              } />
-              <Route path="/client/bookings" element={
-                <ProtectedRoute allowedRoles={['client']}>
-                  <ClientBookings />
-                </ProtectedRoute>
-              } />
-              <Route path="/client/chat/:id" element={
-                <ProtectedRoute allowedRoles={['client']}>
-                  <ClientChat />
-                </ProtectedRoute>
-              } />
-              <Route path="/client/review/:id" element={
-                <ProtectedRoute allowedRoles={['client']}>
-                  <ReviewSubmission />
-                </ProtectedRoute>
-              } />
-              <Route path="/client/album-builder" element={
-                <ProtectedRoute allowedRoles={['client']}>
-                  <AlbumBuilder />
-                </ProtectedRoute>
-              } />
-              <Route path="/client/reel-generator" element={
-                <ProtectedRoute allowedRoles={['client']}>
-                  <ReelGenerator />
-                </ProtectedRoute>
-              } />
-              <Route path="/client/music-suggestion" element={
-                <ProtectedRoute allowedRoles={['client']}>
-                  <MusicSuggestion />
-                </ProtectedRoute>
-              } />
+              <Route
+                path="/client/dashboard"
+                element={
+                  <ProtectedRoute allowedRoles={["client"]}>
+                    <ClientDashboard />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/photographer/:id"
+                element={
+                  <ProtectedRoute allowedRoles={["client"]}>
+                    <PhotographerProfile />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/booking/request/:id"
+                element={
+                  <ProtectedRoute allowedRoles={["client"]}>
+                    <BookingRequest />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/client/bookings"
+                element={
+                  <ProtectedRoute allowedRoles={["client"]}>
+                    <ClientBookings />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/client/chat/:id"
+                element={
+                  <ProtectedRoute allowedRoles={["client"]}>
+                    <ClientChat />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/client/review/:id"
+                element={
+                  <ProtectedRoute allowedRoles={["client"]}>
+                    <ReviewSubmission />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/client/album-builder"
+                element={
+                  <ProtectedRoute allowedRoles={["client"]}>
+                    <AlbumBuilder />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/client/reel-generator"
+                element={
+                  <ProtectedRoute allowedRoles={["client"]}>
+                    <ReelGenerator />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/client/music-suggestion"
+                element={
+                  <ProtectedRoute allowedRoles={["client"]}>
+                    <MusicSuggestion />
+                  </ProtectedRoute>
+                }
+              />
 
               {/* Protected Photographer Routes */}
-              <Route path="/photographer/dashboard" element={
-                <ProtectedRoute allowedRoles={['photographer']}>
-                  <PhotographerDashboard />
-                </ProtectedRoute>
-              } />
-              <Route path="/photographer/bookings" element={
-                <ProtectedRoute allowedRoles={['photographer']}>
-                  <BookingRequests />
-                </ProtectedRoute>
-              } />
-              <Route path="/photographer/equipment" element={
-                <ProtectedRoute allowedRoles={['photographer']}>
-                  <EquipmentList />
-                </ProtectedRoute>
-              } />
-              <Route path="/photographer/travel" element={
-                <ProtectedRoute allowedRoles={['photographer']}>
-                  <TravelEstimator />
-                </ProtectedRoute>
-              } />
+              <Route
+                path="/photographer/dashboard"
+                element={
+                  <ProtectedRoute allowedRoles={["photographer"]}>
+                    <PhotographerDashboard />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/photographer/bookings"
+                element={
+                  <ProtectedRoute allowedRoles={["photographer"]}>
+                    <BookingRequests />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/photographer/equipment"
+                element={
+                  <ProtectedRoute allowedRoles={["photographer"]}>
+                    <EquipmentList />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/photographer/travel"
+                element={
+                  <ProtectedRoute allowedRoles={["photographer"]}>
+                    <TravelEstimator />
+                  </ProtectedRoute>
+                }
+              />
 
               {/* Protected Admin Routes */}
-              <Route path="/admin/dashboard" element={
-                <ProtectedRoute allowedRoles={['admin']}>
-                  <AdminDashboard />
-                </ProtectedRoute>
-              } />
+              <Route
+                path="/admin/dashboard"
+                element={
+                  <ProtectedRoute allowedRoles={["admin"]}>
+                    <AdminDashboard />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/admin/verifications"
+                element={
+                  <ProtectedRoute allowedRoles={["admin"]}>
+                    <AdminVerifications />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/admin/complaints"
+                element={
+                  <ProtectedRoute allowedRoles={["admin"]}>
+                    <AdminComplaints />
+                  </ProtectedRoute>
+                }
+              />
 
               {/* Fallback Routes */}
               <Route path="/client" element={<Navigate to="/client/dashboard" replace />} />
               <Route path="/photographer" element={<Navigate to="/photographer/dashboard" replace />} />
               <Route path="/admin" element={<Navigate to="/admin/dashboard" replace />} />
-              
+
               {/* 404 Page */}
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
@@ -144,7 +213,7 @@ function App() {
         </div>
       </Router>
     </AuthProvider>
-  );
+  )
 }
 
-export default App;
+export default App

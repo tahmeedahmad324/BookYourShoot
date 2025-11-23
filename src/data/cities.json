@@ -4,61 +4,37 @@
       "id": 1,
       "name": "Lahore",
       "province": "Punjab",
-      "coordinates": {"lat": 31.5204, "lng": 74.3587}
+      "coordinates": { "lat": 31.5204, "lng": 74.3587 }
     },
     {
       "id": 2,
-      "name": "Karachi",
-      "province": "Sindh",
-      "coordinates": {"lat": 24.8607, "lng": 67.0011}
+      "name": "Rawalpindi",
+      "province": "Punjab",
+      "coordinates": { "lat": 33.5651, "lng": 73.0169 }
     },
     {
       "id": 3,
-      "name": "Islamabad",
-      "province": "Federal Capital",
-      "coordinates": {"lat": 33.6844, "lng": 73.0479}
+      "name": "Faisalabad",
+      "province": "Punjab",
+      "coordinates": { "lat": 31.4504, "lng": 73.135 }
     },
     {
       "id": 4,
-      "name": "Rawalpindi",
+      "name": "Multan",
       "province": "Punjab",
-      "coordinates": {"lat": 33.5651, "lng": 73.0169}
+      "coordinates": { "lat": 30.1575, "lng": 71.5249 }
     },
     {
       "id": 5,
-      "name": "Faisalabad",
+      "name": "Gujranwala",
       "province": "Punjab",
-      "coordinates": {"lat": 31.4504, "lng": 73.1350}
+      "coordinates": { "lat": 32.1877, "lng": 74.1917 }
     },
     {
       "id": 6,
-      "name": "Multan",
-      "province": "Punjab",
-      "coordinates": {"lat": 30.1575, "lng": 71.5249}
-    },
-    {
-      "id": 7,
-      "name": "Gujranwala",
-      "province": "Punjab",
-      "coordinates": {"lat": 32.1877, "lng": 74.1917}
-    },
-    {
-      "id": 8,
-      "name": "Peshawar",
-      "province": "Khyber Pakhtunkhwa",
-      "coordinates": {"lat": 34.0151, "lng": 71.5249}
-    },
-    {
-      "id": 9,
-      "name": "Quetta",
-      "province": "Balochistan",
-      "coordinates": {"lat": 30.1798, "lng": 66.9750}
-    },
-    {
-      "id": 10,
       "name": "Sialkot",
       "province": "Punjab",
-      "coordinates": {"lat": 32.4945, "lng": 74.5229}
+      "coordinates": { "lat": 32.4945, "lng": 74.5229 }
     }
   ],
   "services": [

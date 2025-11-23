@@ -1,36 +1,13 @@
 {
   "name": "bookyourshoot",
   "version": "1.0.0",
-  "description": "Photography booking platform prototype",
   "private": true,
-  "dependencies": {
-    "@heroicons/react": "^2.0.16",
-    "@hookform/resolvers": "^2.9.11",
-    "@testing-library/jest-dom": "^5.16.4",
-    "@testing-library/react": "^13.3.0",
-    "@testing-library/user-event": "^13.5.0",
-    "all": "^0.0.0",
-    "axios": "^1.3.4",
-    "bootstrap": "^5.2.3",
-    "react": "^18.2.0",
-    "react-dom": "^18.2.0",
-    "react-hook-form": "^7.43.5",
-    "react-router-dom": "^6.8.1",
-    "react-scripts": "5.0.1",
-    "web-vitals": "^2.1.4",
-    "yup": "^1.0.0"
-  },
+  "description": "Photography booking platform prototype",
   "scripts": {
-    "start": "react-scripts start",
     "build": "react-scripts build",
-    "test": "react-scripts test",
-    "eject": "react-scripts eject"
-  },
-  "eslintConfig": {
-    "extends": [
-      "react-app",
-      "react-app/jest"
-    ]
+    "eject": "react-scripts eject",
+    "start": "react-scripts start",
+    "test": "react-scripts test"
   },
   "browserslist": {
     "production": [
@@ -44,7 +21,51 @@
       "last 1 safari version"
     ]
   },
+  "eslintConfig": {
+    "extends": [
+      "react-app",
+      "react-app/jest"
+    ]
+  },
+  "dependencies": {
+    "@heroicons/react": "^2.0.16",
+    "@hookform/resolvers": "latest",
+    "@popperjs/core": "latest",
+    "@testing-library/jest-dom": "^5.16.4",
+    "@testing-library/react": "^13.3.0",
+    "@testing-library/user-event": "^13.5.0",
+    "all": "^0.0.0",
+    "axios": "latest",
+    "bootstrap": "latest",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "crypto": "latest",
+    "dotenv": "latest",
+    "express": "latest",
+    "lucide-react": "^0.454.0",
+    "multer": "latest",
+    "next": "16.0.3",
+    "path": "latest",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-hook-form": "latest",
+    "react-router-dom": "latest",
+    "react-scripts": "5.0.1",
+    "sharp": "latest",
+    "tailwind-merge": "^2.5.5",
+    "tailwindcss-animate": "^1.0.7",
+    "tesseract.js": "latest",
+    "tw-animate-css": "latest",
+    "web-vitals": "^2.1.4",
+    "yup": "latest"
+  },
   "devDependencies": {
-    "@types/bootstrap": "^5.2.6"
+    "@types/bootstrap": "^5.2.6",
+    "@types/node": "^22",
+    "@types/react": "19.2.6",
+    "@types/react-dom": "19.2.3",
+    "postcss": "^8.5",
+    "tailwindcss": "4.1.17",
+    "typescript": "^5"
   }
 }

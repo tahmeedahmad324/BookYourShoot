@@ -1,19 +1,21 @@
-import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
-import { useAuth } from '../../context/AuthContext';
+"use client"
+
+import { useState, useEffect } from "react"
+import { Link } from "react-router-dom"
+import { useAuth } from "../../context/AuthContext"
 
 const PhotographerDashboard = () => {
-  const { user } = useAuth();
+  const { user } = useAuth()
   const [stats, setStats] = useState({
     totalBookings: 0,
     pendingBookings: 0,
     confirmedBookings: 0,
     completedBookings: 0,
     totalEarnings: 0,
-    averageRating: 4.8
-  });
-  const [recentBookings, setRecentBookings] = useState([]);
-  const [upcomingBookings, setUpcomingBookings] = useState([]);
+    averageRating: 4.8,
+  })
+  const [recentBookings, setRecentBookings] = useState([])
+  const [upcomingBookings, setUpcomingBookings] = useState([])
 
   useEffect(() => {
     // Mock data for photographer bookings
@@ -29,7 +31,7 @@ const PhotographerDashboard = () => {
         status: "pending",
         amount: 15000,
         duration: "6 hours",
-        specialRequests: "Outdoor shooting preferred"
+        specialRequests: "Outdoor shooting preferred",
       },
       {
         id: 2,
@@ -42,7 +44,7 @@ const PhotographerDashboard = () => {
         status: "confirmed",
         amount: 8000,
         duration: "3 hours",
-        specialRequests: "Studio lighting required"
+        specialRequests: "Studio lighting required",
       },
       {
         id: 3,
@@ -55,7 +57,7 @@ const PhotographerDashboard = () => {
         status: "confirmed",
         amount: 12000,
         duration: "4 hours",
-        specialRequests: "Candid photography preferred"
+        specialRequests: "Candid photography preferred",
       },
       {
         id: 4,
@@ -68,14 +70,14 @@ const PhotographerDashboard = () => {
         status: "completed",
         amount: 10000,
         duration: "5 hours",
-        specialRequests: "White background setup"
-      }
-    ];
+        specialRequests: "White background setup",
+      },
+    ]
 
-    const pending = mockBookings.filter(b => b.status === 'pending').length;
-    const confirmed = mockBookings.filter(b => b.status === 'confirmed').length;
-    const completed = mockBookings.filter(b => b.status === 'completed').length;
-    const totalEarnings = mockBookings.filter(b => b.status === 'completed').reduce((sum, b) => sum + b.amount, 0);
+    const pending = mockBookings.filter((b) => b.status === "pending").length
+    const confirmed = mockBookings.filter((b) => b.status === "confirmed").length
+    const completed = mockBookings.filter((b) => b.status === "completed").length
+    const totalEarnings = mockBookings.filter((b) => b.status === "completed").reduce((sum, b) => sum + b.amount, 0)
 
     setStats({
       totalBookings: mockBookings.length,
@@ -83,40 +85,40 @@ const PhotographerDashboard = () => {
       confirmedBookings: confirmed,
       completedBookings: completed,
       totalEarnings: totalEarnings,
-      averageRating: 4.8
-    });
+      averageRating: 4.8,
+    })
 
-    setRecentBookings(mockBookings.slice(0, 3));
-    setUpcomingBookings(mockBookings.filter(b => b.status === 'pending' || b.status === 'confirmed'));
-  }, []);
+    setRecentBookings(mockBookings.slice(0, 3))
+    setUpcomingBookings(mockBookings.filter((b) => b.status === "pending" || b.status === "confirmed"))
+  }, [])
 
   const getStatusBadge = (status) => {
     const statusClasses = {
-      pending: 'status-premium',
-      confirmed: 'status-available',
-      completed: 'status-unavailable',
-      cancelled: 'bg-danger text-white'
-    };
-    return statusClasses[status] || 'status-unavailable';
-  };
+      pending: "status-premium",
+      confirmed: "status-available",
+      completed: "status-unavailable",
+      cancelled: "bg-danger text-white",
+    }
+    return statusClasses[status] || "status-unavailable"
+  }
 
   const formatDate = (dateStr) => {
-    const date = new Date(dateStr);
-    return date.toLocaleDateString('en-US', { 
-      weekday: 'short', 
-      year: 'numeric', 
-      month: 'short', 
-      day: 'numeric' 
-    });
-  };
+    const date = new Date(dateStr)
+    return date.toLocaleDateString("en-US", {
+      weekday: "short",
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+    })
+  }
 
   const getDaysUntilBooking = (dateStr) => {
-    const today = new Date();
-    const bookingDate = new Date(dateStr);
-    const diffTime = bookingDate - today;
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    return diffDays;
-  };
+    const today = new Date()
+    const bookingDate = new Date(dateStr)
+    const diffTime = bookingDate - today
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+    return diffDays
+  }
 
   return (
     <div className="photographer-dashboard py-4">
@@ -127,7 +129,7 @@ const PhotographerDashboard = () => {
             <div className="gradient-header rounded-3 p-4">
               <div className="row align-items-center">
                 <div className="col-md-8">
-                  <h2 className="fw-bold mb-2">Welcome back, {user?.name || 'Photographer'}! 📸</h2>
+                  <h2 className="fw-bold mb-2">Welcome back, {user?.name || "Photographer"}! 📸</h2>
                   <p className="mb-0">Manage your bookings and grow your photography business</p>
                 </div>
                 <div className="col-md-4 text-md-end">
@@ -135,9 +137,7 @@ const PhotographerDashboard = () => {
                     <span className="badge bg-success me-2">✓ Verified</span>
                     <span className="badge bg-light text-dark">⭐ {stats.averageRating} Rating</span>
                   </div>
-                  <div className="text-white-50 small">
-                    Response time: 1 hour
-                  </div>
+                  <div className="text-white-50 small">Response time: 1 hour</div>
                 </div>
               </div>
             </div>
@@ -154,7 +154,7 @@ const PhotographerDashboard = () => {
                     <h6 className="text-muted mb-2">Total Bookings</h6>
                     <h3 className="fw-bold mb-0">{stats.totalBookings}</h3>
                   </div>
-                  <div className="text-primary" style={{ fontSize: '2rem' }}>
+                  <div className="text-primary" style={{ fontSize: "2rem" }}>
                     📅
                   </div>
                 </div>
@@ -169,7 +169,7 @@ const PhotographerDashboard = () => {
                     <h6 className="text-muted mb-2">Pending</h6>
                     <h3 className="fw-bold mb-0 text-warning">{stats.pendingBookings}</h3>
                   </div>
-                  <div className="text-primary" style={{ fontSize: '2rem' }}>
+                  <div className="text-primary" style={{ fontSize: "2rem" }}>
                     ⏳
                   </div>
                 </div>
@@ -184,7 +184,7 @@ const PhotographerDashboard = () => {
                     <h6 className="text-muted mb-2">Completed</h6>
                     <h3 className="fw-bold mb-0 text-success">{stats.completedBookings}</h3>
                   </div>
-                  <div className="text-primary" style={{ fontSize: '2rem' }}>
+                  <div className="text-primary" style={{ fontSize: "2rem" }}>
                     ✅
                   </div>
                 </div>
@@ -197,9 +197,9 @@ const PhotographerDashboard = () => {
                 <div className="d-flex justify-content-between align-items-center">
                   <div>
                     <h6 className="text-muted mb-2">Total Earnings</h6>
-                    <h3 className="fw-bold mb-0 text-success">₹{stats.totalEarnings.toLocaleString()}</h3>
+                    <h3 className="fw-bold mb-0 text-success">PKR {stats.totalEarnings.toLocaleString()}</h3>
                   </div>
-                  <div className="text-primary" style={{ fontSize: '2rem' }}>
+                  <div className="text-primary" style={{ fontSize: "2rem" }}>
                     💰
                   </div>
                 </div>
@@ -239,8 +239,10 @@ const PhotographerDashboard = () => {
                           <tr key={booking.id}>
                             <td>
                               <div className="d-flex align-items-center">
-                                <div className="rounded-circle bg-light d-flex align-items-center justify-content-center me-3" 
-                                     style={{ width: '40px', height: '40px' }}>
+                                <div
+                                  className="rounded-circle bg-light d-flex align-items-center justify-content-center me-3"
+                                  style={{ width: "40px", height: "40px" }}
+                                >
                                   <span>👤</span>
                                 </div>
                                 <div>
@@ -251,33 +253,31 @@ const PhotographerDashboard = () => {
                             </td>
                             <td>
                               <div>{formatDate(booking.date)}</div>
-                              <small className="text-muted">{booking.time} • {booking.duration}</small>
+                              <small className="text-muted">
+                                {booking.time} • {booking.duration}
+                              </small>
                             </td>
                             <td>{booking.service}</td>
-                            <td className="fw-semibold">₹{booking.amount.toLocaleString()}</td>
+                            <td className="fw-semibold">PKR {booking.amount.toLocaleString()}</td>
                             <td>
                               <span className={`status-badge ${getStatusBadge(booking.status)}`}>
                                 {booking.status.charAt(0).toUpperCase() + booking.status.slice(1)}
                               </span>
                             </td>
                             <td>
-                              {booking.status === 'pending' ? (
+                              {booking.status === "pending" ? (
                                 <div className="btn-group btn-group-sm">
                                   <Link to={`/photographer/bookings/${booking.id}`} className="btn btn-outline-success">
                                     ✓ Accept
                                   </Link>
-                                  <button className="btn btn-outline-danger">
-                                    ✗ Decline
-                                  </button>
+                                  <button className="btn btn-outline-danger">✗ Decline</button>
                                 </div>
-                              ) : booking.status === 'confirmed' ? (
+                              ) : booking.status === "confirmed" ? (
                                 <Link to={`/client/chat/${booking.id}`} className="btn btn-sm btn-outline-primary">
                                   💬 Chat
                                 </Link>
                               ) : (
-                                <button className="btn btn-sm btn-outline-secondary">
-                                  ⭐ Review
-                                </button>
+                                <button className="btn btn-sm btn-outline-secondary">⭐ Review</button>
                               )}
                             </td>
                           </tr>
@@ -287,7 +287,9 @@ const PhotographerDashboard = () => {
                   </div>
                 ) : (
                   <div className="text-center py-5">
-                    <div className="mb-3" style={{ fontSize: '3rem' }}>📸</div>
+                    <div className="mb-3" style={{ fontSize: "3rem" }}>
+                      📸
+                    </div>
                     <h6 className="text-muted">No bookings yet</h6>
                     <p className="text-muted mb-4">Your upcoming bookings will appear here</p>
                   </div>
@@ -314,12 +316,8 @@ const PhotographerDashboard = () => {
                   <Link to="/photographer/travel" className="btn btn-outline-primary text-start">
                     🚗 Travel Estimator
                   </Link>
-                  <button className="btn btn-outline-primary text-start">
-                    📈 View Analytics
-                  </button>
-                  <button className="btn btn-outline-primary text-start">
-                    ⚙️ Profile Settings
-                  </button>
+                  <button className="btn btn-outline-primary text-start">📈 View Analytics</button>
+                  <button className="btn btn-outline-primary text-start">⚙️ Profile Settings</button>
                 </div>
               </div>
             </div>
@@ -346,9 +344,7 @@ const PhotographerDashboard = () => {
                         <div className="small text-muted mb-1">
                           📅 {formatDate(booking.date)} at {booking.time}
                         </div>
-                        <div className="small text-muted mb-2">
-                          📍 {booking.location}
-                        </div>
+                        <div className="small text-muted mb-2">📍 {booking.location}</div>
                         <div className="d-flex gap-1">
                           <Link to={`/client/chat/${booking.id}`} className="btn btn-sm btn-outline-primary">
                             💬 Message
@@ -362,7 +358,9 @@ const PhotographerDashboard = () => {
                   </div>
                 ) : (
                   <div className="text-center py-4">
-                    <div className="mb-2" style={{ fontSize: '2rem' }}>📅</div>
+                    <div className="mb-2" style={{ fontSize: "2rem" }}>
+                      📅
+                    </div>
                     <h6 className="text-muted">No upcoming bookings</h6>
                     <p className="text-muted small">Your confirmed bookings will appear here</p>
                   </div>
@@ -376,7 +374,7 @@ const PhotographerDashboard = () => {
         </div>
       </div>
     </div>
-  );
-};
+  )
+}
 
-export default PhotographerDashboard;
+export default PhotographerDashboard
