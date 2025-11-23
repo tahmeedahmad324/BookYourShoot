@@ -28,6 +28,118 @@ const PhotographerSearch = () => {
     filterPhotographers();
   }, [searchTerm, location, service, priceRange, sortBy]);
 
+  // Auto-complete functions
+  const generateSuggestions = (input) => {
+    if (!input || input.length < 2) {
+      setSuggestions([]);
+      setShowSuggestions(false);
+      return;
+    }
+
+    const inputLower = input.toLowerCase();
+    const newSuggestions = [];
+
+    // Add photographer name suggestions
+    const photographerMatches = photographers
+      .filter(p => p.name.toLowerCase().includes(inputLower))
+      .slice(0, 3)
+      .map(p => ({
+        type: 'photographer',
+        value: p.name,
+        display: p.name,
+        subtitle: `${p.location} • ${p.specialty.join(', ')}`
+      }));
+
+    // Add specialty/service suggestions
+    const specialtyMatches = [...new Set(photographers.flatMap(p => p.specialty))]
+      .filter(specialty => specialty.toLowerCase().includes(inputLower))
+      .slice(0, 3)
+      .map(specialty => ({
+        type: 'specialty',
+        value: specialty,
+        display: specialty,
+        subtitle: 'Service type'
+      }));
+
+    // Add city suggestions
+    const cityMatches = cities
+      .filter(city => city.name.toLowerCase().includes(inputLower))
+      .slice(0, 2)
+      .map(city => ({
+        type: 'city',
+        value: city.name,
+        display: city.name,
+        subtitle: city.province ? `${city.province}` : 'Location'
+      }));
+
+    newSuggestions.push(...photographerMatches, ...specialtyMatches, ...cityMatches);
+    setSuggestions(newSuggestions.slice(0, 8)); // Limit to 8 suggestions
+    setShowSuggestions(true);
+    setSelectedSuggestionIndex(-1);
+  };
+
+  const handleSearchChange = (e) => {
+    const value = e.target.value;
+    setSearchTerm(value);
+    generateSuggestions(value);
+  };
+
+  const handleSuggestionClick = (suggestion) => {
+    setSearchTerm(suggestion.display);
+    setShowSuggestions(false);
+    setSelectedSuggestionIndex(-1);
+    searchInputRef.current?.focus();
+  };
+
+  const handleKeyDown = (e) => {
+    if (!showSuggestions || suggestions.length === 0) {
+      if (e.key === 'Enter') {
+        handleSearch();
+      }
+      return;
+    }
+
+    switch (e.key) {
+      case 'ArrowDown':
+        e.preventDefault();
+        setSelectedSuggestionIndex(prev =>
+          prev < suggestions.length - 1 ? prev + 1 : 0
+        );
+        break;
+      case 'ArrowUp':
+        e.preventDefault();
+        setSelectedSuggestionIndex(prev =>
+          prev > 0 ? prev - 1 : suggestions.length - 1
+        );
+        break;
+      case 'Enter':
+        e.preventDefault();
+        if (selectedSuggestionIndex >= 0) {
+          handleSuggestionClick(suggestions[selectedSuggestionIndex]);
+        } else {
+          handleSearch();
+        }
+        break;
+      case 'Escape':
+        setShowSuggestions(false);
+        setSelectedSuggestionIndex(-1);
+        break;
+    }
+  };
+
+  // Close suggestions when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (searchInputRef.current && !searchInputRef.current.contains(event.target)) {
+        setShowSuggestions(false);
+        setSelectedSuggestionIndex(-1);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
   const filterPhotographers = () => {
     setLoading(true);
     
