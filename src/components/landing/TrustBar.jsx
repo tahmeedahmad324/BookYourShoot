@@ -10,8 +10,8 @@ const TrustBar = () => {
   ];
 
   const partners = [
-    { name: 'Google Play', icon: '📱' },
-    { name: 'App Store', icon: '🍎' },
+    { name: 'Chrome Web Store', icon: '🌐' },
+    { name: 'Web Platform', icon: '💻' },
     { name: 'PayPal', icon: '💳' },
     { name: 'SSL Secure', icon: '🔒' }
   ];

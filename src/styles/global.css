@@ -54,6 +54,42 @@ body {
   border-color: var(--primary-blue) !important;
 }
 
+/* Button Text Alignment and Consistency */
+.btn {
+  text-align: center !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  font-weight: 500 !important;
+  transition: all 0.2s ease !important;
+  white-space: nowrap !important;
+  text-decoration: none !important;
+}
+
+.btn:disabled {
+  opacity: 0.65 !important;
+  cursor: not-allowed !important;
+}
+
+/* Ensure consistent button heights and padding */
+.btn-sm {
+  padding: 0.25rem 0.5rem !important;
+  font-size: 0.875rem !important;
+  min-height: 2rem !important;
+}
+
+.btn-lg {
+  padding: 0.75rem 1.5rem !important;
+  font-size: 1.125rem !important;
+  min-height: 3rem !important;
+}
+
+/* Standard button size */
+:not(.btn-sm):not(.btn-lg).btn {
+  padding: 0.5rem 1rem !important;
+  min-height: 2.5rem !important;
+}
+
 .form-control:focus {
   border-color: var(--primary-blue) !important;
   box-shadow: 0 0 0 0.2rem rgba(26, 115, 232, 0.25) !important;

@@ -51,15 +51,18 @@ const Footer = () => {
                   Book trusted photographers for any occasion. Professional services, transparent pricing, and secure bookings.
                 </p>
                 
-                {/* App download mini CTA */}
-                <div className="app-download-cta mt-3">
-                  <p className="small mb-2">Get our mobile app</p>
+                {/* Web platform features mini CTA */}
+                <div className="web-platform-cta mt-3">
+                  <p className="small mb-2">Available on all devices</p>
                   <div className="d-flex gap-2">
-                    <button className="btn btn-sm btn-outline-light">
-                      📱 iOS
+                    <button className="btn btn-sm btn-outline-light" disabled>
+                      💻 Web
                     </button>
-                    <button className="btn btn-sm btn-outline-light">
-                      🤖 Android
+                    <button className="btn btn-sm btn-outline-light" disabled>
+                      📱 Mobile
+                    </button>
+                    <button className="btn btn-sm btn-outline-light" disabled>
+                      🖥️ Desktop
                     </button>
                   </div>
                 </div>
