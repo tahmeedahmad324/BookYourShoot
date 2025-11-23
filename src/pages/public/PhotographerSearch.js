@@ -233,15 +233,46 @@ const PhotographerSearch = () => {
               {/* Main Search Bar */}
               <div className="row g-2">
                 <div className="col-md-4">
-                  <div className="input-group">
+                  <div className="input-group position-relative">
                     <span className="input-group-text">🔍</span>
                     <input
+                      ref={searchInputRef}
                       type="text"
                       className="form-control"
                       placeholder="Search photographers, services..."
                       value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
+                      onChange={handleSearchChange}
+                      onKeyDown={handleKeyDown}
+                      onFocus={() => searchTerm.length >= 2 && setShowSuggestions(true)}
                     />
+                    {showSuggestions && suggestions.length > 0 && (
+                      <div
+                        className="position-absolute w-100 bg-white border border-top-0 rounded-bottom shadow-sm"
+                        style={{ top: '100%', zIndex: 1000, maxHeight: '320px', overflowY: 'auto' }}
+                      >
+                        {suggestions.map((suggestion, index) => (
+                          <div
+                            key={index}
+                            className={`px-3 py-2 cursor-pointer border-bottom ${index === selectedSuggestionIndex ? 'bg-light' : ''}`}
+                            style={{ fontSize: '0.875rem' }}
+                            onClick={() => handleSuggestionClick(suggestion)}
+                            onMouseEnter={() => setSelectedSuggestionIndex(index)}
+                          >
+                            <div className="d-flex justify-content-between align-items-center">
+                              <div>
+                                <div className="fw-medium">{suggestion.display}</div>
+                                <div className="text-muted small">{suggestion.subtitle}</div>
+                              </div>
+                              <div className="text-muted small">
+                                {suggestion.type === 'photographer' && '📸'}
+                                {suggestion.type === 'specialty' && '🎯'}
+                                {suggestion.type === 'city' && '📍'}
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </div>
                 <div className="col-md-3">
