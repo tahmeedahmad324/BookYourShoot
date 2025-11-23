@@ -14,6 +14,12 @@ const PhotographerSearch = () => {
   const [loading, setLoading] = useState(false);
   const [filteredPhotographers, setFilteredPhotographers] = useState(photographersData.photographers);
 
+  // Auto-complete state
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [suggestions, setSuggestions] = useState([]);
+  const [selectedSuggestionIndex, setSelectedSuggestionIndex] = useState(-1);
+  const searchInputRef = useRef(null);
+
   const photographers = photographersData.photographers;
   const cities = citiesData.cities;
   const services = citiesData.services;
