@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Link, useNavigate, useLocation } from "react-router-dom"
 import { useAuth } from "../../context/AuthContext"
 
@@ -23,8 +23,9 @@ const Navbar = () => {
   const publicLinks = [
     { path: "/", label: "Home" },
     { path: "/search", label: "Find Photographers" },
-    { path: "#services", label: "Services" },
-    { path: "#pricing", label: "Pricing" },
+    { path: "#services", label: "Services", sectionId: 'services' },
+    { path: "#how-it-works", label: "How it Works", sectionId: 'how-it-works' },
+    { path: "#for-photographers", label: "For Photographers", sectionId: 'for-photographers' }
   ]
 
   const clientLinks = [
@@ -52,6 +53,39 @@ const Navbar = () => {
     if (user?.role === "photographer") return photographerLinks
     if (user?.role === "admin") return adminLinks
     return publicLinks
+  }
+
+  const [activeSection, setActiveSection] = useState('')
+  useEffect(() => {
+    const sectionIds = ['services','how-it-works','for-photographers']
+    const sections = sectionIds.map(id => document.getElementById(id)).filter(Boolean)
+    if (!sections.length) return
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(entry => { if (entry.isIntersecting) setActiveSection(entry.target.id) })
+    }, { root: null, rootMargin: '0px 0px -55% 0px', threshold: [0.25,0.5,0.75] })
+    sections.forEach(sec => observer.observe(sec))
+    return () => observer.disconnect()
+  }, [])
+
+  const animateScroll = (targetY, duration = 600) => {
+    const startY = window.pageYOffset
+    const diff = targetY - startY
+    let start
+    const easeOutCubic = t => 1 - Math.pow(1 - t, 3)
+    function step(ts){ if(!start) start = ts; const elapsed = ts - start; const progress = Math.min(elapsed/duration,1); window.scrollTo(0,startY + diff*easeOutCubic(progress)); if(elapsed<duration) requestAnimationFrame(step) }
+    requestAnimationFrame(step)
+  }
+
+  const handleSectionLink = (e, id) => {
+    if(!id) return
+    const el = document.getElementById(id)
+    if(!el) return
+    e.preventDefault()
+    const navbars = Array.from(document.querySelectorAll('.navbar'))
+    const totalHeight = navbars.reduce((sum,n)=> sum + n.offsetHeight,0)
+    const y = el.getBoundingClientRect().top + window.pageYOffset - totalHeight + 8
+    animateScroll(y)
+    setExpanded(false)
   }
 
   return (
@@ -88,13 +122,23 @@ const Navbar = () => {
           <ul className="navbar-nav mx-auto">
             {getNavLinks().map((link) => (
               <li className="nav-item" key={link.path}>
-                <Link
-                  className={`nav-link ${isActive(link.path) ? "active" : ""}`}
-                  to={link.path}
-                  onClick={() => setExpanded(false)}
-                >
-                  {link.label}
-                </Link>
+                {link.sectionId ? (
+                  <a
+                    href={link.path}
+                    className={`nav-link ${activeSection === link.sectionId ? 'active' : ''}`}
+                    onClick={(e) => handleSectionLink(e, link.sectionId)}
+                  >
+                    {link.label}
+                  </a>
+                ) : (
+                  <Link
+                    className={`nav-link ${isActive(link.path) ? "active" : ""}`}
+                    to={link.path}
+                    onClick={() => setExpanded(false)}
+                  >
+                    {link.label}
+                  </Link>
+                )}
               </li>
             ))}
           </ul>
@@ -114,15 +158,11 @@ const Navbar = () => {
                 </button>
                 <ul className="dropdown-menu dropdown-menu-end" aria-labelledby="userDropdown">
                   <li>
-                    <span className="dropdown-item-text text-muted">Role: {user?.role}</span>
+                    <Link className="dropdown-item" to="/profile" onClick={() => setExpanded(false)}>Profile</Link>
                   </li>
+                  <li><hr className="dropdown-divider" /></li>
                   <li>
-                    <hr className="dropdown-divider" />
-                  </li>
-                  <li>
-                    <button className="dropdown-item" onClick={handleLogout}>
-                      🚪 Logout
-                    </button>
+                    <button className="dropdown-item" onClick={handleLogout}>Logout</button>
                   </li>
                 </ul>
               </div>

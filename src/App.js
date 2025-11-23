@@ -12,6 +12,7 @@ import Register from "./pages/auth/Register"
 import CNICUpload from "./pages/auth/CNICUpload"
 import OTPVerification from "./pages/auth/OTPVerification"
 import PhotographerSearch from "./pages/public/PhotographerSearch"
+import Profile from "./pages/Profile"
 import ForgotPassword from "./pages/auth/ForgotPassword"
 import TermsAndConditions from "./pages/legal/TermsAndConditions"
 import PrivacyPolicy from "./pages/legal/PrivacyPolicy"
@@ -60,6 +61,7 @@ function App() {
               <Route path="/verify-otp" element={<OTPVerification />} />
               <Route path="/forgot-password" element={<ForgotPassword />} />
               <Route path="/search" element={<PhotographerSearch />} />
+              <Route path="/profile" element={<Profile />} />
               <Route path="/search-results" element={<SearchResults />} />
               <Route path="/terms" element={<TermsAndConditions />} />
               <Route path="/privacy" element={<PrivacyPolicy />} />

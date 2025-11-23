@@ -5,7 +5,7 @@ const LandingPage = () => {
   return (
     <div className="landing-page">
       {/* Hero Section */}
-      <section className="gradient-header text-center">
+      <section id="hero" className="gradient-header text-center">
         <div className="container">
           <div className="row align-items-center min-vh-100">
             <div className="col-lg-6">
@@ -48,7 +48,7 @@ const LandingPage = () => {
         </div>
       </section>
 
-      {/* Role Selection Section */}
+      {/* Role Selection Section (client only) */}
       <section className="py-5 bg-light">
         <div className="container">
           <div className="text-center mb-5">
@@ -56,8 +56,8 @@ const LandingPage = () => {
             <p className="text-muted">Choose your role and get started today</p>
           </div>
           
-          <div className="row g-4">
-            <div className="col-md-6">
+          <div className="row g-4 justify-content-center">
+            <div className="col-md-8 col-lg-6">
               <div className="card h-100 border-0 shadow-sm hover-lift">
                 <div className="card-body text-center p-4">
                   <div className="text-primary mb-3" style={{ fontSize: '3rem' }}>
@@ -75,29 +75,12 @@ const LandingPage = () => {
               </div>
             </div>
             
-            <div className="col-md-6">
-              <div className="card h-100 border-0 shadow-sm hover-lift">
-                <div className="card-body text-center p-4">
-                  <div className="text-primary mb-3" style={{ fontSize: '3rem' }}>
-                    📸
-                  </div>
-                  <h3 className="card-title fw-bold mb-3">Are you a Photographer?</h3>
-                  <p className="card-text text-muted mb-4">
-                    Showcase your portfolio, connect with clients, and grow your photography business. 
-                    Join our network of verified professionals.
-                  </p>
-                  <Link to="/register" className="btn btn-secondary">
-                    Join as Photographer
-                  </Link>
-                </div>
-              </div>
-            </div>
           </div>
         </div>
       </section>
 
       {/* Features Section */}
-      <section className="py-5">
+      <section id="services" className="py-5">
         <div className="container">
           <div className="text-center mb-5">
             <h2 className="fw-bold mb-3">Why Choose BookYourShoot?</h2>
@@ -193,7 +176,7 @@ const LandingPage = () => {
       </section>
 
       {/* Services Preview Section */}
-      <section className="py-5 bg-light">
+      <section id="services-preview" className="py-5 bg-light">
         <div className="container">
           <div className="text-center mb-5">
             <h2 className="fw-bold mb-3">Photography Services</h2>
@@ -226,7 +209,7 @@ const LandingPage = () => {
       </section>
 
       {/* CTA Section */}
-      <section className="py-5">
+      <section id="cta" className="py-5">
         <div className="container">
           <div className="text-center">
             <div className="gradient-header rounded-4 p-5">

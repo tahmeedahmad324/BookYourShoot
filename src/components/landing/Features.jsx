@@ -34,7 +34,7 @@ const Features = () => {
   ];
 
   return (
-    <section id="features" className="features-section py-5">
+    <section id="services" className="features-section py-5">
       <div className="container landing-container">
         {/* Section header */}
         <div className="text-center mb-5">
@@ -74,7 +74,7 @@ const Features = () => {
         </div>
 
         {/* CTA section */}
-        <div className="text-center mt-5">
+        <div className="text-center mt-5" id="for-photographers">
           <p className="mb-4">Ready to get started?</p>
           <div className="d-flex justify-content-center gap-3 flex-wrap">
             <Link to="/search" className="btn btn-primary btn-lg">

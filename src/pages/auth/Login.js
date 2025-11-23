@@ -36,17 +36,18 @@ const Login = () => {
       await new Promise(resolve => setTimeout(resolve, 1000));
 
       // Mock login logic - in real app, this would be an API call
+      const remember = document.getElementById('remember')?.checked;
       if (data.email === 'admin@bookyourshoot.com' && data.password === 'admin123') {
         const userData = { id: 1, name: 'Admin User', email: data.email, role: 'admin' };
-        login(userData, 'mock-jwt-token-admin');
+        login(userData, 'mock-jwt-token-admin', remember);
         navigate('/admin/dashboard');
       } else if (data.email === 'client@test.com' && data.password === 'client123') {
         const userData = { id: 2, name: 'Test Client', email: data.email, role: 'client' };
-        login(userData, 'mock-jwt-token-client');
+        login(userData, 'mock-jwt-token-client', remember);
         navigate('/client/dashboard');
       } else if (data.email === 'photographer@test.com' && data.password === 'photo123') {
         const userData = { id: 3, name: 'Test Photographer', email: data.email, role: 'photographer' };
-        login(userData, 'mock-jwt-token-photographer');
+        login(userData, 'mock-jwt-token-photographer', remember);
         navigate('/photographer/dashboard');
       } else {
         // For demo purposes, allow any login with valid format
@@ -56,7 +57,7 @@ const Login = () => {
           email: data.email, 
           role: data.role 
         };
-        login(userData, 'mock-jwt-token');
+        login(userData, 'mock-jwt-token', remember);
         navigate(`/${data.role}/dashboard`);
       }
     } catch (error) {

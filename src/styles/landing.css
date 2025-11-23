@@ -1,4 +1,15 @@
 /* BookYourShoot Landing Page Styles */
+html {
+  scroll-behavior: smooth;
+}
+body {
+  scroll-behavior: smooth;
+}
+
+/* Provide offset for fixed navbar using scroll-margin */
+section[id] {
+  scroll-margin-top: 90px;
+}
 
 /* CSS Variables - Brand Colors */
 :root {
@@ -71,7 +82,7 @@
   backdrop-filter: blur(10px);
   box-shadow: var(--shadow-sm);
   transition: all 0.3s ease;
-  padding: 1rem 0;
+  padding: 1rem 1;
   z-index: 1000;
 }
 
@@ -93,6 +104,23 @@
 
 .navbar-nav .nav-link:hover {
   color: var(--primary-blue) !important;
+}
+
+.navbar-nav .nav-link.active {
+  color: var(--primary-blue) !important;
+  position: relative;
+}
+
+.navbar-nav .nav-link.active::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  transform: translateX(-50%);
+  width: 40%;
+  height: 2px;
+  background: var(--primary-blue);
+  border-radius: 2px;
 }
 
 .navbar-buttons {
@@ -427,6 +455,15 @@
   font-size: 1.5rem;
 }
 
+  /* Force footer text visibility */
+  .site-footer h5,
+  .site-footer h6,
+  .site-footer p,
+  .site-footer a,
+  .site-footer li,
+  .site-footer span {
+    color: #ffffff !important;
+  }
 .badge-content {
   display: flex;
   flex-direction: column;
@@ -508,6 +545,11 @@
   line-height: 1.6;
 }
 
+.footer-description {
+  color: #ffffff;
+  line-height: 1.6;
+  margin-bottom: 1.5rem;
+}
 .feature-link {
   color: var(--primary-blue);
   font-weight: 500;
@@ -581,6 +623,13 @@
   display: inline-flex;
   align-items: center;
   gap: 0.5rem;
+}
+.footer-link {
+  color: #ffffff;
+  text-decoration: none;
+  display: block;
+  padding: 0.25rem 0;
+  transition: color 0.3s ease;
 }
 
 .step-link:hover {
@@ -926,17 +975,29 @@
   padding-top: 2rem;
   border-top: 1px solid rgba(255, 255, 255, 0.1);
 }
-
+.footer-bottom-link {
+  color: #ffffff;
+  text-decoration: none;
+  transition: color 0.3s ease;
+}
 .copyright {
   color: rgba(255, 255, 255, 0.6);
   font-size: 0.875rem;
 }
 
 .footer-bottom-links {
+  color: #ffffff;
+  font-size: 0.875rem;
+}
+.footer-bottom-links {
   color: rgba(255, 255, 255, 0.6);
   font-size: 0.875rem;
 }
 
+.copyright {
+  color: #ffffff;
+  font-size: 0.875rem;
+}
 .footer-bottom-link {
   color: rgba(255, 255, 255, 0.6);
   text-decoration: none;
