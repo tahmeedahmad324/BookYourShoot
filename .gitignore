@@ -3,5 +3,4 @@ backend/.venv/Include
 backend/.venv/Lib
 backend/.venv/Scripts
 backend/.venv/pyvenv.cfg
-backend/__pycache__/
-backend/*.pyc
+backend/.venv/__pycache__
