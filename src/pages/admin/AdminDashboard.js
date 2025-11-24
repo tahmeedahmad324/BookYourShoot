@@ -224,7 +224,7 @@ const AdminDashboard = () => {
                       <span className="badge bg-warning ms-2">{stats.pendingVerifications}</span>
                     )}
                   </h5>
-                  <Link to="/admin/verifications" className="btn btn-outline-primary btn-sm">
+                  <Link to="/admin/verifications" className="btn btn-outline-primary btn-sm" onClick={() => window.scrollTo(0, 0)}>
                     View All
                   </Link>
                 </div>
@@ -282,7 +282,7 @@ const AdminDashboard = () => {
                             </td>
                             <td>
                               <div className="btn-group btn-group-sm">
-                                <Link to={`/admin/verify/${photographer.id}`} className="btn btn-outline-primary">
+                                <Link to={`/admin/verify/${photographer.id}`} className="btn btn-outline-primary" onClick={() => window.scrollTo(0, 0)}>
                                   👁️ Review
                                 </Link>
                                 <button className="btn btn-outline-success">✓ Approve</button>
@@ -316,7 +316,7 @@ const AdminDashboard = () => {
               </div>
               <div className="card-body">
                 <div className="d-grid gap-2">
-                  <Link to="/admin/verifications" className="btn btn-primary text-start">
+                  <Link to="/admin/verifications" className="btn btn-primary text-start" onClick={() => window.scrollTo(0, 0)}>
                     🔍 Photographer Verifications
                   </Link>
                   <button className="btn btn-outline-primary text-start">👥 User Management</button>
@@ -362,7 +362,7 @@ const AdminDashboard = () => {
                     </div>
                   ))}
                 </div>
-                <Link to="/admin/complaints" className="btn btn-outline-primary w-100 mt-3">
+                <Link to="/admin/complaints" className="btn btn-outline-primary w-100 mt-3" onClick={() => window.scrollTo(0, 0)}>
                   View All Complaints
                 </Link>
               </div>

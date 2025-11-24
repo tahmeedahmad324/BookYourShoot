@@ -113,7 +113,7 @@ const PhotographerProfile = () => {
           <div className="text-center py-5">
             <h4 className="fw-bold mb-3">Photographer Not Found</h4>
             <p className="text-muted mb-4">The photographer you're looking for doesn't exist.</p>
-            <Link to="/search" className="btn btn-primary">
+            <Link to="/search" className="btn btn-primary" onClick={() => window.scrollTo(0, 0)}>
               Find Photographers
             </Link>
           </div>
@@ -174,13 +174,13 @@ const PhotographerProfile = () => {
             <div className="col-md-3 text-md-end">
               <div className="text-white mb-3">
                 <div className="small opacity-75">Starting from</div>
-                <div className="h2 fw-bold">₹{photographer.hourly_rate}/hr</div>
+                <div className="h2 fw-bold">PKR {photographer.hourly_rate}/hr</div>
               </div>
               <div className="d-grid gap-2">
-                <Link to={`/booking/request/${photographer.id}`} className="btn btn-light">
+                <Link to={`/booking/request/${photographer.id}`} className="btn btn-light" onClick={() => window.scrollTo(0, 0)}>
                   📅 Book Now
                 </Link>
-                <Link to={`/client/chat/${photographer.id}`} className="btn btn-outline-light">
+                <Link to={`/client/chat/${photographer.id}`} className="btn btn-outline-light" onClick={() => window.scrollTo(0, 0)}>
                   💬 Chat
                 </Link>
               </div>
@@ -300,10 +300,10 @@ const PhotographerProfile = () => {
                     </ul>
 
                     <div className="mt-4">
-                      <Link to={`/booking/request/${photographer.id}`} className="btn btn-primary w-100 mb-2">
+                      <Link to={`/booking/request/${photographer.id}`} className="btn btn-primary w-100 mb-2" onClick={() => window.scrollTo(0, 0)}>
                         📅 Book Now
                       </Link>
-                      <Link to={`/client/chat/${photographer.id}`} className="btn btn-outline-primary w-100">
+                      <Link to={`/client/chat/${photographer.id}`} className="btn btn-outline-primary w-100" onClick={() => window.scrollTo(0, 0)}>
                         💬 Send Message
                       </Link>
                     </div>
@@ -384,7 +384,7 @@ const PhotographerProfile = () => {
                         </div>
                         <div className="d-flex justify-content-between mb-3">
                           <span className="text-muted">Starting Price:</span>
-                          <span className="fw-bold text-primary">₹{service.startingPrice.toLocaleString()}</span>
+                          <span className="fw-bold text-primary">PKR {service.startingPrice.toLocaleString()}</span>
                         </div>
                       </div>
                       <Link to={`/booking/request/${photographer.id}?service=${service.name}`} className="btn btn-primary w-100">

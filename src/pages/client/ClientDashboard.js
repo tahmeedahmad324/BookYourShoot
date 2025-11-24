@@ -175,7 +175,7 @@ const ClientDashboard = () => {
               <div className="card-header bg-white border-0 pt-4 pb-3">
                 <div className="d-flex justify-content-between align-items-center">
                   <h5 className="fw-bold mb-0">Recent Bookings</h5>
-                  <Link to="/client/bookings" className="btn btn-outline-primary btn-sm">
+                  <Link to="/client/bookings" className="btn btn-outline-primary btn-sm" onClick={() => window.scrollTo(0, 0)}>
                     View All
                   </Link>
                 </div>
@@ -251,7 +251,7 @@ const ClientDashboard = () => {
                     </div>
                     <h6 className="text-muted">No bookings yet</h6>
                     <p className="text-muted mb-4">Book your first photographer to get started</p>
-                    <Link to="/search" className="btn btn-primary">
+                    <Link to="/search" className="btn btn-primary" onClick={() => window.scrollTo(0, 0)}>
                       Find Photographers
                     </Link>
                   </div>
@@ -269,19 +269,19 @@ const ClientDashboard = () => {
               </div>
               <div className="card-body">
                 <div className="d-grid gap-2">
-                  <Link to="/search" className="btn btn-primary text-start">
+                  <Link to="/search" className="btn btn-primary text-start" onClick={() => window.scrollTo(0, 0)}>
                     🔍 Find Photographers
                   </Link>
-                  <Link to="/client/bookings" className="btn btn-outline-primary text-start">
+                  <Link to="/client/bookings" className="btn btn-outline-primary text-start" onClick={() => window.scrollTo(0, 0)}>
                     📅 View All Bookings
                   </Link>
-                  <Link to="/client/album-builder" className="btn btn-outline-primary text-start">
+                  <Link to="/client/album-builder" className="btn btn-outline-primary text-start" onClick={() => window.scrollTo(0, 0)}>
                     🎨 Album Builder
                   </Link>
-                  <Link to="/client/reel-generator" className="btn btn-outline-primary text-start">
+                  <Link to="/client/reel-generator" className="btn btn-outline-primary text-start" onClick={() => window.scrollTo(0, 0)}>
                     🎬 Reel Generator
                   </Link>
-                  <Link to="/client/music-suggestion" className="btn btn-outline-primary text-start">
+                  <Link to="/client/music-suggestion" className="btn btn-outline-primary text-start" onClick={() => window.scrollTo(0, 0)}>
                     🎵 Music Suggestions
                   </Link>
                 </div>
@@ -311,14 +311,14 @@ const ClientDashboard = () => {
                       </div>
                       <div className="text-end">
                         <div className="small text-primary fw-semibold">PKR {photographer.hourly_rate}/hr</div>
-                        <Link to={`/photographer/${photographer.id}`} className="btn btn-sm btn-outline-primary mt-1">
+                        <Link to={`/photographer/${photographer.id}`} className="btn btn-sm btn-outline-primary mt-1" onClick={() => window.scrollTo(0, 0)}>
                           View
                         </Link>
                       </div>
                     </div>
                   ))}
                 </div>
-                <Link to="/search" className="btn btn-outline-primary w-100 mt-3">
+                <Link to="/search" className="btn btn-outline-primary w-100 mt-3" onClick={() => window.scrollTo(0, 0)}>
                   View All Photographers
                 </Link>
               </div>

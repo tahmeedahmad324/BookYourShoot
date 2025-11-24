@@ -48,7 +48,7 @@ const Features = () => {
         <div className="row g-4">
           {features.map((feature, index) => (
             <div key={index} className="col-md-6 col-lg-3">
-              <Link to={feature.link} className="feature-card-link">
+              <Link to={feature.link} className="feature-card-link" onClick={() => window.scrollTo(0, 0)}>
                 <div className="card feature-card h-100">
                   <div className="card-body text-center">
                     {/* Feature icon */}
@@ -85,27 +85,27 @@ const Features = () => {
           </p>
           <div className="row justify-content-center mb-4">
             <div className="col-md-3 col-6 text-center mb-3">
-              <div className="fw-bold" style={{ fontSize: '2rem', color: 'var(--primary-blue)' }}>6,000+</div>
+              <div className="fw-bold" style={{ fontSize: '2rem', color: 'var(--primary-purple)' }}>6,000+</div>
               <div className="small text-muted">Active Photographers</div>
             </div>
             <div className="col-md-3 col-6 text-center mb-3">
-              <div className="fw-bold" style={{ fontSize: '2rem', color: 'var(--primary-blue)' }}>100k+</div>
+              <div className="fw-bold" style={{ fontSize: '2rem', color: 'var(--primary-purple)' }}>100k+</div>
               <div className="small text-muted">Bookings</div>
             </div>
             <div className="col-md-3 col-6 text-center mb-3">
-              <div className="fw-bold" style={{ fontSize: '2rem', color: 'var(--primary-blue)' }}>4.8★</div>
+              <div className="fw-bold" style={{ fontSize: '2rem', color: 'var(--primary-purple)' }}>4.8★</div>
               <div className="small text-muted">Average Rating</div>
             </div>
             <div className="col-md-3 col-6 text-center mb-3">
-              <div className="fw-bold" style={{ fontSize: '2rem', color: 'var(--primary-blue)' }}>50+</div>
+              <div className="fw-bold" style={{ fontSize: '2rem', color: 'var(--primary-purple)' }}>50+</div>
               <div className="small text-muted">Cities</div>
             </div>
           </div>
           <div className="d-flex justify-content-center gap-3 flex-wrap">
-            <Link to="/register" className="btn btn-primary btn-lg px-5 py-3">
+            <Link to="/register" className="btn btn-primary btn-lg px-5 py-3" onClick={() => window.scrollTo(0, 0)}>
               Join as Photographer
             </Link>
-            <Link to="/search" className="btn btn-outline-primary btn-lg px-5 py-3">
+            <Link to="/search" className="btn btn-outline-primary btn-lg px-5 py-3" onClick={() => window.scrollTo(0, 0)}>
               Browse Photographers
             </Link>
           </div>

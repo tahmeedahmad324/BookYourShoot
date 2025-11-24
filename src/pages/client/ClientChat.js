@@ -159,7 +159,7 @@ const ClientChat = () => {
           <div className="text-center py-5">
             <h4 className="fw-bold mb-3">Photographer Not Found</h4>
             <p className="text-muted mb-4">The photographer you're trying to chat with doesn't exist.</p>
-            <Link to="/search" className="btn btn-primary">
+            <Link to="/search" className="btn btn-primary" onClick={() => window.scrollTo(0, 0)}>
               Find Photographers
             </Link>
           </div>
@@ -194,7 +194,7 @@ const ClientChat = () => {
               </div>
             </div>
             <div className="col-auto">
-              <Link to={`/photographer/${photographer.id}`} className="btn btn-light btn-sm">
+              <Link to={`/photographer/${photographer.id}`} className="btn btn-light btn-sm" onClick={() => window.scrollTo(0, 0)}>
                 View Profile
               </Link>
             </div>
@@ -318,7 +318,7 @@ const ClientChat = () => {
               </div>
               <div className="card-body">
                 <div className="d-grid gap-2">
-                  <Link to={`/booking/request/${photographer.id}`} className="btn btn-primary">
+                  <Link to={`/booking/request/${photographer.id}`} className="btn btn-primary" onClick={() => window.scrollTo(0, 0)}>
                     📅 Book {photographer.name}
                   </Link>
                   <button className="btn btn-outline-primary">
@@ -355,7 +355,7 @@ const ClientChat = () => {
                   </div>
                   <div className="d-flex justify-content-between mb-1">
                     <span className="text-muted">Rate:</span>
-                    <span className="fw-semibold">₹{photographer.hourly_rate}/hr</span>
+                    <span className="fw-semibold">PKR {photographer.hourly_rate}/hr</span>
                   </div>
                 </div>
                 

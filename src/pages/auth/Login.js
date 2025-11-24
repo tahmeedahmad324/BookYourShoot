@@ -68,11 +68,11 @@ const Login = () => {
   };
 
   return (
-    <div className="login-page py-5">
+    <div className="login-page py-5" style={{ background: 'radial-gradient(circle at top right, rgba(168, 85, 247, 0.1) 0%, transparent 50%), linear-gradient(135deg, #f3e8ff 0%, #e9d5ff 100%)', minHeight: '100vh' }}>
       <div className="container">
         <div className="row justify-content-center">
-          <div className="col-md-6 col-lg-5">
-            <div className="card border-0 shadow-lg">
+          <div className="col-md-8 col-lg-6">
+            <div className="card border-0 shadow-lg" style={{ borderRadius: '16px' }}>
               <div className="card-body p-5">
                 {/* Logo and Header */}
                 <div className="text-center mb-4">
@@ -206,7 +206,11 @@ const Login = () => {
                 <div className="text-center mt-4">
                   <p className="mb-0">
                     Don't have an account?{' '}
-                    <Link to="/register" className="text-primary text-decoration-none fw-semibold">
+                    <Link 
+                      to="/register" 
+                      className="text-primary text-decoration-none fw-semibold"
+                      onClick={() => window.scrollTo(0, 0)}
+                    >
                       Sign up here
                     </Link>
                   </p>

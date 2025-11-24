@@ -61,10 +61,10 @@ const TermsAndConditions = () => {
               </div>
 
               <div className="d-flex justify-content-between mt-4">
-                <Link to="/" className="btn btn-outline-primary">
+                <Link to="/" className="btn btn-outline-primary" onClick={() => window.scrollTo(0, 0)}>
                   Back to Home
                 </Link>
-                <Link to="/privacy" className="btn btn-outline-primary">
+                <Link to="/privacy" className="btn btn-outline-primary" onClick={() => window.scrollTo(0, 0)}>
                   Privacy Policy
                 </Link>
               </div>

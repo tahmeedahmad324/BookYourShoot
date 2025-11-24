@@ -62,7 +62,7 @@ const HowItWorks = () => {
                 </p>
 
                 {/* Step link */}
-                <Link to={step.link} className="step-link">
+                <Link to={step.link} className="step-link" onClick={() => window.scrollTo(0, 0)}>
                   {step.linkText} →
                 </Link>
 
@@ -73,24 +73,6 @@ const HowItWorks = () => {
               </div>
             </div>
           ))}
-        </div>
-
-        {/* Bottom CTA */}
-        <div className="text-center mt-5">
-          <div className="cta-card bg-white p-4 rounded-3 shadow-sm">
-            <h4 className="mb-3">Ready to get started?</h4>
-            <p className="text-muted mb-4">
-              Join thousands of happy customers who have found their perfect photographer through BookYourShoot
-            </p>
-            <div className="d-flex justify-content-center gap-3 flex-wrap">
-              <Link to="/search" className="btn btn-primary">
-                Find Photographers
-              </Link>
-              <Link to="/register" className="btn btn-outline-primary">
-                Sign Up
-              </Link>
-            </div>
-          </div>
         </div>
       </div>
     </section>

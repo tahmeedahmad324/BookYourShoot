@@ -113,14 +113,14 @@ const Support = () => {
             <div className="card-body text-center p-5">
               <h5 className="fw-bold mb-3">Didn't find what you're looking for?</h5>
               <p className="text-muted mb-3">Contact our support team for personalized assistance</p>
-              <Link to="/contact" className="btn btn-primary">
+              <Link to="/contact" className="btn btn-primary" onClick={() => window.scrollTo(0, 0)}>
                 Contact Support
               </Link>
             </div>
           </div>
 
           <div className="text-center mt-4">
-            <Link to="/" className="btn btn-outline-primary">
+            <Link to="/" className="btn btn-outline-primary" onClick={() => window.scrollTo(0, 0)}>
               Back to Home
             </Link>
           </div>

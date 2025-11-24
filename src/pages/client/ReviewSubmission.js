@@ -185,7 +185,7 @@ const ReviewSubmission = () => {
           <div className="text-center py-5">
             <h4 className="fw-bold mb-3">Photographer Not Found</h4>
             <p className="text-muted mb-4">The photographer you want to review doesn't exist.</p>
-            <Link to="/search" className="btn btn-primary">
+            <Link to="/search" className="btn btn-primary" onClick={() => window.scrollTo(0, 0)}>
               Find Photographers
             </Link>
           </div>
@@ -376,7 +376,7 @@ const ReviewSubmission = () => {
                         </>
                       )}
                     </button>
-                    <Link to={`/photographer/${photographer.id}`} className="btn btn-outline-secondary btn-lg">
+                    <Link to={`/photographer/${photographer.id}`} className="btn btn-outline-secondary btn-lg" onClick={() => window.scrollTo(0, 0)}>
                       Cancel
                     </Link>
                   </div>

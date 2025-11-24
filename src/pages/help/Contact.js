@@ -155,7 +155,7 @@ const Contact = () => {
                 +92-300-1234567
               </a>
             </p>
-            <Link to="/" className="btn btn-outline-primary mt-3">
+            <Link to="/" className="btn btn-outline-primary mt-3" onClick={() => window.scrollTo(0, 0)}>
               Back to Home
             </Link>
           </div>
