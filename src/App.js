@@ -2,6 +2,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-d
 import Navbar from "./components/common/Navbar"
 import Footer from "./components/common/Footer"
 import ProtectedRoute from "./components/common/ProtectedRoute"
+import AIChatbot from "./components/common/AIChatbot"
 
 // Public Pages
 import LandingPage from "./pages/public/LandingPage"
@@ -212,6 +213,7 @@ function App() {
             </Routes>
           </main>
           <Footer />
+          <AIChatbot />
         </div>
       </Router>
     </AuthProvider>
