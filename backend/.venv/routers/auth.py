@@ -1,19 +1,78 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
+from pydantic import BaseModel
+from supabase_client import supabase
 
-router = APIRouter(prefix="/auth", tags=["Auth"])
+router = APIRouter(prefix="/auth", tags=["Authentication"])
+
+
+class SignupRequest(BaseModel):
+    email: str
+    full_name: str
+    phone: str
+    city: str
+
 
 @router.post("/signup")
-def signup():
-    return {"msg": "signup endpoint"}
+def signup(payload: SignupRequest):
+    try:
+        # Step 1: Create supabase user (this sends OTP automatically)
+        response = supabase.auth.sign_up({
+            "email": payload.email,
+            "password": "TEMP_PASSWORD_123"   # Required even if not used
+        })
 
-@router.post("/login")
-def login():
-    return {"msg": "login endpoint"}
+        if response.user is None:
+            raise HTTPException(status_code=400, detail="Error creating user.")
 
-@router.post("/send-otp")
-def send_otp():
-    return {"msg": "send otp"}
+        # Step 2: Store metadata after OTP verification, not now!
+        # So we return user_id temporarily so front-end can reuse it
+        return {
+            "message": "OTP sent to email.",
+            "user_id_temp": response.user.id
+        }
+
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+class VerifyOtpRequest(BaseModel):
+    email: str
+    otp: str
+    full_name: str
+    phone: str
+    city: str
+
 
 @router.post("/verify-otp")
-def verify_otp():
-    return {"msg": "verify otp"}
+def verify_otp(payload: VerifyOtpRequest):
+    try:
+        # Step 1: Verify OTP
+        response = supabase.auth.verify_otp({
+            "type": "email",
+            "email": payload.email,
+            "token": payload.otp
+        })
+
+        if response.session is None:
+            raise HTTPException(status_code=400, detail="OTP verification failed.")
+
+        user_id = response.user.id
+
+        # Step 2: Insert user into our database after verification
+        supabase.table("users").insert({
+            "id": user_id,
+            "email": payload.email,
+            "full_name": payload.full_name,
+            "phone": payload.phone,
+            "city": payload.city,
+            "role": "client"   # default
+        }).execute()
+
+        return {
+            "message": "OTP verified & user created.",
+            "access_token": response.session.access_token,
+            "user_id": user_id
+        }
+
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
