@@ -1,16 +1,25 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from routers import auth, photographers, booking, cnic, chat
+
 app = FastAPI()
 
 app.add_middleware(
-  CORSMiddleware,
-  allow_origins=["http://localhost:3000"],  # update when deployed
-  allow_credentials=True,
-  allow_methods=["*"],
-  allow_headers=["*"],
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
+
+# Register routes
+app.include_router(auth.router)
+app.include_router(photographers.router)
+app.include_router(booking.router)
+app.include_router(cnic.router)
+app.include_router(chat.router)
 
 @app.get("/")
 def root():
-  return {"status": "ok"}
+    return {"status": "ok"}
