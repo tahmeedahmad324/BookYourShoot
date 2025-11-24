@@ -55,18 +55,6 @@ const Navbar = () => {
     return publicLinks
   }
 
-  const [activeSection, setActiveSection] = useState('')
-  useEffect(() => {
-    const sectionIds = ['services','how-it-works','for-photographers']
-    const sections = sectionIds.map(id => document.getElementById(id)).filter(Boolean)
-    if (!sections.length) return
-    const observer = new IntersectionObserver((entries) => {
-      entries.forEach(entry => { if (entry.isIntersecting) setActiveSection(entry.target.id) })
-    }, { root: null, rootMargin: '0px 0px -55% 0px', threshold: [0.25,0.5,0.75] })
-    sections.forEach(sec => observer.observe(sec))
-    return () => observer.disconnect()
-  }, [])
-
   const animateScroll = (targetY, duration = 600) => {
     const startY = window.pageYOffset
     const diff = targetY - startY
@@ -78,12 +66,31 @@ const Navbar = () => {
 
   const handleSectionLink = (e, id) => {
     if(!id) return
+    e.preventDefault()
+    // If not on landing page, navigate to home first
+    if (location.pathname !== '/') {
+      navigate('/')
+      // Wait for navigation then scroll
+      setTimeout(() => {
+        const el = document.getElementById(id)
+        if (el) {
+          const navbars = Array.from(document.querySelectorAll('.navbar'))
+          const totalHeight = navbars.reduce((sum,n)=> sum + n.offsetHeight,0)
+          const extraOffset = id === 'for-photographers' ? 50 : 20
+          const y = el.getBoundingClientRect().top + window.pageYOffset - totalHeight - extraOffset
+          animateScroll(y)
+        }
+      }, 100)
+      setExpanded(false)
+      return
+    }
+    // Already on landing page, just scroll
     const el = document.getElementById(id)
     if(!el) return
-    e.preventDefault()
     const navbars = Array.from(document.querySelectorAll('.navbar'))
     const totalHeight = navbars.reduce((sum,n)=> sum + n.offsetHeight,0)
-    const y = el.getBoundingClientRect().top + window.pageYOffset - totalHeight + 8
+    const extraOffset = id === 'for-photographers' ? 50 : 20
+    const y = el.getBoundingClientRect().top + window.pageYOffset - totalHeight - extraOffset
     animateScroll(y)
     setExpanded(false)
   }
@@ -125,7 +132,7 @@ const Navbar = () => {
                 {link.sectionId ? (
                   <a
                     href={link.path}
-                    className={`nav-link ${activeSection === link.sectionId ? 'active' : ''}`}
+                    className="nav-link"
                     onClick={(e) => handleSectionLink(e, link.sectionId)}
                   >
                     {link.label}

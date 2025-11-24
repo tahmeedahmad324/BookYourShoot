@@ -1,8 +1,8 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import SearchForm from './SearchForm';
 
-const Hero = ({ searchData, setSearchData }) => {
+// Search form removed per request
+const Hero = () => {
   const navigate = useNavigate();
 
   const handleBookNow = () => {
@@ -43,10 +43,7 @@ const Hero = ({ searchData, setSearchData }) => {
                 </button>
               </div>
 
-              {/* Search Form */}
-              <div className="hero-search">
-                <SearchForm searchData={searchData} setSearchData={setSearchData} />
-              </div>
+              {/* Search form removed */}
             </div>
           </div>
 
