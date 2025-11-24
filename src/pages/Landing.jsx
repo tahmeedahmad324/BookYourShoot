@@ -6,11 +6,11 @@ import AppDownloads from '../components/landing/AppDownloads';
 import '../styles/landing.css';
 
 const Landing = () => {
-  const [searchData, setSearchData] = useState({ city: '', service: 'all' });
+  // searchData removed with search form removal
 
   return (
     <div className="landing-page">
-      <Hero searchData={searchData} setSearchData={setSearchData} />
+      <Hero />
       <Features />
       <HowItWorks />
       <AppDownloads />
