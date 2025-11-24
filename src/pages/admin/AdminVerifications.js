@@ -56,7 +56,7 @@ const AdminVerifications = () => {
         <div className="col-12">
           <div className="d-flex justify-content-between align-items-center">
             <h2 className="fw-bold">Photographer Verifications</h2>
-            <Link to="/admin/dashboard" className="btn btn-outline-primary">
+            <Link to="/admin/dashboard" className="btn btn-outline-primary" onClick={() => window.scrollTo(0, 0)}>
               Back to Dashboard
             </Link>
           </div>

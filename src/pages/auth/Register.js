@@ -108,39 +108,41 @@ const Register = () => {
   };
 
   return (
-    <div className="register-page py-5">
+    <div className="register-page py-5" style={{ background: 'radial-gradient(circle at top right, rgba(168, 85, 247, 0.1) 0%, transparent 50%), linear-gradient(135deg, #f3e8ff 0%, #e9d5ff 100%)', minHeight: '100vh' }}>
       <div className="container">
         <div className="row justify-content-center">
-          <div className="col-lg-10 col-xl-8">
+          <div className="col-lg-11 col-xl-10">
             {/* Role Selection Section */}
             <div className="text-center mb-5">
-              <h2 className="fw-bold mb-3">Join BookYourShoot</h2>
-              <p className="text-muted">Choose your role and start your photography journey</p>
+              <h2 className="fw-bold mb-3" style={{ fontSize: '2.5rem' }}>Join BookYourShoot</h2>
+              <p className="text-muted" style={{ fontSize: '1.1rem' }}>Choose your role and start your photography journey</p>
               
-              <div className="row g-3 mt-2">
+              <div className="row g-4 mt-3">
                 {Object.entries(roleDescriptions).map(([role, desc]) => {
-                  const cardClass = 'card h-100 border-2 ' + (selectedRole === role ? ('border-' + desc.color + ' bg-light') : 'border-soft-gray');
-                  const borderCol = selectedRole === role
-                    ? ('var(--' + (desc.color === 'primary' ? 'primary-blue' : (desc.color === 'secondary' ? 'primary-orange' : 'dark-neutral')) + ')')
-                    : 'var(--soft-gray)';
+                  const isSelected = selectedRole === role;
+                  const borderCol = isSelected ? 'var(--primary-purple)' : 'var(--soft-gray)';
 
                   return (
                   <div className="col-md-4" key={role}>
                     <div 
-                      className={cardClass}
+                      className={`card h-100 ${isSelected ? 'border-primary shadow-sm' : ''}`}
                       style={{ 
                         cursor: 'pointer',
-                        borderWidth: selectedRole === role ? '2px' : '1px',
-                        borderColor: borderCol
+                        borderWidth: isSelected ? '3px' : '1px',
+                        borderColor: borderCol,
+                        borderRadius: '12px',
+                        transition: 'all 0.3s ease',
+                        transform: isSelected ? 'scale(1.05)' : 'scale(1)',
+                        backgroundColor: isSelected ? 'rgba(139, 92, 246, 0.05)' : 'white'
                       }}
                       onClick={() => handleRoleSelect(role)}
                     >
-                      <div className="card-body text-center p-3">
-                        <div className={'text-' + desc.color + ' mb-2'} style={{ fontSize: '2rem' }}>
+                      <div className="card-body text-center p-4">
+                        <div className="mb-3" style={{ fontSize: '3rem' }}>
                           {desc.icon}
                         </div>
-                        <h6 className="fw-bold mb-1">{desc.title}</h6>
-                        <p className="small text-muted mb-0">{desc.description}</p>
+                        <h5 className="fw-bold mb-2">{desc.title}</h5>
+                        <p className="text-muted mb-0" style={{ fontSize: '0.95rem' }}>{desc.description}</p>
                       </div>
                     </div>
                   </div>
@@ -154,18 +156,18 @@ const Register = () => {
 
             {/* Registration Form */}
             {selectedRole && (
-              <div className="card border-0 shadow-lg fade-in">
-                <div className="card-body p-5">
-                  <div className="text-center mb-4">
+              <div className="card border-0 shadow-lg fade-in" style={{ borderRadius: '16px' }}>
+                <div className="card-body p-5" style={{ padding: '3rem !important' }}>
+                  <div className="text-center mb-5">
                     <div className="mb-3">
-                      <span style={{ fontSize: '2.5rem' }}>
+                      <span style={{ fontSize: '3.5rem' }}>
                         {roleDescriptions[selectedRole].icon}
                       </span>
                     </div>
-                    <h3 className="fw-bold">
+                    <h3 className="fw-bold" style={{ fontSize: '2rem' }}>
                       Register as {selectedRole.charAt(0).toUpperCase() + selectedRole.slice(1)}
                     </h3>
-                    <p className="text-muted">Fill in your details to get started</p>
+                    <p className="text-muted" style={{ fontSize: '1.05rem' }}>Fill in your details to get started</p>
                   </div>
 
                   {/* Server Error */}

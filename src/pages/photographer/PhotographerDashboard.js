@@ -215,7 +215,7 @@ const PhotographerDashboard = () => {
               <div className="card-header bg-white border-0 pt-4 pb-3">
                 <div className="d-flex justify-content-between align-items-center">
                   <h5 className="fw-bold mb-0">Recent Bookings</h5>
-                  <Link to="/photographer/bookings" className="btn btn-outline-primary btn-sm">
+                  <Link to="/photographer/bookings" className="btn btn-outline-primary btn-sm" onClick={() => window.scrollTo(0, 0)}>
                     View All Bookings
                   </Link>
                 </div>
@@ -365,7 +365,7 @@ const PhotographerDashboard = () => {
                     <p className="text-muted small">Your confirmed bookings will appear here</p>
                   </div>
                 )}
-                <Link to="/photographer/bookings" className="btn btn-outline-primary w-100 mt-3">
+                <Link to="/photographer/bookings" className="btn btn-outline-primary w-100 mt-3" onClick={() => window.scrollTo(0, 0)}>
                   View All Bookings
                 </Link>
               </div>

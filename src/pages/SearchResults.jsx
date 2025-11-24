@@ -34,7 +34,7 @@ const SearchResults = () => {
 
   if (loading) {
     return (
-      <div className="search-results py-5">
+      <div className="search-results py-5" style={{ background: 'radial-gradient(circle at top left, rgba(168, 85, 247, 0.08) 0%, transparent 50%), linear-gradient(135deg, #f3e8ff 0%, #e9d5ff 100%)', minHeight: '100vh' }}>
         <div className="container landing-container">
           <div className="text-center py-5">
             <div className="spinner-border text-primary" role="status">
@@ -49,7 +49,7 @@ const SearchResults = () => {
 
   if (error) {
     return (
-      <div className="search-results py-5">
+      <div className="search-results py-5" style={{ background: 'radial-gradient(circle at top left, rgba(168, 85, 247, 0.08) 0%, transparent 50%), linear-gradient(135deg, #f3e8ff 0%, #e9d5ff 100%)', minHeight: '100vh' }}>
         <div className="container landing-container">
           <div className="text-center py-5">
             <h3 className="text-danger mb-3">Error</h3>
@@ -68,12 +68,12 @@ const SearchResults = () => {
 
   if (!city) {
     return (
-      <div className="search-results py-5">
+      <div className="search-results py-5" style={{ background: 'radial-gradient(circle at top left, rgba(168, 85, 247, 0.08) 0%, transparent 50%), linear-gradient(135deg, #f3e8ff 0%, #e9d5ff 100%)', minHeight: '100vh' }}>
         <div className="container landing-container">
           <div className="text-center py-5">
             <h3>No Search Parameters</h3>
             <p>Please specify a city to search for photographers.</p>
-            <Link to="/" className="btn btn-primary">
+            <Link to="/" className="btn btn-primary" onClick={() => window.scrollTo(0, 0)}>
               Back to Search
             </Link>
           </div>
@@ -83,7 +83,7 @@ const SearchResults = () => {
   }
 
   return (
-    <div className="search-results py-5">
+    <div className="search-results py-5" style={{ background: 'radial-gradient(circle at top left, rgba(168, 85, 247, 0.08) 0%, transparent 50%), linear-gradient(135deg, #f3e8ff 0%, #e9d5ff 100%)', minHeight: '100vh' }}>
       <div className="container landing-container">
         {/* Header */}
         <div className="text-center mb-5">
@@ -104,7 +104,7 @@ const SearchResults = () => {
             <p className="text-muted mb-4">
               Try adjusting your search criteria or search in a different city.
             </p>
-            <Link to="/" className="btn btn-primary">
+            <Link to="/" className="btn btn-primary" onClick={() => window.scrollTo(0, 0)}>
               Back to Search
             </Link>
           </div>
@@ -192,10 +192,10 @@ const SearchResults = () => {
             Try expanding your search or contact us for personalized recommendations.
           </p>
           <div className="d-flex justify-content-center gap-3">
-            <Link to="/" className="btn btn-outline-primary">
+            <Link to="/" className="btn btn-outline-primary" onClick={() => window.scrollTo(0, 0)}>
               New Search
             </Link>
-            <Link to="/contact" className="btn btn-primary">
+            <Link to="/contact" className="btn btn-primary" onClick={() => window.scrollTo(0, 0)}>
               Contact Support
             </Link>
           </div>

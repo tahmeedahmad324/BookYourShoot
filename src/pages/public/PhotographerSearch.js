@@ -223,7 +223,7 @@ const PhotographerSearch = () => {
   }
 
   return (
-    <div className="photographer-search py-4">
+    <div className="photographer-search py-4" style={{ background: 'radial-gradient(circle at top left, rgba(168, 85, 247, 0.08) 0%, transparent 50%), linear-gradient(135deg, #f3e8ff 0%, #e9d5ff 100%)', minHeight: '100vh' }}>
       <div className="container">
         {/* Search Header */}
         <div className="row mb-4">
@@ -494,7 +494,7 @@ const PhotographerSearch = () => {
                                 >
                                   View Profile
                                 </Link>
-                                <Link to={`/booking/request/${photographer.id}`} className="btn btn-primary btn-sm">
+                                <Link to={`/booking/request/${photographer.id}`} className="btn btn-primary btn-sm" onClick={() => window.scrollTo(0, 0)}>
                                   Book Now
                                 </Link>
                               </div>

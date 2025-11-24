@@ -2,7 +2,7 @@ import React from 'react';
 
 const AppDownloads = () => {
   return (
-    <section className="app-downloads-section bg-primary text-white" style={{ paddingTop: '3rem', paddingBottom: '3rem', marginBottom: 0 }}>
+    <section className="app-downloads-section" style={{ paddingTop: '3rem', paddingBottom: '3rem', marginBottom: 0 }}>
       <div className="container landing-container">
         <div className="row align-items-center">
           {/* Left column - Content */}
@@ -38,7 +38,7 @@ const AppDownloads = () => {
               {/* Web features call-to-action */}
               <div className="download-buttons mt-4">
                 <a
-                  href="/photographers"
+                  href="/search"
                   className="download-button"
                   aria-label="Browse photographers"
                 >

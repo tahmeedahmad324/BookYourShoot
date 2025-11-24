@@ -282,7 +282,7 @@ const ClientBookings = () => {
                   : 'You haven\'t made any bookings yet'
                 }
               </p>
-              <Link to="/search" className="btn btn-primary">
+              <Link to="/search" className="btn btn-primary" onClick={() => window.scrollTo(0, 0)}>
                 Find Photographers
               </Link>
             </div>
