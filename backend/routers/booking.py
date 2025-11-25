@@ -1,6 +1,7 @@
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
 from backend.supabase_client import supabase
+from backend.auth import get_current_user
 
 router = APIRouter(prefix="/bookings", tags=["Booking"])
 
@@ -16,9 +17,16 @@ class CreateBookingRequest(BaseModel):
 
 
 @router.post("/")
-def create_booking(payload: CreateBookingRequest, user_id: str = None):
+def create_booking(payload: CreateBookingRequest, current_user: dict = Depends(get_current_user)):
     try:
-        # user_id should be extracted from auth middleware; accept as param for now
+        # Extract user id from verified user object
+        user_id = None
+        if isinstance(current_user, dict):
+            user_id = current_user.get("id") or current_user.get("sub")
+        else:
+            # supabase client can return a user-like object with .id
+            user_id = getattr(current_user, 'id', None)
+
         if not user_id:
             raise HTTPException(status_code=401, detail="Unauthorized")
 
@@ -40,8 +48,15 @@ def create_booking(payload: CreateBookingRequest, user_id: str = None):
 
 
 @router.get("/")
-def list_bookings(role: str = "client", user_id: str = None):
+def list_bookings(role: str = "client", current_user: dict = Depends(get_current_user)):
     try:
+        # determine user id from current_user
+        user_id = None
+        if isinstance(current_user, dict):
+            user_id = current_user.get("id") or current_user.get("sub")
+        else:
+            user_id = getattr(current_user, 'id', None)
+
         if not user_id:
             raise HTTPException(status_code=401, detail="Unauthorized")
 
@@ -56,8 +71,14 @@ def list_bookings(role: str = "client", user_id: str = None):
 
 
 @router.get("/{booking_id}")
-def get_booking(booking_id: str, user_id: str = None):
+def get_booking(booking_id: str, current_user: dict = Depends(get_current_user)):
     try:
+        user_id = None
+        if isinstance(current_user, dict):
+            user_id = current_user.get("id") or current_user.get("sub")
+        else:
+            user_id = getattr(current_user, 'id', None)
+
         if not user_id:
             raise HTTPException(status_code=401, detail="Unauthorized")
 
