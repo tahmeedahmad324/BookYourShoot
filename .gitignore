@@ -1,7 +1,4 @@
 node_modules
-backend/.venv/Include
-backend/.venv/Lib
-backend/.venv/Scripts
-backend/.venv/pyvenv.cfg
-backend/.venv/__pycache__
-backend/.venv/.env
+backend/.venv
+backend/.env
+package-lock.json
