@@ -1,4 +1,5 @@
 node_modules
 backend/.venv
 backend/.env
-package-lock.json
+backend/__pycache__
+backend/routers/__pycache__
