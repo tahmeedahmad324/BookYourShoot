@@ -4,6 +4,7 @@ import { useForm } from 'react-hook-form';
 import { yupResolver } from '@hookform/resolvers/yup';
 import * as yup from 'yup';
 import { useAuth } from '../../context/AuthContext';
+import { sendOTP, registerWithOTP } from '../../api/auth';
 
 // Validation schema
 const registerSchema = yup.object().shape({
@@ -61,26 +62,22 @@ const Register = () => {
     setServerError('');
 
     try {
-      // Simulate API call for registration
-      await new Promise(resolve => setTimeout(resolve, 1500));
-
-      // Mock successful registration - in real app, this would be an API call
-      const userData = {
-        id: Date.now(),
-        name: data.name,
+      // Send OTP to user's email via backend
+      const response = await sendOTP(data.email);
+      
+      // Store registration data in session for OTP verification step
+      sessionStorage.setItem('registrationData', JSON.stringify({
         email: data.email,
+        full_name: data.name,
         phone: data.phone,
-        role: data.role,
-        verified: data.role === 'admin' // Admins are auto-verified
-      };
-
-      // Auto-login after registration but require OTP verification first
-      login(userData, 'mock-jwt-token-new-user');
-
-      // Redirect to OTP verification for all users
-      navigate('/verify-otp');
+        city: 'Lahore', // Default, can add city field to form
+        role: data.role
+      }));
+      
+      // Navigate to OTP verification with email in state
+      navigate('/verify-otp', { state: { email: data.email, flow: 'register' } });
     } catch (error) {
-      setServerError('Registration failed. Please try again.');
+      setServerError(error.message || 'Failed to send OTP. Please try again.');
     } finally {
       setLoading(false);
     }

@@ -23,7 +23,7 @@ def list_photographers(
         # Some supabase-py versions expect an enum/typed value; passing as string may produce type-checker warnings,
         # but at runtime it typically works. If your client fails, remove `count` or adapt to your client API.
         try:
-            query = supabase.table('photographer_profile').select('*, users:users(*)', count='exact')
+            query = supabase.table('photographer_profile').select('*, users:users(*)', count='exact') # type: ignore
         except TypeError:
             # Fallback for clients that reject the `count` parameter type
             query = supabase.table('photographer_profile').select('*, users:users(*)')

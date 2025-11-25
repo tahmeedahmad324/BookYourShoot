@@ -15,20 +15,17 @@ class SignupRequest(BaseModel):
 @router.post("/signup")
 def signup(payload: SignupRequest):
     try:
-        # Step 1: Create supabase user (this sends OTP automatically)
-        response = supabase.auth.sign_up({
+        # Use sign_in_with_otp which sends a 6-digit OTP code
+        response = supabase.auth.sign_in_with_otp({
             "email": payload.email,
-            "password": "TEMP_PASSWORD_123"   # Required even if not used
+            "options": {
+                "should_create_user": True,
+            }
         })
 
-        if response.user is None:
-            raise HTTPException(status_code=400, detail="Error creating user.")
-
-        # Step 2: Store metadata after OTP verification, not now!
-        # So we return user_id temporarily so front-end can reuse it
+        # Store user metadata temporarily in session storage (frontend will send this during verification)
         return {
-            "message": "OTP sent to email.",
-            "user_id_temp": response.user.id
+            "message": "OTP sent to email. Please check your inbox and enter the 6-digit code."
         }
 
     except Exception as e:
@@ -42,15 +39,17 @@ class SendOtpRequest(BaseModel):
 @router.post("/send-otp")
 def send_otp(payload: SendOtpRequest):
     try:
-        response = supabase.auth.sign_up({
+        # Use sign_in_with_otp which sends a 6-digit OTP code
+        # This works for both new users (creates account) and existing users (login)
+        response = supabase.auth.sign_in_with_otp({
             "email": payload.email,
-            "password": "TEMP_PASSWORD_123"
+            "options": {
+                "should_create_user": True,  # Allow signup via OTP
+            }
         })
 
-        if response.user is None:
-            raise HTTPException(status_code=400, detail="Error sending OTP")
-
-        return {"message": "OTP sent to email.", "user_id_temp": response.user.id}
+        # sign_in_with_otp doesn't return user immediately (user is created after OTP verification)
+        return {"message": "OTP sent to email. Please check your inbox."}
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
@@ -66,36 +65,42 @@ class VerifyOtpRequest(BaseModel):
 @router.post("/verify-otp")
 def verify_otp(payload: VerifyOtpRequest):
     try:
-        # Step 1: Verify OTP
+        # Step 1: Verify OTP with Supabase
         response = supabase.auth.verify_otp({
-            "type": "email",
             "email": payload.email,
-            "token": payload.otp
+            "token": payload.otp,
+            "type": "email"  # Specify it's an email OTP
         })
 
-        if response.session is None:
-            raise HTTPException(status_code=400, detail="OTP verification failed.")
+        if response.session is None or response.user is None:
+            raise HTTPException(status_code=400, detail="Invalid OTP code. Please check and try again.")
 
         user_id = response.user.id
 
-        # Step 2: Insert user into our database after verification
-        supabase.table("users").insert({
-            "id": user_id,
-            "email": payload.email,
-            "full_name": payload.full_name,
-            "phone": payload.phone,
-            "city": payload.city,
-            "role": "client"   # default
-        }).execute()
+        # Step 2: Check if user already exists in our database
+        existing_user = supabase.table("users").select("*").eq("id", user_id).execute()
+        
+        if not existing_user.data:
+            # Insert new user into our database
+            supabase.table("users").insert({
+                "id": user_id,
+                "email": payload.email,
+                "full_name": payload.full_name,
+                "phone": payload.phone,
+                "city": payload.city,
+                "role": "client"   # default
+            }).execute()
 
         return {
-            "message": "OTP verified & user created.",
+            "message": "OTP verified successfully.",
             "access_token": response.session.access_token,
             "user_id": user_id
         }
 
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail=f"Verification failed: {str(e)}")
 
 
 class RegisterRequest(BaseModel):
@@ -111,29 +116,35 @@ def register(payload: RegisterRequest):
     try:
         # Verify OTP and create session
         response = supabase.auth.verify_otp({
-            "type": "email",
             "email": payload.email,
-            "token": payload.otp
+            "token": payload.otp,
+            "type": "email"
         })
 
-        if response.session is None:
-            raise HTTPException(status_code=400, detail="OTP verification failed.")
+        if response.session is None or response.user is None:
+            raise HTTPException(status_code=400, detail="Invalid OTP code. Please check and try again.")
 
         user_id = response.user.id
 
-        # Insert user into our users table
-        supabase.table("users").insert({
-            "id": user_id,
-            "email": payload.email,
-            "full_name": payload.full_name,
-            "phone": payload.phone,
-            "city": payload.city,
-            "role": "client"
-        }).execute()
+        # Check if user already exists
+        existing_user = supabase.table("users").select("*").eq("id", user_id).execute()
+        
+        if not existing_user.data:
+            # Insert user into our users table
+            supabase.table("users").insert({
+                "id": user_id,
+                "email": payload.email,
+                "full_name": payload.full_name,
+                "phone": payload.phone,
+                "city": payload.city,
+                "role": "client"
+            }).execute()
 
-        return {"message": "User registered.", "access_token": response.session.access_token, "user_id": user_id}
+        return {"message": "User registered successfully.", "access_token": response.session.access_token, "user_id": user_id}
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail=f"Registration failed: {str(e)}")
 
 
 class LoginRequest(BaseModel):
@@ -145,14 +156,16 @@ class LoginRequest(BaseModel):
 def login(payload: LoginRequest):
     try:
         response = supabase.auth.verify_otp({
-            "type": "email",
             "email": payload.email,
-            "token": payload.otp
+            "token": payload.otp,
+            "type": "email"
         })
 
-        if response.session is None:
-            raise HTTPException(status_code=400, detail="Login failed: OTP verification failed.")
+        if response.session is None or response.user is None:
+            raise HTTPException(status_code=400, detail="Invalid OTP code. Please check and try again.")
 
         return {"message": "Login successful", "access_token": response.session.access_token, "user_id": response.user.id}
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail=f"Login failed: {str(e)}")

@@ -4,15 +4,20 @@ import { useForm } from 'react-hook-form';
 import { yupResolver } from '@hookform/resolvers/yup';
 import * as yup from 'yup';
 import { useAuth } from '../../context/AuthContext';
+import { sendOTP } from '../../api/auth';
 
-// Validation schema
+// Validation schema - supports both password and OTP login
 const loginSchema = yup.object().shape({
   email: yup.string()
     .email('Please enter a valid email address')
     .required('Email is required'),
   password: yup.string()
     .min(6, 'Password must be at least 6 characters')
-    .required('Password is required'),
+    .when('loginMethod', {
+      is: 'password',
+      then: (schema) => schema.required('Password is required'),
+      otherwise: (schema) => schema.notRequired()
+    }),
   role: yup.string()
     .required('Please select your role')
 });
@@ -22,6 +27,7 @@ const Login = () => {
   const { login } = useAuth();
   const [loading, setLoading] = useState(false);
   const [serverError, setServerError] = useState('');
+  const [loginMethod, setLoginMethod] = useState('password'); // 'password' or 'otp'
 
   const { register, handleSubmit, formState: { errors } } = useForm({
     resolver: yupResolver(loginSchema)
@@ -32,36 +38,52 @@ const Login = () => {
     setServerError('');
 
     try {
-      // Simulate API call for login
-      await new Promise(resolve => setTimeout(resolve, 1000));
-
-      // Mock login logic - in real app, this would be an API call
-      const remember = document.getElementById('remember')?.checked;
-      if (data.email === 'admin@bookyourshoot.com' && data.password === 'admin123') {
-        const userData = { id: 1, name: 'Admin User', email: data.email, role: 'admin' };
-        login(userData, 'mock-jwt-token-admin', remember);
-        navigate('/admin/dashboard');
-      } else if (data.email === 'client@test.com' && data.password === 'client123') {
-        const userData = { id: 2, name: 'Test Client', email: data.email, role: 'client' };
-        login(userData, 'mock-jwt-token-client', remember);
-        navigate('/client/dashboard');
-      } else if (data.email === 'photographer@test.com' && data.password === 'photo123') {
-        const userData = { id: 3, name: 'Test Photographer', email: data.email, role: 'photographer' };
-        login(userData, 'mock-jwt-token-photographer', remember);
-        navigate('/photographer/dashboard');
+      if (loginMethod === 'otp') {
+        // OTP flow - send OTP to user's email
+        await sendOTP(data.email);
+        
+        // Store login info for OTP verification
+        sessionStorage.setItem('loginData', JSON.stringify({
+          email: data.email,
+          role: data.role
+        }));
+        
+        // Navigate to OTP verification
+        navigate('/verify-otp', { state: { email: data.email, flow: 'login' } });
       } else {
-        // For demo purposes, allow any login with valid format
-        const userData = { 
-          id: Date.now(), 
-          name: data.email.split('@')[0], 
-          email: data.email, 
-          role: data.role 
-        };
-        login(userData, 'mock-jwt-token', remember);
-        navigate(`/${data.role}/dashboard`);
+        // Password flow - simulate login (replace with real API call)
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        // Mock password login - replace with actual backend call
+        const remember = document.getElementById('remember')?.checked;
+        
+        // Demo accounts for testing
+        if (data.email === 'admin@bookyourshoot.com' && data.password === 'admin123') {
+          const userData = { id: 1, name: 'Admin User', email: data.email, role: 'admin' };
+          login(userData, 'mock-jwt-token-admin', remember);
+          navigate('/admin/dashboard');
+        } else if (data.email === 'client@test.com' && data.password === 'client123') {
+          const userData = { id: 2, name: 'Test Client', email: data.email, role: 'client' };
+          login(userData, 'mock-jwt-token-client', remember);
+          navigate('/client/dashboard');
+        } else if (data.email === 'photographer@test.com' && data.password === 'photo123') {
+          const userData = { id: 3, name: 'Test Photographer', email: data.email, role: 'photographer' };
+          login(userData, 'mock-jwt-token-photographer', remember);
+          navigate('/photographer/dashboard');
+        } else {
+          // For any other valid credentials, allow login
+          const userData = { 
+            id: Date.now(), 
+            name: data.email.split('@')[0], 
+            email: data.email, 
+            role: data.role 
+          };
+          login(userData, 'mock-jwt-token', remember);
+          navigate(`/${data.role}/dashboard`);
+        }
       }
     } catch (error) {
-      setServerError('Login failed. Please try again.');
+      setServerError(error.message || 'Login failed. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -142,40 +164,68 @@ const Login = () => {
                     )}
                   </div>
 
-                  {/* Password Field */}
-                  <div className="mb-4">
-                    <label htmlFor="password" className="form-label fw-semibold">
-                      Password
-                    </label>
-                    <div className="input-group">
-                      <span className="input-group-text">
-                        🔒
-                      </span>
-                      <input
-                        type="password"
-                        className={`form-control ${errors.password ? 'is-invalid' : ''}`}
-                        id="password"
-                        placeholder="Enter your password"
-                        {...register('password')}
-                      />
-                    </div>
-                    {errors.password && (
-                      <div className="text-danger small mt-1">{errors.password.message}</div>
-                    )}
-                  </div>
-
-                  {/* Remember Me & Forgot Password */}
-                  <div className="d-flex justify-content-between align-items-center mb-4">
-                    <div className="form-check">
-                      <input className="form-check-input" type="checkbox" id="remember" />
-                      <label className="form-check-label" htmlFor="remember">
-                        Remember me
+                  {/* Password Field - shown only in password mode */}
+                  {loginMethod === 'password' && (
+                    <div className="mb-3">
+                      <label htmlFor="password" className="form-label fw-semibold">
+                        Password
                       </label>
+                      <div className="input-group">
+                        <span className="input-group-text">
+                          🔒
+                        </span>
+                        <input
+                          type="password"
+                          className={`form-control ${errors.password ? 'is-invalid' : ''}`}
+                          id="password"
+                          placeholder="Enter your password"
+                          {...register('password')}
+                        />
+                      </div>
+                      {errors.password && (
+                        <div className="text-danger small mt-1">{errors.password.message}</div>
+                      )}
                     </div>
-                    <Link to="/forgot-password" className="text-primary text-decoration-none">
-                      Forgot password?
-                    </Link>
-                  </div>
+                  )}
+
+                  {/* Remember Me & Forgot Password - shown only in password mode */}
+                  {loginMethod === 'password' && (
+                    <div className="d-flex justify-content-between align-items-center mb-4">
+                      <div className="form-check">
+                        <input className="form-check-input" type="checkbox" id="remember" />
+                        <label className="form-check-label" htmlFor="remember">
+                          Remember me
+                        </label>
+                      </div>
+                      <button 
+                        type="button"
+                        className="btn btn-link text-primary text-decoration-none p-0"
+                        onClick={() => setLoginMethod('otp')}
+                      >
+                        Forgot password?
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Info about OTP login - shown only in OTP mode */}
+                  {loginMethod === 'otp' && (
+                    <div className="alert alert-info small mb-3" role="alert">
+                      <strong>📧 OTP Login:</strong> We'll send a 6-digit code to your email for secure login.
+                    </div>
+                  )}
+
+                  {/* Toggle back to password login - shown only in OTP mode */}
+                  {loginMethod === 'otp' && (
+                    <div className="text-center mb-3">
+                      <button 
+                        type="button"
+                        className="btn btn-link text-primary text-decoration-none p-0"
+                        onClick={() => setLoginMethod('password')}
+                      >
+                        ← Back to password login
+                      </button>
+                    </div>
+                  )}
 
                   {/* Submit Button */}
                   <button 
@@ -186,21 +236,23 @@ const Login = () => {
                     {loading ? (
                       <>
                         <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
-                        Signing in...
+                        {loginMethod === 'otp' ? 'Sending OTP...' : 'Signing in...'}
                       </>
                     ) : (
-                      'Sign In'
+                      loginMethod === 'otp' ? 'Send OTP' : 'Sign In'
                     )}
                   </button>
                 </form>
 
-                {/* Demo Accounts Info */}
-                <div className="alert alert-info small" role="alert">
-                  <strong>Demo Accounts:</strong><br/>
-                  Client: client@test.com / client123<br/>
-                  Photographer: photographer@test.com / photo123<br/>
-                  Admin: admin@bookyourshoot.com / admin123
-                </div>
+                {/* Demo Accounts Info - shown only in password mode */}
+                {loginMethod === 'password' && (
+                  <div className="alert alert-info small" role="alert">
+                    <strong>Demo Accounts:</strong><br/>
+                    Client: client@test.com / client123<br/>
+                    Photographer: photographer@test.com / photo123<br/>
+                    Admin: admin@bookyourshoot.com / admin123
+                  </div>
+                )}
 
                 {/* Register Link */}
                 <div className="text-center mt-4">

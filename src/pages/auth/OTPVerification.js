@@ -1,15 +1,21 @@
 import React, { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import { registerWithOTP, loginWithOTP, sendOTP } from '../../api/auth';
 
 const OTPVerification = () => {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const location = useLocation();
+  const { login } = useAuth();
   const [otp, setOtp] = useState(['', '', '', '', '', '']);
   const [loading, setLoading] = useState(false);
   const [timeLeft, setTimeLeft] = useState(120); // 2 minutes
   const [isResending, setIsResending] = useState(false);
   const [error, setError] = useState('');
+  
+  // Get email and flow from navigation state
+  const email = location.state?.email;
+  const flow = location.state?.flow; // 'register' or 'login'
 
   useEffect(() => {
     const timer = timeLeft > 0 && setInterval(() => setTimeLeft(timeLeft - 1), 1000);
@@ -69,27 +75,50 @@ const OTPVerification = () => {
     }
 
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1500));
-
-      // Mock OTP verification - accept any 6-digit code for demo
-      if (otpValue.length === 6) {
-        // Redirect based on user role
-        if (user?.role === 'photographer') {
-          // Photographers need CNIC verification first
+      if (flow === 'register') {
+        // Registration flow
+        const regData = JSON.parse(sessionStorage.getItem('registrationData') || '{}');
+        const response = await registerWithOTP(regData, otpValue);
+        
+        // Login user with returned token
+        const userData = {
+          id: response.user_id,
+          email: regData.email,
+          name: regData.full_name,
+          role: regData.role
+        };
+        login(userData, response.access_token);
+        
+        // Clear session storage
+        sessionStorage.removeItem('registrationData');
+        
+        // Redirect based on role
+        if (regData.role === 'photographer') {
           navigate('/register/cnic');
-        } else if (user?.role === 'client') {
-          navigate('/client/dashboard');
-        } else if (user?.role === 'admin') {
-          navigate('/admin/dashboard');
         } else {
-          navigate('/');
+          navigate(`/${regData.role}/dashboard`);
         }
-      } else {
-        setError('Invalid OTP. Please try again.');
+      } else if (flow === 'login') {
+        // Login flow
+        const loginData = JSON.parse(sessionStorage.getItem('loginData') || '{}');
+        const response = await loginWithOTP(email, otpValue);
+        
+        // Login user with returned token
+        const userData = {
+          id: response.user_id,
+          email: email,
+          role: loginData.role
+        };
+        login(userData, response.access_token);
+        
+        // Clear session storage
+        sessionStorage.removeItem('loginData');
+        
+        // Redirect to dashboard
+        navigate(`/${loginData.role}/dashboard`);
       }
     } catch (error) {
-      setError('Verification failed. Please try again.');
+      setError(error.message || 'Verification failed. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -100,10 +129,12 @@ const OTPVerification = () => {
     setError('');
 
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      // Resend OTP using the email from state
+      if (email) {
+        await sendOTP(email);
+      }
       
-      // Reset timer
+      // Reset timer and OTP inputs
       setTimeLeft(120);
       setOtp(['', '', '', '', '', '']);
       
@@ -113,7 +144,7 @@ const OTPVerification = () => {
         if (firstInput) firstInput.focus();
       }, 0);
     } catch (error) {
-      setError('Failed to resend OTP. Please try again.');
+      setError(error.message || 'Failed to resend OTP. Please try again.');
     } finally {
       setIsResending(false);
     }
@@ -140,12 +171,12 @@ const OTPVerification = () => {
                   <p className="text-muted">
                     We've sent a 6-digit verification code to your email address
                   </p>
-                  {user?.email && (
+                  {email && (
                     <p className="text-primary fw-semibold">
-                      {user.email}
+                      {email}
                     </p>
                   )}
-                  {user?.role === 'photographer' && (
+                  {flow === 'register' && JSON.parse(sessionStorage.getItem('registrationData') || '{}').role === 'photographer' && (
                     <div className="alert alert-info small">
                       <strong>Next Step:</strong> After email verification, you'll need to upload your CNIC for identity verification.
                     </div>
