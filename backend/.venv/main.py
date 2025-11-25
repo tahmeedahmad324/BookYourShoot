@@ -14,12 +14,19 @@ app.add_middleware(
 )
 
 # Register routes
-app.include_router(auth.router)
-app.include_router(photographers.router)
-app.include_router(booking.router)
-app.include_router(cnic.router)
-app.include_router(chat.router)
+app.include_router(auth.router, prefix="/api")
+app.include_router(photographers.router, prefix="/api")
+app.include_router(booking.router, prefix="/api")
+app.include_router(cnic.router, prefix="/api")
+app.include_router(chat.router, prefix="/api")
 
 @app.get("/")
 def root():
     return {"status": "ok"}
+
+
+if __name__ == "__main__":
+    import uvicorn
+
+    # Run server directly: python backend/.venv/main.py
+    uvicorn.run(app, host="127.0.0.1", port=5000, reload=True)
