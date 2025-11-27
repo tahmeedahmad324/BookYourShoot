@@ -34,7 +34,7 @@ const SearchResults = () => {
 
   if (loading) {
     return (
-      <div className="search-results py-5" style={{ background: 'radial-gradient(circle at top left, rgba(168, 85, 247, 0.08) 0%, transparent 50%), linear-gradient(135deg, #f3e8ff 0%, #e9d5ff 100%)', minHeight: '100vh' }}>
+      <div className="search-results py-5" style={{ background: 'radial-gradient(circle at top left, rgba(34, 94, 161, 0.08) 0%, transparent 50%), linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%)', minHeight: '100vh' }}>
         <div className="container landing-container">
           <div className="text-center py-5">
             <div className="spinner-border text-primary" role="status">
@@ -49,7 +49,7 @@ const SearchResults = () => {
 
   if (error) {
     return (
-      <div className="search-results py-5" style={{ background: 'radial-gradient(circle at top left, rgba(168, 85, 247, 0.08) 0%, transparent 50%), linear-gradient(135deg, #f3e8ff 0%, #e9d5ff 100%)', minHeight: '100vh' }}>
+      <div className="search-results py-5" style={{ background: 'radial-gradient(circle at top left, rgba(34, 94, 161, 0.08) 0%, transparent 50%), linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%)', minHeight: '100vh' }}>
         <div className="container landing-container">
           <div className="text-center py-5">
             <h3 className="text-danger mb-3">Error</h3>
@@ -68,7 +68,7 @@ const SearchResults = () => {
 
   if (!city) {
     return (
-      <div className="search-results py-5" style={{ background: 'radial-gradient(circle at top left, rgba(168, 85, 247, 0.08) 0%, transparent 50%), linear-gradient(135deg, #f3e8ff 0%, #e9d5ff 100%)', minHeight: '100vh' }}>
+      <div className="search-results py-5" style={{ background: 'radial-gradient(circle at top left, rgba(34, 94, 161, 0.08) 0%, transparent 50%), linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%)', minHeight: '100vh' }}>
         <div className="container landing-container">
           <div className="text-center py-5">
             <h3>No Search Parameters</h3>
@@ -83,7 +83,7 @@ const SearchResults = () => {
   }
 
   return (
-    <div className="search-results py-5" style={{ background: 'radial-gradient(circle at top left, rgba(168, 85, 247, 0.08) 0%, transparent 50%), linear-gradient(135deg, #f3e8ff 0%, #e9d5ff 100%)', minHeight: '100vh' }}>
+    <div className="search-results py-5" style={{ background: 'radial-gradient(circle at top left, rgba(34, 94, 161, 0.08) 0%, transparent 50%), linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%)', minHeight: '100vh' }}>
       <div className="container landing-container">
         {/* Header */}
         <div className="text-center mb-5">

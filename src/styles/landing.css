@@ -26,7 +26,7 @@ section[id] {
   position: absolute;
   width: 90px;
   height: 90px;
-  background: linear-gradient(135deg, rgba(139, 92, 246, 0.1), rgba(168, 85, 247, 0.06));
+  background: linear-gradient(135deg, rgba(34, 94, 161, 0.1), rgba(45, 117, 199, 0.06));
   border-radius: 50%;
   top: 15%;
   right: 7%;
@@ -38,7 +38,7 @@ section[id] {
   position: absolute;
   width: 70px;
   height: 70px;
-  background: linear-gradient(135deg, rgba(168, 85, 247, 0.08), rgba(139, 92, 246, 0.05));
+  background: linear-gradient(135deg, rgba(45, 117, 199, 0.08), rgba(34, 94, 161, 0.05));
   border-radius: 12px;
   bottom: 20%;
   left: 8%;
@@ -55,9 +55,9 @@ section[id] {
 :root {
   --primary-blue: #1A73E8;
   --primary-dark: #1557B0;
-  --primary-purple: #8b5cf6;
-  --primary-purple-dark: #7c3aed;
-  --primary-purple-light: #a78bfa;
+  --primary-purple: #225ea1;
+  --primary-purple-dark: #1a4a7a;
+  --primary-purple-light: #2d75c7;
   --accent-orange: #F7931E;
   --dark-neutral: #1E1E1E;
   --white: #FFFFFF;
@@ -65,7 +65,7 @@ section[id] {
   --gray-medium: #6C757D;
   --gray-dark: #343A40;
   --gradient-primary: linear-gradient(135deg, #1A73E8 0%, #1557B0 100%);
-  --gradient-purple: linear-gradient(135deg, #a78bfa 0%, #8b5cf6 100%);
+  --gradient-purple: linear-gradient(135deg, #2d75c7 0%, #225ea1 100%);
   --gradient-hero: linear-gradient(135deg, #1A73E8 0%, #0D47A1 100%);
   --shadow-sm: 0 2px 4px rgba(0,0,0,0.08);
   --shadow-md: 0 4px 8px rgba(0,0,0,0.12);
@@ -187,8 +187,8 @@ section[id] {
 .hero-section {
   padding: 120px 0 80px;
   background: 
-    radial-gradient(circle at top right, rgba(168, 85, 247, 0.12) 0%, transparent 50%),
-    linear-gradient(135deg, #f3e8ff 0%, #e9d5ff 100%);
+    radial-gradient(circle at top right, rgba(45, 117, 199, 0.12) 0%, transparent 50%),
+    linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%);
   position: relative;
   overflow: hidden;
 }
@@ -199,7 +199,7 @@ section[id] {
   position: absolute;
   width: 120px;
   height: 120px;
-  background: linear-gradient(135deg, rgba(139, 92, 246, 0.15), rgba(168, 85, 247, 0.08));
+  background: linear-gradient(135deg, rgba(34, 94, 161, 0.15), rgba(45, 117, 199, 0.08));
   border-radius: 20px;
   top: 10%;
   left: 5%;
@@ -214,7 +214,7 @@ section[id] {
   height: 0;
   border-left: 60px solid transparent;
   border-right: 60px solid transparent;
-  border-bottom: 100px solid rgba(168, 85, 247, 0.1);
+  border-bottom: 100px solid rgba(45, 117, 199, 0.1);
   bottom: 15%;
   right: 8%;
   transform: rotate(15deg);
@@ -236,7 +236,7 @@ section[id] {
   line-height: 1.2;
   margin-bottom: 1.5rem;
   color: var(--dark-neutral);
-  background: linear-gradient(135deg, #7c3aed 0%, #a78bfa 100%);
+  background: linear-gradient(135deg, #1a4a7a 0%, #2d75c7 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -572,8 +572,8 @@ section[id] {
 /* Features Section */
 .features-section {
   background: 
-    radial-gradient(circle at bottom left, rgba(139, 92, 246, 0.08) 0%, transparent 50%),
-    linear-gradient(180deg, #ffffff 0%, #f3e8ff 100%);
+    radial-gradient(circle at bottom left, rgba(34, 94, 161, 0.08) 0%, transparent 50%),
+    linear-gradient(180deg, #ffffff 0%, #e3f2fd 100%);
   padding: 5rem 0;
   position: relative;
   overflow: hidden;
@@ -587,9 +587,9 @@ section[id] {
   height: 250px;
   background: linear-gradient(to bottom, 
     transparent 0%, 
-    rgba(139, 92, 246, 0.15) 20%, 
-    rgba(168, 85, 247, 0.2) 50%,
-    rgba(139, 92, 246, 0.15) 80%,
+    rgba(34, 94, 161, 0.15) 20%, 
+    rgba(45, 117, 199, 0.2) 50%,
+    rgba(34, 94, 161, 0.15) 80%,
     transparent 100%);
   left: 3%;
   top: 20%;
@@ -602,8 +602,8 @@ section[id] {
   position: absolute;
   width: 200px;
   height: 200px;
-  background: radial-gradient(circle, rgba(168, 85, 247, 0.08) 0%, transparent 70%);
-  border: 2px dashed rgba(139, 92, 246, 0.15);
+  background: radial-gradient(circle, rgba(45, 117, 199, 0.08) 0%, transparent 70%);
+  border: 2px dashed rgba(34, 94, 161, 0.15);
   border-radius: 50%;
   right: 5%;
   bottom: 10%;
@@ -698,8 +698,8 @@ section[id] {
 /* How It Works Section */
 .how-it-works-section {
   background: 
-    radial-gradient(circle at top left, rgba(168, 85, 247, 0.12) 0%, transparent 50%),
-    linear-gradient(135deg, #e9d5ff 0%, #ddd6fe 100%);
+    radial-gradient(circle at top left, rgba(45, 117, 199, 0.12) 0%, transparent 50%),
+    linear-gradient(135deg, #bbdefb 0%, #90caf9 100%);
   padding: 5rem 0;
   position: relative;
   overflow: hidden;
@@ -712,7 +712,7 @@ section[id] {
   width: 180px;
   height: 180px;
   background-image: 
-    radial-gradient(circle, rgba(139, 92, 246, 0.4) 3px, transparent 3px);
+    radial-gradient(circle, rgba(34, 94, 161, 0.4) 3px, transparent 3px);
   background-size: 22px 22px;
   top: 8%;
   right: 5%;
@@ -726,7 +726,7 @@ section[id] {
   width: 130px;
   height: 130px;
   background-image: 
-    radial-gradient(circle, rgba(168, 85, 247, 0.35) 4px, transparent 4px);
+    radial-gradient(circle, rgba(45, 117, 199, 0.35) 4px, transparent 4px);
   background-size: 28px 28px;
   bottom: 12%;
   left: 8%;
@@ -901,8 +901,8 @@ section[id] {
 /* App Downloads Section */
 .app-downloads-section {
   background: 
-    radial-gradient(circle at center, rgba(139, 92, 246, 0.2) 0%, transparent 70%),
-    linear-gradient(135deg, #ddd6fe 0%, #c4b5fd 100%);
+    radial-gradient(circle at center, rgba(34, 94, 161, 0.2) 0%, transparent 70%),
+    linear-gradient(135deg, #90caf9 0%, #64b5f6 100%);
   color: var(--dark-neutral);
   position: relative;
   overflow: hidden;
@@ -915,7 +915,7 @@ section[id] {
   position: absolute;
   width: 300px;
   height: 300px;
-  background: rgba(139, 92, 246, 0.15);
+  background: rgba(34, 94, 161, 0.15);
   border-radius: 50%;
   top: -100px;
   right: -100px;
@@ -926,7 +926,7 @@ section[id] {
   position: absolute;
   width: 200px;
   height: 200px;
-  background: rgba(168, 85, 247, 0.12);
+  background: rgba(45, 117, 199, 0.12);
   border-radius: 50%;
   bottom: -50px;
   left: -50px;
@@ -1001,7 +1001,7 @@ section[id] {
   text-decoration: none;
   transition: all 0.3s ease;
   min-width: 140px;
-  box-shadow: 0 4px 12px rgba(139, 92, 246, 0.3);
+  box-shadow: 0 4px 12px rgba(34, 94, 161, 0.3);
 }
 
 .download-button:hover {
@@ -1009,7 +1009,7 @@ section[id] {
   background: var(--primary-purple-dark);
   color: var(--white);
   text-decoration: none;
-  box-shadow: 0 6px 20px rgba(139, 92, 246, 0.4);
+  box-shadow: 0 6px 20px rgba(34, 94, 161, 0.4);
 }
 
 .download-small {

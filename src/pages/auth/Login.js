@@ -90,7 +90,7 @@ const Login = () => {
   };
 
   return (
-    <div className="login-page py-5" style={{ background: 'radial-gradient(circle at top right, rgba(168, 85, 247, 0.1) 0%, transparent 50%), linear-gradient(135deg, #f3e8ff 0%, #e9d5ff 100%)', minHeight: '100vh' }}>
+    <div className="login-page py-5" style={{ background: 'radial-gradient(circle at top right, rgba(34, 94, 161, 0.1) 0%, transparent 50%), linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%)', minHeight: '100vh' }}>
       <div className="container">
         <div className="row justify-content-center">
           <div className="col-md-8 col-lg-6">

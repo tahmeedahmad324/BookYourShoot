@@ -105,7 +105,7 @@ const Register = () => {
   };
 
   return (
-    <div className="register-page py-5" style={{ background: 'radial-gradient(circle at top right, rgba(168, 85, 247, 0.1) 0%, transparent 50%), linear-gradient(135deg, #f3e8ff 0%, #e9d5ff 100%)', minHeight: '100vh' }}>
+    <div className="register-page py-5" style={{ background: 'radial-gradient(circle at top right, rgba(34, 94, 161, 0.1) 0%, transparent 50%), linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%)', minHeight: '100vh' }}>
       <div className="container">
         <div className="row justify-content-center">
           <div className="col-lg-11 col-xl-10">
@@ -130,7 +130,7 @@ const Register = () => {
                         borderRadius: '12px',
                         transition: 'all 0.3s ease',
                         transform: isSelected ? 'scale(1.05)' : 'scale(1)',
-                        backgroundColor: isSelected ? 'rgba(139, 92, 246, 0.05)' : 'white'
+                        backgroundColor: isSelected ? 'rgba(34, 94, 161, 0.05)' : 'white'
                       }}
                       onClick={() => handleRoleSelect(role)}
                     >

@@ -1,10 +1,10 @@
 /* BookYourShoot Brand Colors */
 :root {
-  --primary-blue: #1A73E8;
+  --primary-blue: #225ea1;
   --primary-orange: #F7931E;
-  --primary-purple: #8b5cf6;
-  --primary-purple-dark: #7c3aed;
-  --primary-purple-light: #a78bfa;
+  --primary-purple: #225ea1;
+  --primary-purple-dark: #1a4a7a;
+  --primary-purple-light: #2d75c7;
   --dark-neutral: #1E1E1E;
   --bg-white: #FFFFFF;
   --soft-gray: #D9D9D9;
@@ -97,7 +97,7 @@ body {
 
 .form-control:focus {
   border-color: var(--primary-purple) !important;
-  box-shadow: 0 0 0 0.2rem rgba(139, 92, 246, 0.25) !important;
+  box-shadow: 0 0 0 0.2rem rgba(34, 94, 161, 0.25) !important;
 }
 
 .nav-link {
@@ -125,12 +125,12 @@ body {
 
 /* Custom Components */
 .gradient-header {
-  background: linear-gradient(135deg, rgba(139, 92, 246, 0.95) 0%, rgba(168, 85, 247, 0.9) 100%);
+  background: linear-gradient(135deg, rgba(34, 94, 161, 0.95) 0%, rgba(45, 117, 199, 0.9) 100%);
   color: white;
   padding: 2rem;
   border-radius: 12px;
   margin-bottom: 2rem;
-  box-shadow: 0 8px 24px rgba(139, 92, 246, 0.25);
+  box-shadow: 0 8px 24px rgba(34, 94, 161, 0.25);
 }
 
 .status-badge {
@@ -203,7 +203,7 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .upload-zone:hover {
-  background-color: rgba(139, 92, 246, 0.05);
+  background-color: rgba(34, 94, 161, 0.05);
   border-color: var(--primary-purple-dark);
 }
 

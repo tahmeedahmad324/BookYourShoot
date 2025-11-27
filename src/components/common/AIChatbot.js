@@ -16,7 +16,11 @@ const AIChatbot = () => {
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
 
-  const genAI = new GoogleGenerativeAI('');
+  // Get API key from environment variable
+  const apiKey = process.env.REACT_APP_GEMINI_API_KEY;
+  
+  // Initialize Gemini AI only if API key is available
+  const genAI = apiKey ? new GoogleGenerativeAI(apiKey) : null;
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
