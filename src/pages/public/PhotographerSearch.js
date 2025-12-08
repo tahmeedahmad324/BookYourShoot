@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react"
 import { Link, useSearchParams } from "react-router-dom"
-import photographersData from "../../data/photographers.json"
+import { photographerAPI } from "../../api/api"
 import citiesData from "../../data/cities.json"
 
 const PhotographerSearch = () => {
@@ -17,7 +17,9 @@ const PhotographerSearch = () => {
   const [sortBy, setSortBy] = useState(searchParams.get("sort") || "rating")
   const [showFilters, setShowFilters] = useState(false)
   const [loading, setLoading] = useState(false)
-  const [filteredPhotographers, setFilteredPhotographers] = useState(photographersData.photographers)
+  const [photographers, setPhotographers] = useState([])
+  const [filteredPhotographers, setFilteredPhotographers] = useState([])
+  const [error, setError] = useState(null)
 
   // Auto-complete state
   const [showSuggestions, setShowSuggestions] = useState(false)
@@ -25,13 +27,43 @@ const PhotographerSearch = () => {
   const [selectedSuggestionIndex, setSelectedSuggestionIndex] = useState(-1)
   const searchInputRef = useRef(null)
 
-  const photographers = photographersData.photographers
   const cities = citiesData.cities
   const services = citiesData.services
 
+  // Fetch photographers from API
+  useEffect(() => {
+    fetchPhotographers()
+  }, [location, service])
+
   useEffect(() => {
     filterPhotographers()
-  }, [searchTerm, location, service, priceRange, sortBy])
+  }, [searchTerm, photographers, priceRange, sortBy])
+
+  const fetchPhotographers = async () => {
+    setLoading(true)
+    setError(null)
+    
+    try {
+      const params = {}
+      if (location) params.city = location
+      if (service) params.specialty = service
+      
+      const response = await photographerAPI.search(params)
+      
+      if (response.success) {
+        setPhotographers(response.data || [])
+      } else {
+        setError(response.error || 'Failed to fetch photographers')
+        setPhotographers([])
+      }
+    } catch (err) {
+      console.error('Error fetching photographers:', err)
+      setError(err.message || 'Failed to load photographers')
+      setPhotographers([])
+    } finally {
+      setLoading(false)
+    }
+  }
 
   // Auto-complete functions
   const generateSuggestions = (input) => {
@@ -142,47 +174,36 @@ const PhotographerSearch = () => {
   }, [])
 
   const filterPhotographers = () => {
-    setLoading(true)
+    const filtered = photographers.filter((photographer) => {
+      const matchesSearch =
+        !searchTerm ||
+        photographer.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (photographer.specialty && photographer.specialty.some((spec) => spec.toLowerCase().includes(searchTerm.toLowerCase())))
 
-    // Simulate API delay
-    setTimeout(() => {
-      const filtered = photographers.filter((photographer) => {
-        const matchesSearch =
-          !searchTerm ||
-          photographer.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          photographer.specialty.some((spec) => spec.toLowerCase().includes(searchTerm.toLowerCase()))
+      const matchesPrice = photographer.hourly_rate >= priceRange[0] && photographer.hourly_rate <= priceRange[1]
 
-        const matchesLocation = !location || photographer.location.toLowerCase().includes(location.toLowerCase())
+      return matchesSearch && matchesPrice
+    })
 
-        const matchesService =
-          !service || photographer.specialty.some((spec) => spec.toLowerCase().includes(service.toLowerCase()))
+    // Sort photographers
+    filtered.sort((a, b) => {
+      switch (sortBy) {
+        case "rating":
+          return b.rating - a.rating
+        case "price_low":
+          return a.hourly_rate - b.hourly_rate
+        case "price_high":
+          return b.hourly_rate - a.hourly_rate
+        case "experience":
+          return b.experience - a.experience
+        case "reviews":
+          return b.reviews_count - a.reviews_count
+        default:
+          return 0
+      }
+    })
 
-        const matchesPrice = photographer.hourly_rate >= priceRange[0] && photographer.hourly_rate <= priceRange[1]
-
-        return matchesSearch && matchesLocation && matchesService && matchesPrice
-      })
-
-      // Sort photographers
-      filtered.sort((a, b) => {
-        switch (sortBy) {
-          case "rating":
-            return b.rating - a.rating
-          case "price_low":
-            return a.hourly_rate - b.hourly_rate
-          case "price_high":
-            return b.hourly_rate - a.hourly_rate
-          case "experience":
-            return b.experience - a.experience
-          case "reviews":
-            return b.reviews_count - a.reviews_count
-          default:
-            return 0
-        }
-      })
-
-      setFilteredPhotographers(filtered)
-      setLoading(false)
-    }, 300)
+    setFilteredPhotographers(filtered)
   }
 
   const handleSearch = () => {
@@ -194,9 +215,8 @@ const PhotographerSearch = () => {
     if (priceRange[1] < 10000) params.set("maxPrice", priceRange[1])
     params.set("sort", sortBy)
     setSearchParams(params)
-  }
-
-  const clearFilters = () => {
+    fetchPhotographers()
+  };  const clearFilters = () => {
     setSearchTerm("")
     setLocation("")
     setService("")

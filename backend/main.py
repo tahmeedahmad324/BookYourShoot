@@ -11,28 +11,70 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 # Import routers via package-qualified names
-from backend.routers import auth, photographers, booking, cnic
+from backend.routers import (
+    auth, 
+    photographers, 
+    booking, 
+    cnic, 
+    reviews, 
+    chat, 
+    equipment, 
+    music, 
+    admin, 
+    profile, 
+    complaints, 
+    support, 
+    travel
+)
 
-app = FastAPI()
+app = FastAPI(title="BookYourShoot API", version="1.0.0")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
+    allow_origins=["http://localhost:3000", "http://localhost:3001"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Register routes under /api
+# Register all routes under /api prefix
 app.include_router(auth.router, prefix="/api")
 app.include_router(photographers.router, prefix="/api")
 app.include_router(booking.router, prefix="/api")
 app.include_router(cnic.router, prefix="/api")
+app.include_router(reviews.router, prefix="/api")
+app.include_router(chat.router, prefix="/api")
+app.include_router(equipment.router, prefix="/api")
+app.include_router(music.router, prefix="/api")
+app.include_router(admin.router, prefix="/api")
+app.include_router(profile.router, prefix="/api")
+app.include_router(complaints.router, prefix="/api")
+app.include_router(support.router, prefix="/api")
+app.include_router(travel.router, prefix="/api")
 
 
 @app.get("/")
 def root():
-    return {"status": "ok"}
+    return {
+        "status": "ok",
+        "message": "BookYourShoot API is running",
+        "version": "1.0.0",
+        "endpoints": {
+            "auth": "/api/auth",
+            "photographers": "/api/photographers",
+            "bookings": "/api/bookings",
+            "reviews": "/api/reviews",
+            "chat": "/api/chat",
+            "equipment": "/api/equipment",
+            "music": "/api/music",
+            "admin": "/api/admin",
+            "profile": "/api/profile",
+            "complaints": "/api/complaints",
+            "support": "/api/support",
+            "travel": "/api/travel",
+            "cnic": "/api/cnic"
+        }
+    }
 
 
 if __name__ == "__main__":
