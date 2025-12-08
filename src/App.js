@@ -23,6 +23,7 @@ import Contact from "./pages/help/Contact"
 
 // Client Pages
 import ClientDashboard from "./pages/client/ClientDashboard"
+import ClientProfile from "./pages/client/ClientProfile"
 import PhotographerProfile from "./pages/client/PhotographerProfile"
 import BookingRequest from "./pages/client/BookingRequest"
 import ClientBookings from "./pages/client/ClientBookings"
@@ -34,6 +35,7 @@ import MusicSuggestion from "./pages/client/MusicSuggestion"
 
 // Photographer Pages
 import PhotographerDashboard from "./pages/photographer/PhotographerDashboard"
+import PhotographerProfilePage from "./pages/photographer/PhotographerProfile"
 import BookingRequests from "./pages/photographer/BookingRequests"
 import EquipmentList from "./pages/photographer/EquipmentList"
 import TravelEstimator from "./pages/photographer/TravelEstimator"
@@ -42,6 +44,9 @@ import TravelEstimator from "./pages/photographer/TravelEstimator"
 import AdminDashboard from "./pages/admin/AdminDashboard"
 import AdminVerifications from "./pages/admin/AdminVerifications"
 import AdminComplaints from "./pages/admin/AdminComplaints"
+import AdminSettings from "./pages/admin/AdminSettings"
+import AdminReportedReviews from "./pages/admin/AdminReportedReviews"
+import AdminPlatformSettings from "./pages/admin/AdminPlatformSettings"
 
 // Context Providers
 import { AuthProvider } from "./context/AuthContext"
@@ -144,6 +149,14 @@ function App() {
                   </ProtectedRoute>
                 }
               />
+              <Route
+                path="/client/profile"
+                element={
+                  <ProtectedRoute allowedRoles={["client"]}>
+                    <ClientProfile />
+                  </ProtectedRoute>
+                }
+              />
 
               {/* Protected Photographer Routes */}
               <Route
@@ -151,6 +164,14 @@ function App() {
                 element={
                   <ProtectedRoute allowedRoles={["photographer"]}>
                     <PhotographerDashboard />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/photographer/profile"
+                element={
+                  <ProtectedRoute allowedRoles={["photographer"]}>
+                    <PhotographerProfilePage />
                   </ProtectedRoute>
                 }
               />
@@ -201,6 +222,30 @@ function App() {
                 element={
                   <ProtectedRoute allowedRoles={["admin"]}>
                     <AdminComplaints />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/admin/settings"
+                element={
+                  <ProtectedRoute allowedRoles={["admin"]}>
+                    <AdminSettings />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/admin/reported-reviews"
+                element={
+                  <ProtectedRoute allowedRoles={["admin"]}>
+                    <AdminReportedReviews />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/admin/platform-settings"
+                element={
+                  <ProtectedRoute allowedRoles={["admin"]}>
+                    <AdminPlatformSettings />
                   </ProtectedRoute>
                 }
               />

@@ -165,7 +165,13 @@ const Navbar = () => {
                 </button>
                 <ul className="dropdown-menu dropdown-menu-end" aria-labelledby="userDropdown">
                   <li>
-                    <Link className="dropdown-item" to="/profile" onClick={() => setExpanded(false)}>Profile</Link>
+                    <Link 
+                      className="dropdown-item" 
+                      to={user?.role === "client" ? "/client/profile" : user?.role === "photographer" ? "/photographer/profile" : user?.role === "admin" ? "/admin/settings" : "/profile"} 
+                      onClick={() => setExpanded(false)}
+                    >
+                      Profile
+                    </Link>
                   </li>
                   <li><hr className="dropdown-divider" /></li>
                   <li>

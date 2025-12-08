@@ -137,7 +137,11 @@ const PhotographerDashboard = () => {
                     <span className="badge bg-success me-2">✓ Verified</span>
                     <span className="badge bg-light text-dark">⭐ {stats.averageRating} Rating</span>
                   </div>
-                  <div className="text-white-50 small">Response time: 1 hour</div>
+                  <div className="mt-2">
+                    <Link to="/photographer/profile" className="btn btn-light btn-sm" onClick={() => window.scrollTo(0, 0)}>
+                      👤 My Profile
+                    </Link>
+                  </div>
                 </div>
               </div>
             </div>

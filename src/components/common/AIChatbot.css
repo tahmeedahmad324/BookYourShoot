@@ -62,8 +62,8 @@
   position: fixed;
   bottom: 24px;
   right: 24px;
-  width: 380px;
-  height: 600px;
+  width: 480px;
+  height: 650px;
   background: white;
   border-radius: 16px;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
@@ -142,18 +142,56 @@
 
 .chatbot-header-actions {
   display: flex;
-  gap: 8px;
+  gap: 6px;
   align-items: center;
+}
+
+.chatbot-lang-toggle {
+  background: rgba(255, 255, 255, 0.2);
+  border: none;
+  color: white;
+  padding: 5px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  transition: all 0.2s ease;
+  font-family: 'Noto Nastaliq Urdu', 'Jameel Noori Nastaleeq', serif;
+}
+
+.chatbot-lang-toggle:hover {
+  background: rgba(255, 255, 255, 0.3);
+  transform: scale(1.05);
+}
+
+.chatbot-actions-toggle {
+  background: rgba(255, 255, 255, 0.2);
+  border: none;
+  color: white;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.chatbot-actions-toggle:hover {
+  background: rgba(255, 255, 255, 0.3);
+  transform: scale(1.05);
 }
 
 .chatbot-faq-toggle {
   background: rgba(255, 255, 255, 0.2);
   border: none;
   color: white;
-  padding: 6px 12px;
-  border-radius: 8px;
+  padding: 5px 10px;
+  border-radius: 6px;
   cursor: pointer;
-  font-size: 13px;
+  font-size: 11px;
   font-weight: 600;
   display: flex;
   align-items: center;
@@ -255,10 +293,10 @@
 }
 
 .message-content {
-  max-width: 70%;
-  padding: 12px 16px;
+  max-width: 85%;
+  padding: 14px 18px;
   border-radius: 12px;
-  line-height: 1.5;
+  line-height: 1.6;
   font-size: 14px;
   white-space: pre-wrap;
   word-wrap: break-word;
@@ -269,6 +307,40 @@
   color: #1f2937;
   border-bottom-left-radius: 4px;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+/* Markdown content styling */
+.message.assistant .message-content p:last-child {
+  margin-bottom: 0 !important;
+}
+
+.message.assistant .message-content ul,
+.message.assistant .message-content ol {
+  margin: 8px 0;
+  padding-left: 20px;
+}
+
+.message.assistant .message-content li {
+  margin-bottom: 4px;
+}
+
+.message.assistant .message-content pre {
+  margin: 10px 0;
+  border-radius: 8px;
+  overflow-x: auto;
+}
+
+.message.assistant .message-content code {
+  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+}
+
+.message.assistant .message-content a {
+  color: #225ea1;
+  text-decoration: underline;
+}
+
+.message.assistant .message-content a:hover {
+  color: #1a4a7a;
 }
 
 .message.user .message-content {
@@ -456,6 +528,188 @@
   border-top: 1px solid #e5e7eb;
 }
 
+/* Quick Actions Panel */
+.chatbot-actions-panel {
+  background: white;
+  border-bottom: 1px solid #e5e7eb;
+  padding: 12px 16px;
+  animation: slideDown 0.2s ease;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.actions-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.actions-header h5 {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: #374151;
+}
+
+.actions-header button {
+  background: none;
+  border: none;
+  color: #9ca3af;
+  cursor: pointer;
+  font-size: 14px;
+  padding: 2px;
+}
+
+.actions-header button:hover {
+  color: #374151;
+}
+
+.actions-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.action-btn {
+  background: #f3f4f6;
+  border: 1px solid #e5e7eb;
+  padding: 10px 12px;
+  border-radius: 8px;
+  font-size: 12px;
+  color: #374151;
+  cursor: pointer;
+  transition: all 0.2s;
+  text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.action-btn:hover {
+  background: #e0f2fe;
+  border-color: #225ea1;
+  color: #225ea1;
+}
+
+.actions-special {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.action-btn.special {
+  background: linear-gradient(135deg, #225ea1 0%, #1a4a7a 100%);
+  color: white;
+  border: none;
+  text-align: center;
+  font-weight: 500;
+}
+
+.action-btn.special:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(34, 94, 161, 0.3);
+}
+
+/* Message Actions */
+.message-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.msg-action-btn {
+  background: #f3f4f6;
+  border: 1px solid #e5e7eb;
+  padding: 8px 14px;
+  border-radius: 20px;
+  font-size: 12px;
+  color: #374151;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.msg-action-btn:hover {
+  background: #e5e7eb;
+}
+
+.msg-action-btn.primary {
+  background: linear-gradient(135deg, #225ea1 0%, #1a4a7a 100%);
+  color: white;
+  border: none;
+}
+
+.msg-action-btn.primary:hover {
+  transform: scale(1.02);
+  box-shadow: 0 2px 8px rgba(34, 94, 161, 0.3);
+}
+
+/* Photographer Finder */
+.finder-options {
+  padding: 0 20px 16px;
+  animation: fadeIn 0.3s ease;
+}
+
+.finder-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+}
+
+.finder-grid.budget {
+  grid-template-columns: 1fr;
+}
+
+.finder-option-btn {
+  background: white;
+  border: 1px solid #e5e7eb;
+  padding: 10px 14px;
+  border-radius: 10px;
+  font-size: 13px;
+  color: #374151;
+  cursor: pointer;
+  transition: all 0.2s;
+  text-align: center;
+}
+
+.finder-option-btn:hover {
+  background: #e0f2fe;
+  border-color: #225ea1;
+  color: #225ea1;
+  transform: scale(1.02);
+}
+
+.finder-option-btn.budget {
+  background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
+  border-color: #86efac;
+}
+
+.finder-option-btn.budget:hover {
+  background: linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%);
+  border-color: #4ade80;
+}
+
+/* Urdu Font Support */
+.chatbot-window[data-lang="ur"] .message-content,
+.chatbot-window[data-lang="ur"] .quick-question-btn,
+.chatbot-window[data-lang="ur"] .action-btn,
+.chatbot-window[data-lang="ur"] .chatbot-input {
+  font-family: 'Noto Nastaliq Urdu', 'Jameel Noori Nastaleeq', 'Nafees Nastaleeq', sans-serif;
+  direction: rtl;
+  text-align: right;
+}
+
 /* Mobile Responsive */
 @media (max-width: 480px) {
   .chatbot-window {
@@ -477,13 +731,38 @@
   }
 
   .message-content {
-    max-width: 80%;
+    max-width: 90%;
+    padding: 12px 14px;
+  }
+
+  .chatbot-header-actions {
+    gap: 4px;
+  }
+
+  .chatbot-lang-toggle,
+  .chatbot-faq-toggle {
+    padding: 4px 8px;
+    font-size: 10px;
+  }
+
+  .chatbot-actions-toggle {
+    width: 24px;
+    height: 24px;
+    font-size: 12px;
+  }
+
+  .actions-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .finder-grid {
+    grid-template-columns: 1fr;
   }
 }
 
 @media (max-width: 768px) {
   .chatbot-window {
     width: calc(100vw - 48px);
-    height: 550px;
+    height: 600px;
   }
 }
