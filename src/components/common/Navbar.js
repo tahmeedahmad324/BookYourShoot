@@ -38,7 +38,7 @@ const Navbar = () => {
   const photographerLinks = [
     { path: "/photographer/dashboard", label: "Dashboard" },
     { path: "/photographer/bookings", label: "Bookings" },
-    { path: "/photographer/equipment", label: "Equipment" },
+    { path: "/photographer/equipment", label: "Equipment Rental" },
     { path: "/photographer/travel", label: "Travel Estimator" },
   ]
 

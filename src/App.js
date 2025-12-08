@@ -38,6 +38,7 @@ import PhotographerDashboard from "./pages/photographer/PhotographerDashboard"
 import PhotographerProfilePage from "./pages/photographer/PhotographerProfile"
 import BookingRequests from "./pages/photographer/BookingRequests"
 import EquipmentList from "./pages/photographer/EquipmentList"
+import MyEquipmentListings from "./pages/photographer/MyEquipmentListings"
 import TravelEstimator from "./pages/photographer/TravelEstimator"
 
 // Admin Pages
@@ -188,6 +189,14 @@ function App() {
                 element={
                   <ProtectedRoute allowedRoles={["photographer"]}>
                     <EquipmentList />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/photographer/my-equipment-listings"
+                element={
+                  <ProtectedRoute allowedRoles={["photographer"]}>
+                    <MyEquipmentListings />
                   </ProtectedRoute>
                 }
               />

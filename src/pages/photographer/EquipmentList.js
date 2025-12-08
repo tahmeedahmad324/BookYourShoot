@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
+import { useNavigate } from 'react-router-dom';
 
 const EquipmentList = () => {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [equipment, setEquipment] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('all');
@@ -331,19 +333,27 @@ const EquipmentList = () => {
     <div className="equipment-list py-4">
       <div className="container">
         {/* Header */}
-        <div className="gradient-header rounded-3 p-4 mb-4">
+        <div className="gradient-header rounded-3 p-4 pb-5 mb-4">
           <div className="row align-items-center">
-            <div className="col-md-8">
+            <div className="col-md-6">
               <h1 className="fw-bold mb-2">🔧 Equipment Rental</h1>
               <p className="mb-0">Rent professional photography equipment at affordable rates</p>
             </div>
-            <div className="col-md-4 text-md-end">
-              <button 
-                className="btn btn-primary btn-lg"
-                onClick={() => setShowCart(!showCart)}
-              >
-                🛒 Rental Cart ({rentalCart.length})
-              </button>
+            <div className="col-md-6">
+              <div className="d-flex gap-2 justify-content-md-end">
+                <button 
+                  className="btn btn-primary btn-lg flex-grow-1 flex-md-grow-0"
+                  onClick={() => navigate('/photographer/my-equipment-listings')}
+                >
+                  📦 List My Equipment
+                </button>
+                <button 
+                  className="btn btn-primary btn-lg flex-grow-1 flex-md-grow-0"
+                  onClick={() => setShowCart(!showCart)}
+                >
+                  🛒 Rental Cart ({rentalCart.length})
+                </button>
+              </div>
             </div>
           </div>
         </div>
