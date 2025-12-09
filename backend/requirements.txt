@@ -1,0 +1,11 @@
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+supabase==2.0.3
+pydantic==2.5.0
+python-dotenv==1.0.0
+requests==2.31.0
+
+# Optional dependencies for specific features
+//pytesseract==0.3.10
+Pillow==10.1.0
+spotipy==2.23.0
