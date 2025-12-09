@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { GoogleGenerativeAI } from '@google/generative-ai';
+import ReactMarkdown from 'react-markdown';
 import './AIChatbot.css';
 
 const AIChatbot = () => {
@@ -58,53 +59,41 @@ const AIChatbot = () => {
         .map(msg => `${msg.role === 'user' ? 'User' : 'Assistant'}: ${msg.content}`)
         .join('\n');
 
-      const systemPrompt = `You are a helpful AI assistant for BookYourShoot, a photography booking platform in Pakistan.
+      const systemPrompt = `You are a versatile AI assistant that can help with ANY topic. You have expertise in BookYourShoot (a photography booking platform) but can answer questions on any subject.
 
 Current Date & Time: ${currentDateTime} (Pakistan Standard Time)
 
-Platform Information:
-- 6,000+ verified photographers across 50+ cities in Pakistan (Karachi, Lahore, Islamabad, Rawalpindi, Faisalabad, Multan, etc.)
-- Services: Wedding Photography, Portrait Photography, Event Photography, Product Photography, Real Estate Photography
-- Currency: PKR (Pakistani Rupees)
-- Average Pricing: PKR 5,000-50,000 per session
-- Special Features:
-  * Album Builder - Create beautiful digital photo albums
-  * Reel Generator - AI-powered video reels with Spotify music integration
-  * Equipment Rental - Rent cameras, lenses, lighting equipment
-  * Real-time Chat - Direct messaging with photographers
-  * CNIC Verification - All photographers are verified for safety
-  * Travel Bookings - Many photographers accept travel assignments
-  * Secure Payments - Protected payment processing
+## BookYourShoot Platform Knowledge (use when relevant):
+- 6,000+ verified photographers across 50+ cities in Pakistan
+- Services: Wedding, Portrait, Event, Product, Real Estate Photography
+- Pricing: PKR 5,000-50,000 per session
+- Features: Album Builder, Reel Generator (with Spotify), Equipment Rental, Real-time Chat, CNIC Verification, Secure Payments
+- Booking: Search → View profiles → Check availability → Request booking → Confirm → Pay → Chat
+- Support: support@bookyourshoot.com
 
-Booking Process:
-1. Search by location and photography type
-2. View photographer profiles, portfolios, and ratings
-3. Check availability and pricing
-4. Send booking request with event details
-5. Photographer confirms and provides quote
-6. Make secure payment
-7. Communicate via real-time chat
-
-Recent Conversation:
+## Recent Conversation:
 ${conversationHistory}
 
-User's Current Question: ${userMessage}
+## User's Question: ${userMessage}
 
-Instructions:
-- Be friendly, helpful, and conversational
-- Provide specific, detailed answers
-- If asked about date/time, use the current date/time provided above
-- Reference conversation history when relevant
-- For booking questions, guide users through the process
-- For technical issues, suggest contacting support@bookyourshoot.com
-- Keep responses natural and engaging (3-5 sentences unless more detail needed)`;
+## Response Guidelines:
+- **Format your responses using Markdown** for better readability
+- Use **bold** for emphasis, *italics* for terms
+- Use bullet points (•) or numbered lists for multiple items
+- Use headers (##) for sections in longer responses
+- Use \`code\` formatting for technical terms or commands
+- Use code blocks for code snippets
+- Be helpful, accurate, and engaging
+- For BookYourShoot questions, provide platform-specific guidance
+- For general questions, provide comprehensive, well-structured answers
+- Keep responses concise but thorough`;
 
       const model = genAI.getGenerativeModel({ 
         model: 'gemini-2.5-flash',
         generationConfig: {
-          temperature: 0.8,
-          maxOutputTokens: 800,
-          topP: 0.95,
+          temperature: 0.7,
+          maxOutputTokens: 1500,
+          topP: 0.9,
         }
       });
       
@@ -166,13 +155,13 @@ Instructions:
     'How do I book a photographer?',
     'What services do you offer?',
     'How does pricing work?',
-    'How do I become a photographer?',
+    'Explain something complex simply',
     'What cities do you cover?',
-    'Can I cancel my booking?',
+    'Help me with a coding problem',
     'How does the Album Builder work?',
+    'Give me creative ideas',
     'What is the Reel Generator?',
-    'Can photographers travel for events?',
-    'How do I contact a photographer?'
+    'Tell me an interesting fact'
   ];
 
   const handleQuickQuestion = async (question) => {
@@ -259,7 +248,30 @@ Instructions:
                   {message.role === 'assistant' ? '🤖' : '👤'}
                 </div>
                 <div className="message-content">
-                  {message.content}
+                  {message.role === 'assistant' ? (
+                    <ReactMarkdown
+                      components={{
+                        p: ({children}) => <p style={{margin: '0 0 8px 0'}}>{children}</p>,
+                        ul: ({children}) => <ul style={{margin: '8px 0', paddingLeft: '20px'}}>{children}</ul>,
+                        ol: ({children}) => <ol style={{margin: '8px 0', paddingLeft: '20px'}}>{children}</ol>,
+                        li: ({children}) => <li style={{marginBottom: '4px'}}>{children}</li>,
+                        h1: ({children}) => <h1 style={{fontSize: '18px', fontWeight: 'bold', margin: '12px 0 8px'}}>{children}</h1>,
+                        h2: ({children}) => <h2 style={{fontSize: '16px', fontWeight: 'bold', margin: '10px 0 6px'}}>{children}</h2>,
+                        h3: ({children}) => <h3 style={{fontSize: '14px', fontWeight: 'bold', margin: '8px 0 4px'}}>{children}</h3>,
+                        code: ({inline, children}) => inline ? 
+                          <code style={{background: '#f3f4f6', padding: '2px 6px', borderRadius: '4px', fontSize: '13px', fontFamily: 'monospace'}}>{children}</code> :
+                          <pre style={{background: '#1f2937', color: '#f9fafb', padding: '12px', borderRadius: '8px', overflow: 'auto', fontSize: '13px', margin: '8px 0'}}><code>{children}</code></pre>,
+                        strong: ({children}) => <strong style={{fontWeight: '600'}}>{children}</strong>,
+                        em: ({children}) => <em style={{fontStyle: 'italic'}}>{children}</em>,
+                        a: ({href, children}) => <a href={href} target="_blank" rel="noopener noreferrer" style={{color: '#225ea1', textDecoration: 'underline'}}>{children}</a>,
+                        blockquote: ({children}) => <blockquote style={{borderLeft: '3px solid #225ea1', paddingLeft: '12px', margin: '8px 0', color: '#6b7280'}}>{children}</blockquote>
+                      }}
+                    >
+                      {message.content}
+                    </ReactMarkdown>
+                  ) : (
+                    message.content
+                  )}
                 </div>
               </div>
             ))}

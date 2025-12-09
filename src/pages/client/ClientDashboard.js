@@ -98,8 +98,15 @@ const ClientDashboard = () => {
         <div className="row mb-4">
           <div className="col-12">
             <div className="gradient-header rounded-3 p-4">
-              <h2 className="fw-bold mb-2">Welcome back, {user?.name || "Client"}! 👋</h2>
-              <p className="mb-0">Manage your bookings and discover talented photographers</p>
+              <div className="d-flex justify-content-between align-items-center">
+                <div>
+                  <h2 className="fw-bold mb-2">Welcome back, {user?.name || "Client"}! 👋</h2>
+                  <p className="mb-0">Manage your bookings and discover talented photographers</p>
+                </div>
+                <Link to="/client/profile" className="btn btn-light">
+                  👤 My Profile
+                </Link>
+              </div>
             </div>
           </div>
         </div>

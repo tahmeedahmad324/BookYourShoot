@@ -38,7 +38,7 @@ const Navbar = () => {
   const photographerLinks = [
     { path: "/photographer/dashboard", label: "Dashboard" },
     { path: "/photographer/bookings", label: "Bookings" },
-    { path: "/photographer/equipment", label: "Equipment" },
+    { path: "/photographer/equipment", label: "Equipment Rental" },
     { path: "/photographer/travel", label: "Travel Estimator" },
   ]
 
@@ -165,7 +165,13 @@ const Navbar = () => {
                 </button>
                 <ul className="dropdown-menu dropdown-menu-end" aria-labelledby="userDropdown">
                   <li>
-                    <Link className="dropdown-item" to="/profile" onClick={() => setExpanded(false)}>Profile</Link>
+                    <Link 
+                      className="dropdown-item" 
+                      to={user?.role === "client" ? "/client/profile" : user?.role === "photographer" ? "/photographer/profile" : user?.role === "admin" ? "/admin/settings" : "/profile"} 
+                      onClick={() => setExpanded(false)}
+                    >
+                      Profile
+                    </Link>
                   </li>
                   <li><hr className="dropdown-divider" /></li>
                   <li>

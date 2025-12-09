@@ -252,10 +252,7 @@ const Register = () => {
                         <label htmlFor="password" className="form-label fw-semibold">
                           Password *
                         </label>
-                        <div className="input-group">
-                          <span className="input-group-text">
-                            🔒
-                          </span>
+                        <div>
                           <input
                             type="password"
                             className={`form-control ${errors.password ? 'is-invalid' : ''}`}
@@ -275,10 +272,7 @@ const Register = () => {
                       <label htmlFor="confirmPassword" className="form-label fw-semibold">
                         Confirm Password *
                       </label>
-                      <div className="input-group">
-                        <span className="input-group-text">
-                          🔒
-                        </span>
+                      <div>
                         <input
                           type="password"
                           className={`form-control ${errors.confirmPassword ? 'is-invalid' : ''}`}
