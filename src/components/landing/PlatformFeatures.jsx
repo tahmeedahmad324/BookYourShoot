@@ -1,7 +1,7 @@
 import React from 'react';
 import { MessageCircle, MapPin, ShieldCheck, Camera } from 'lucide-react';
 
-const AppDownloads = () => {
+const PlatformFeatures = () => {
   return (
     <section className="app-downloads-section" style={{ paddingTop: '3rem', paddingBottom: '3rem', marginBottom: 0 }}>
       <div className="container landing-container">
@@ -158,4 +158,4 @@ const AppDownloads = () => {
   );
 };
 
-export default AppDownloads;
+export default PlatformFeatures;

@@ -26,6 +26,20 @@ const Navbar = () => {
     navigate("/register")
   }
 
+  const handleHomeClick = (e) => {
+    e.preventDefault()
+    // If already on home page, scroll to top
+    if (window.location.pathname === '/' || window.location.pathname === '') {
+      window.scrollTo({ top: 0, behavior: 'smooth' })
+    } else {
+      // Navigate to home page
+      navigate('/')
+      // Scroll to top after navigation
+      setTimeout(() => window.scrollTo({ top: 0, behavior: 'smooth' }), 100)
+    }
+    setMobileMenuOpen(false)
+  }
+
   const animateScroll = (targetY, duration = 600) => {
     const startY = window.pageYOffset
     const diff = targetY - startY
@@ -55,7 +69,7 @@ const Navbar = () => {
   // Active section tracking
   const [activeSection, setActiveSection] = useState('')
   useEffect(() => {
-    const sectionIds = ['services', 'how-it-works', 'for-photographers']
+    const sectionIds = ['how-it-works', 'services', 'for-photographers']
     const sections = sectionIds.map(id => document.getElementById(id)).filter(Boolean)
     if (!sections.length) return
     const observer = new IntersectionObserver(
@@ -79,13 +93,13 @@ const Navbar = () => {
   return (
     <nav className={`navbar navbar-expand-lg navbar-light fixed-top ${scrolled ? "navbar-scrolled" : ""}`}>
       <div className="container landing-container">
-        <Link className="navbar-brand d-flex align-items-center gap-2" to="/">
+        <a className="navbar-brand d-flex align-items-center gap-2" href="/" onClick={handleHomeClick} style={{ cursor: 'pointer' }}>
           <img src="/logo.png" alt="BookYourShoot" height="32" className="d-inline-block align-text-top" />
           <div>
             <div style={{ fontSize: "14px", fontWeight: "bold" }}>BookYourShoot</div>
             <div style={{ fontSize: "9px", fontStyle: "italic", color: "#FF9900" }}>Shoot Smart</div>
           </div>
-        </Link>
+        </a>
 
         {/* Mobile menu button */}
         <button
@@ -101,10 +115,13 @@ const Navbar = () => {
         <div className={`collapse navbar-collapse ${mobileMenuOpen ? "show" : ""}`}>
           <ul className="navbar-nav mx-auto">
             <li className="nav-item">
-              <a className={`nav-link ${activeSection === 'services' ? 'active' : ''}`} href="#services" onClick={(e) => { e.preventDefault(); scrollTo('services') }}>Services</a>
+              <a className="nav-link" href="/" onClick={handleHomeClick}>Home</a>
             </li>
             <li className="nav-item">
               <a className={`nav-link ${activeSection === 'how-it-works' ? 'active' : ''}`} href="#how-it-works" onClick={(e) => { e.preventDefault(); scrollTo('how-it-works') }}>How it Works</a>
+            </li>
+            <li className="nav-item">
+              <a className={`nav-link ${activeSection === 'services' ? 'active' : ''}`} href="#services" onClick={(e) => { e.preventDefault(); scrollTo('services') }}>Services</a>
             </li>
             <li className="nav-item">
               <a className={`nav-link ${activeSection === 'for-photographers' ? 'active' : ''}`} href="#for-photographers" onClick={(e) => { e.preventDefault(); scrollTo('for-photographers') }}>For Photographers</a>

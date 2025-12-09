@@ -2,7 +2,8 @@ import React, { useState } from 'react';
 import Hero from '../components/landing/Hero';
 import Features from '../components/landing/Features';
 import HowItWorks from '../components/landing/HowItWorks';
-import AppDownloads from '../components/landing/AppDownloads';
+import PhotographerCTA from '../components/landing/PhotographerCTA';
+import PlatformFeatures from '../components/landing/PlatformFeatures';
 import '../styles/landing.css';
 
 const Landing = () => {
@@ -11,9 +12,10 @@ const Landing = () => {
   return (
     <div className="landing-page">
       <Hero />
-      <Features />
       <HowItWorks />
-      <AppDownloads />
+      <Features />
+      <PhotographerCTA />
+      <PlatformFeatures />
     </div>
   );
 };

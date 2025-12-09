@@ -13,8 +13,24 @@ const Hero = () => {
     navigate('/register?role=photographer');
   };
 
+  const heroStyle = {
+    backgroundImage: `
+      linear-gradient(135deg, rgba(227, 242, 253, 0.55) 0%, rgba(200, 230, 255, 0.5) 40%, rgba(227, 242, 253, 0.85) 100%),
+      url('/illustrations/landingPageBG1.jpg')
+    `,
+    backgroundSize: 'cover, 60% auto',
+    backgroundPosition: 'center, left 5% bottom',
+    backgroundRepeat: 'no-repeat, no-repeat'
+  };
+
   return (
-    <section className="hero-section">
+    <section className="hero-section" style={heroStyle}>
+      {/* Floating circles */}
+      <div className="hero-circle hero-circle-1"></div>
+      <div className="hero-circle hero-circle-2"></div>
+      <div className="hero-circle hero-circle-3"></div>
+      <div className="hero-circle hero-circle-4"></div>
+      
       <div className="container landing-container">
         <div className="row align-items-center">
           {/* Left column - Content */}
