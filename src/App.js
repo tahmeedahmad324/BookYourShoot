@@ -14,6 +14,7 @@ import Register from "./pages/auth/Register"
 import CNICUpload from "./pages/auth/CNICUpload"
 import OTPVerification from "./pages/auth/OTPVerification"
 import PhotographerSearch from "./pages/public/PhotographerSearch"
+import PhotographerProfileSetup from "./pages/photographer/PhotographerProfileSetup"
 import Profile from "./pages/Profile"
 import ForgotPassword from "./pages/auth/ForgotPassword"
 import TermsAndConditions from "./pages/legal/TermsAndConditions"
@@ -168,6 +169,14 @@ function App() {
               />
 
               {/* Protected Photographer Routes */}
+              <Route
+                path="/photographer/profile-setup"
+                element={
+                  <ProtectedRoute allowedRoles={["photographer"]}>
+                    <PhotographerProfileSetup />
+                  </ProtectedRoute>
+                }
+              />
               <Route
                 path="/photographer/dashboard"
                 element={

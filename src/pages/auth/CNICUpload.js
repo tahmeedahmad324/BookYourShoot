@@ -103,7 +103,8 @@ const CNICUpload = () => {
     setLoading(true);
     try {
       // Verification complete - both sides processed
-      navigate('/photographer/dashboard');
+      // Navigate to profile setup page
+      navigate('/photographer/profile-setup');
     } catch (error) {
       console.error('Submission error:', error);
       setError('Failed to submit CNIC for verification');

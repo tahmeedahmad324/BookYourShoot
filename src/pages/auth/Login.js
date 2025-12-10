@@ -148,18 +148,13 @@ const Login = () => {
                     <label htmlFor="email" className="form-label fw-semibold">
                       Email Address
                     </label>
-                    <div className="input-group">
-                      <span className="input-group-text">
-                        📧
-                      </span>
-                      <input
-                        type="email"
-                        className={`form-control ${errors.email ? 'is-invalid' : ''}`}
-                        id="email"
-                        placeholder="Enter your email"
-                        {...register('email')}
-                      />
-                    </div>
+                    <input
+                      type="email"
+                      className={`form-control ${errors.email ? 'is-invalid' : ''}`}
+                      id="email"
+                      placeholder="Enter your email"
+                      {...register('email')}
+                    />
                     {errors.email && (
                       <div className="text-danger small mt-1">{errors.email.message}</div>
                     )}

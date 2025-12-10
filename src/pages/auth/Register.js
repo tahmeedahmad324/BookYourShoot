@@ -13,15 +13,35 @@ const registerSchema = yup.object().shape({
   name: yup.string()
     .min(2, 'Name must be at least 2 characters')
     .max(50, 'Name must be less than 50 characters')
-    .required('Full name is required'),
+    .matches(/^[A-Za-z\s]+$/, 'Name can only contain alphabets and spaces')
+    .required('Full name is required')
+    .transform((value) => {
+      if (!value) return value;
+      // Capitalize first letter of each word
+      return value.split(' ')
+        .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+        .join(' ');
+    }),
   email: yup.string()
     .email('Please enter a valid email address')
+    .matches(/^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/, 'Invalid email format')
     .required('Email is required'),
   phone: yup.string()
-    .matches(/^(\+92|0)?[3-9]\d{9}$/, 'Please enter a valid Pakistani phone number')
-    .required('Phone number is required'),
+    .required('Phone number is required')
+    .test('phone-format', 'Please enter a valid Pakistani phone number', function(value) {
+      if (!value) return false;
+      // Remove all spaces, hyphens, and parentheses
+      const cleaned = value.replace(/[\s\-()]/g, '');
+      // Check valid formats: +923001234567, 923001234567, 03001234567
+      const phoneRegex = /^(\+92|92|0)?3[0-9]{9}$/;
+      return phoneRegex.test(cleaned);
+    }),
   password: yup.string()
-    .min(6, 'Password must be at least 6 characters')
+    .min(8, 'Password must be at least 8 characters')
+    .matches(/[a-z]/, 'Password must contain at least one lowercase letter')
+    .matches(/[A-Z]/, 'Password must contain at least one uppercase letter')
+    .matches(/[0-9]/, 'Password must contain at least one number')
+    .matches(/[@$!%*?&#]/, 'Password must contain at least one special character (@$!%*?&#)')
     .required('Password is required'),
   confirmPassword: yup.string()
     .oneOf([yup.ref('password'), null], 'Passwords must match')
@@ -29,6 +49,29 @@ const registerSchema = yup.object().shape({
   agreeToTerms: yup.bool()
     .oneOf([true], 'You must agree to the terms and conditions')
 });
+
+// Normalize phone number to +92-300-1234567 format
+const normalizePhone = (phone) => {
+  if (!phone) return '';
+  const cleaned = phone.replace(/[\s\-()]/g, '');
+  let normalized = cleaned;
+  
+  // Add +92 if not present
+  if (normalized.startsWith('0')) {
+    normalized = '92' + normalized.slice(1);
+  }
+  if (!normalized.startsWith('+')) {
+    normalized = '+' + normalized;
+  }
+  
+  // Format as +92-300-1234567
+  if (normalized.startsWith('+92')) {
+    const rest = normalized.slice(3);
+    normalized = `+92-${rest.slice(0, 3)}-${rest.slice(3)}`;
+  }
+  
+  return normalized;
+};
 
 const Register = () => {
   const navigate = useNavigate();
@@ -62,14 +105,17 @@ const Register = () => {
     setServerError('');
 
     try {
+      // Normalize phone number
+      const normalizedPhone = normalizePhone(data.phone);
+      
       // Send OTP to user's email via backend
       const response = await sendOTP(data.email);
       
       // Store registration data in session for OTP verification step
       sessionStorage.setItem('registrationData', JSON.stringify({
-        email: data.email,
+        email: data.email.toLowerCase(),
         full_name: data.name,
-        phone: data.phone,
+        phone: normalizedPhone,
         city: 'Lahore', // Default, can add city field to form
         role: data.role
       }));
@@ -95,12 +141,6 @@ const Register = () => {
       description: 'Showcase your portfolio and connect with clients',
       icon: '📸',
       color: 'secondary'
-    },
-    admin: {
-      title: 'Administrator Access',
-      description: 'Manage the platform and verify photographers',
-      icon: '🔐',
-      color: 'dark'
     }
   };
 
@@ -184,18 +224,13 @@ const Register = () => {
                         <label htmlFor="name" className="form-label fw-semibold">
                           Full Name *
                         </label>
-                        <div className="input-group">
-                          <span className="input-group-text">
-                            👤
-                          </span>
-                          <input
-                            type="text"
-                            className={`form-control ${errors.name ? 'is-invalid' : ''}`}
-                            id="name"
-                            placeholder="Enter your full name"
-                            {...register('name')}
-                          />
-                        </div>
+                        <input
+                          type="text"
+                          className={`form-control ${errors.name ? 'is-invalid' : ''}`}
+                          id="name"
+                          placeholder="Enter your full name"
+                          {...register('name')}
+                        />
                         {errors.name && (
                           <div className="text-danger small mt-1">{errors.name.message}</div>
                         )}
@@ -206,18 +241,13 @@ const Register = () => {
                         <label htmlFor="email" className="form-label fw-semibold">
                           Email Address *
                         </label>
-                        <div className="input-group">
-                          <span className="input-group-text">
-                            📧
-                          </span>
-                          <input
-                            type="email"
-                            className={`form-control ${errors.email ? 'is-invalid' : ''}`}
-                            id="email"
-                            placeholder="Enter your email"
-                            {...register('email')}
-                          />
-                        </div>
+                        <input
+                          type="email"
+                          className={`form-control ${errors.email ? 'is-invalid' : ''}`}
+                          id="email"
+                          placeholder="example@email.com"
+                          {...register('email')}
+                        />
                         {errors.email && (
                           <div className="text-danger small mt-1">{errors.email.message}</div>
                         )}
@@ -230,18 +260,13 @@ const Register = () => {
                         <label htmlFor="phone" className="form-label fw-semibold">
                           Phone Number *
                         </label>
-                        <div className="input-group">
-                          <span className="input-group-text">
-                            📱
-                          </span>
-                          <input
-                            type="tel"
-                            className={`form-control ${errors.phone ? 'is-invalid' : ''}`}
-                            id="phone"
-                            placeholder="+92 300 1234567"
-                            {...register('phone')}
-                          />
-                        </div>
+                        <input
+                          type="tel"
+                          className={`form-control ${errors.phone ? 'is-invalid' : ''}`}
+                          id="phone"
+                          placeholder="+92 300 1234567 or 0300 1234567"
+                          {...register('phone')}
+                        />
                         {errors.phone && (
                           <div className="text-danger small mt-1">{errors.phone.message}</div>
                         )}
@@ -252,15 +277,13 @@ const Register = () => {
                         <label htmlFor="password" className="form-label fw-semibold">
                           Password *
                         </label>
-                        <div>
-                          <input
-                            type="password"
-                            className={`form-control ${errors.password ? 'is-invalid' : ''}`}
-                            id="password"
-                            placeholder="Create a password"
-                            {...register('password')}
-                          />
-                        </div>
+                        <input
+                          type="password"
+                          className={`form-control ${errors.password ? 'is-invalid' : ''}`}
+                          id="password"
+                          placeholder="Min 8 chars, with uppercase, lowercase, number & special char"
+                          {...register('password')}
+                        />
                         {errors.password && (
                           <div className="text-danger small mt-1">{errors.password.message}</div>
                         )}
@@ -272,15 +295,13 @@ const Register = () => {
                       <label htmlFor="confirmPassword" className="form-label fw-semibold">
                         Confirm Password *
                       </label>
-                      <div>
-                        <input
-                          type="password"
-                          className={`form-control ${errors.confirmPassword ? 'is-invalid' : ''}`}
-                          id="confirmPassword"
-                          placeholder="Confirm your password"
-                          {...register('confirmPassword')}
-                        />
-                      </div>
+                      <input
+                        type="password"
+                        className={`form-control ${errors.confirmPassword ? 'is-invalid' : ''}`}
+                        id="confirmPassword"
+                        placeholder="Re-enter your password"
+                        {...register('confirmPassword')}
+                      />
                       {errors.confirmPassword && (
                         <div className="text-danger small mt-1">{errors.confirmPassword.message}</div>
                       )}
