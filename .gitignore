@@ -7,6 +7,7 @@ backend/services/__pycache__
 
 # Storage - user uploads and generated files
 backend/storage/reels/uploads/
-backend/storage/reels/*/
+backend/storage/reels/
 !backend/storage/reels/.gitkeep
 !backend/storage/reels/.gitignore
+backend/storage
