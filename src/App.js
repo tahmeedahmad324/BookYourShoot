@@ -144,7 +144,7 @@ function App() {
                 }
               />
               <Route
-                path="/client/music-suggestion"
+                path="/client/music-discovery"
                 element={
                   <ProtectedRoute allowedRoles={["client"]}>
                     <MusicDiscoveryUI />
@@ -152,12 +152,8 @@ function App() {
                 }
               />
               <Route
-                path="/client/music-discovery"
-                element={
-                  <ProtectedRoute allowedRoles={["client"]}>
-                    <MusicDiscoveryUI />
-                  </ProtectedRoute>
-                }
+                path="/client/music-suggestion"
+                element={<Navigate to="/client/music-discovery" replace />}
               />
               <Route
                 path="/client/profile"

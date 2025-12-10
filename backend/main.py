@@ -28,7 +28,8 @@ from backend.routers import (
     profile, 
     complaints, 
     support, 
-    travel
+    travel,
+    reels
 )
 
 app = FastAPI(title="BookYourShoot API", version="1.0.0")
@@ -55,6 +56,7 @@ app.include_router(profile.router, prefix="/api")
 app.include_router(complaints.router, prefix="/api")
 app.include_router(support.router, prefix="/api")
 app.include_router(travel.router, prefix="/api")
+app.include_router(reels.router, prefix="/api")
 
 
 @app.get("/")
@@ -76,7 +78,8 @@ def root():
             "complaints": "/api/complaints",
             "support": "/api/support",
             "travel": "/api/travel",
-            "cnic": "/api/cnic"
+            "cnic": "/api/cnic",
+            "reels": "/api/reels"
         }
     }
 

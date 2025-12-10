@@ -1,5 +1,3 @@
-"use client"
-
 import { useState, useEffect } from "react"
 import { Link } from "react-router-dom"
 import { useAuth } from "../../context/AuthContext"
@@ -91,18 +89,16 @@ const ClientDashboard = () => {
       title: "Album Builder",
       description: "Create beautiful photo albums from your shoots",
       icon: ImageIcon,
-      link: "#",
-      badge: "Coming Soon",
-      badgeColor: "secondary",
+      link: "/client/album-builder",
+      badge: null,
     },
     {
       id: "reel",
       title: "Reel Generator",
       description: "Turn your photos into stunning video reels",
       icon: Video,
-      link: "#",
-      badge: "Coming Soon",
-      badgeColor: "secondary",
+      link: "/client/reel-generator",
+      badge: null,
     },
     {
       id: "music",

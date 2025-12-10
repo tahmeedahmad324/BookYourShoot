@@ -1,94 +1,178 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import React, { useState, useRef } from 'react';
+import { useAuth } from '../../context/AuthContext';
+import { supabase } from '../../supabaseClient';
 
 const ReelGenerator = () => {
-  const [uploadedClips, setUploadedClips] = useState([]);
-  const [selectedClips, setSelectedClips] = useState([]);
-  const [reelTitle, setReelTitle] = useState('My Photo Reel');
-  const [selectedMusic, setSelectedMusic] = useState('');
-  const [selectedTheme, setSelectedTheme] = useState('modern');
-  const [isCreating, setIsCreating] = useState(false);
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [currentTime, setCurrentTime] = useState(0);
-  const [duration, setDuration] = useState(60);
+  const { user } = useAuth();
   const fileInputRef = useRef(null);
-  const playerRef = useRef(null);
+  
+  // State management
+  const [images, setImages] = useState([]);
+  const [uploadedUrls, setUploadedUrls] = useState([]);
+  const [transition, setTransition] = useState('fade');
+  const [aspectRatio, setAspectRatio] = useState('9:16');
+  const [introText, setIntroText] = useState('');
+  const [durationPerImage, setDurationPerImage] = useState(3.0);
+  const [fadeDuration, setFadeDuration] = useState(0.5);
+  
+  const [uploading, setUploading] = useState(false);
+  const [generating, setGenerating] = useState(false);
+  const [generatedVideo, setGeneratedVideo] = useState(null);
+  const [error, setError] = useState('');
+  const [uploadProgress, setUploadProgress] = useState(0);
 
-  const themes = [
-    { id: 'modern', name: 'Modern', colors: '#1A73E8,#F7931E' },
-    { id: 'vintage', name: 'Vintage', colors: '#8B4513,#DAA520' },
-    { id: 'nature', name: 'Nature', colors: '#228B22,#90EE90' },
-    { id: 'urban', name: 'Urban', colors: '#333333,#999999' },
-    { id: 'dreamy', name: 'Dreamy', colors: '#FF69B4,#87CEEB' },
-    { id: 'minimal', name: 'Minimal', colors: '#FFFFFF,#000000' }
-  ];
-
-  const musicOptions = [
-    { id: 'upbeat', name: 'Upbeat Adventure', duration: '2:30', genre: 'Pop' },
-    { id: 'romantic', name: 'Romantic Memories', duration: '3:15', genre: 'Ballad' },
-    { id: 'energetic', name: 'Energetic Vibes', duration: '1:45', genre: 'Electronic' },
-    { id: 'cinematic', name: 'Cinematic Journey', duration: '4:00', genre: 'Orchestral' },
-    { id: 'chill', name: 'Chill Sunset', duration: '2:10', genre: 'Acoustic' },
-    { id: 'party', name: 'Party Time', duration: '2:45', genre: 'Dance' }
-  ];
-
-  const effects = [
-    { id: 'fade', name: 'Fade In/Out', icon: '🌅' },
-    { id: 'slide', name: 'Slide Transition', icon: '🎞️' },
-    { id: 'zoom', name: 'Zoom In/Out', icon: '🔍' },
-    { id: 'spin', name: 'Spin Effect', icon: '🌀' },
-    { id: 'blur', name: 'Motion Blur', icon: '💫' },
-    { id: 'glitch', name: 'Glitch Effect', icon: '📺' }
-  ];
-
-  const handleFileUpload = (e) => {
+  // Handle file selection
+  const handleFileSelect = (e) => {
     const files = Array.from(e.target.files);
-    const newClips = files.map((file, index) => ({
-      id: Date.now() + index,
-      file: file,
-      name: file.name,
-      size: file.size,
-      type: file.type,
-      url: URL.createObjectURL(file),
-      uploadedAt: new Date().toISOString(),
-      duration: 5 + Math.random() * 10, // Mock duration 5-15 seconds
-    }));
     
-    setUploadedClips(prev => [...prev, ...newClips]);
-  };
-
-  const handleDrop = (e) => {
-    e.preventDefault();
-    const files = Array.from(e.dataTransfer.files);
-    const newClips = files.map((file, index) => ({
-      id: Date.now() + index,
-      file: file,
-      name: file.name,
-      size: file.size,
-      type: file.type,
-      url: URL.createObjectURL(file),
-      uploadedAt: new Date().toISOString(),
-      duration: 5 + Math.random() * 10
-    }));
+    if (files.length < 1) {
+      setError('Please select at least 1 image');
+      return;
+    }
     
-    setUploadedClips(prev => [...prev, ...newClips]);
+    if (files.length > 15) {
+      setError('Maximum 15 images allowed');
+      return;
+    }
+    
+    // Validate file types
+    const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+    const invalidFiles = files.filter(f => !validTypes.includes(f.type));
+    
+    if (invalidFiles.length > 0) {
+      setError('Only JPG, PNG, and WebP images are allowed');
+      return;
+    }
+    
+    setError('');
+    setImages(files);
+    setUploadedUrls([]); // Clear previous uploads
+    setGeneratedVideo(null); // Clear previous video
   };
 
-  const handleDragOver = (e) => {
-    e.preventDefault();
-  };
-
-  const addClipToTimeline = (clip) => {
-    if (selectedClips.find(c => c.id === clip.id)) {
-      setSelectedClips(prev => prev.filter(c => c.id !== clip.id));
-    } else {
-      setSelectedClips(prev => [...prev, clip]);
+  // Upload images to Supabase Storage
+  const handleUploadImages = async () => {
+    if (images.length === 0) {
+      setError('Please select images first');
+      return;
+    }
+    
+    setUploading(true);
+    setError('');
+    setUploadProgress(0);
+    
+    try {
+      const urls = [];
+      const userId = user.id;
+      const timestamp = Date.now();
+      
+      for (let i = 0; i < images.length; i++) {
+        const file = images[i];
+        const fileName = `${userId}/${timestamp}_${i}_${file.name}`;
+        const filePath = `reels/inputs/${fileName}`;
+        
+        // Upload to Supabase
+        const { data, error: uploadError } = await supabase.storage
+          .from('reels')
+          .upload(filePath, file, {
+            cacheControl: '3600',
+            upsert: false
+          });
+        
+        if (uploadError) {
+          throw new Error(`Failed to upload ${file.name}: ${uploadError.message}`);
+        }
+        
+        // Get public URL
+        const { data: publicUrlData } = supabase.storage
+          .from('reels')
+          .getPublicUrl(filePath);
+        
+        urls.push(publicUrlData.publicUrl);
+        
+        // Update progress
+        setUploadProgress(Math.round(((i + 1) / images.length) * 100));
+      }
+      
+      setUploadedUrls(urls);
+      setError('');
+    } catch (err) {
+      setError(err.message || 'Failed to upload images');
+      console.error('Upload error:', err);
+    } finally {
+      setUploading(false);
     }
   };
 
-  const removeClip = (clipId) => {
-    setSelectedClips(prev => prev.filter(c => c.id !== clipId));
-    setUploadedClips(prev => prev.filter(c => c.id !== clipId));
+  // Generate reel
+  const handleGenerateReel = async () => {
+    if (uploadedUrls.length === 0) {
+      setError('Please upload images first');
+      return;
+    }
+    
+    setGenerating(true);
+    setError('');
+    setGeneratedVideo(null);
+    
+    try {
+      const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+      
+      const response = await fetch('http://localhost:5000/api/reels/generate', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          images: uploadedUrls,
+          transition: transition,
+          ratio: aspectRatio,
+          intro_text: introText || null,
+          duration_per_image: durationPerImage,
+          fade_duration: fadeDuration
+        })
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || 'Failed to generate reel');
+      }
+      
+      const data = await response.json();
+      setGeneratedVideo(data);
+      
+    } catch (err) {
+      setError(err.message || 'Failed to generate reel');
+      console.error('Generation error:', err);
+    } finally {
+      setGenerating(false);
+    }
+  };
+
+  // Download video
+  const handleDownload = () => {
+    if (generatedVideo?.video_url) {
+      const link = document.createElement('a');
+      link.href = generatedVideo.video_url;
+      link.download = `reel_${Date.now()}.mp4`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+  };
+
+  // Reset form
+  const handleReset = () => {
+    setImages([]);
+    setUploadedUrls([]);
+    setGeneratedVideo(null);
+    setError('');
+    setUploadProgress(0);
+    setIntroText('');
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
   };
 
   const formatFileSize = (bytes) => {
@@ -177,328 +261,255 @@ const ReelGenerator = () => {
   }, [isPlaying, currentTime, duration]);
 
   return (
-    <div className="reel-generator py-4">
-      <div className="container">
-        {/* Header */}
-        <div className="gradient-header rounded-3 p-4 mb-4">
-          <div className="row align-items-center">
-            <div className="col-md-8">
-              <h1 className="fw-bold mb-2">🎬 Reel Generator</h1>
-              <p className="mb-0">Create stunning video reels from your photos with music and effects</p>
+    <div className="container py-4">
+      <div className="row">
+        <div className="col-12">
+          <h2 className="mb-4">🎬 Reel Generator</h2>
+          
+          {error && (
+            <div className="alert alert-danger alert-dismissible fade show" role="alert">
+              {error}
+              <button type="button" className="btn-close" onClick={() => setError('')}></button>
             </div>
-            <div className="col-md-4 text-md-end">
-              <div className="text-white mb-2">
-                <div className="small opacity-75">Reel Progress</div>
-                <div className="h5 fw-bold">{selectedClips.length} Clips Added</div>
-              </div>
-            </div>
-          </div>
-        </div>
+          )}
 
-        <div className="row">
-          {/* Left Sidebar - Upload & Settings */}
-          <div className="col-lg-3">
-            {/* Reel Settings */}
-            <div className="card border-0 shadow-sm mb-4">
-              <div className="card-header bg-white border-0 pt-4 pb-3">
-                <h5 className="fw-bold mb-0">Reel Settings</h5>
+          {/* Upload Section */}
+          <div className="card mb-4">
+            <div className="card-body">
+              <h5 className="card-title">1. Upload Images (1-15 photos)</h5>
+              
+              <div className="mb-3">
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  className="form-control"
+                  accept="image/jpeg,image/jpg,image/png,image/webp"
+                  multiple
+                  onChange={handleFileSelect}
+                  disabled={uploading || generating}
+                />
+                <small className="form-text text-muted">
+                  Supported formats: JPG, PNG, WebP. Maximum 15 images.
+                </small>
               </div>
-              <div className="card-body">
+              
+              {images.length > 0 && (
                 <div className="mb-3">
-                  <label className="form-label fw-semibold">Reel Title *</label>
-                  <input
-                    type="text"
-                    className="form-control"
-                    value={reelTitle}
-                    onChange={(e) => setReelTitle(e.target.value)}
-                    placeholder="My Amazing Reel"
-                  />
-                </div>
-                
-                <div className="mb-3">
-                  <label className="form-label fw-semibold">Music Track *</label>
-                  <select 
-                    className="form-select"
-                    value={selectedMusic}
-                    onChange={(e) => setSelectedMusic(e.target.value)}
-                  >
-                    <option value="">Select background music</option>
-                    {musicOptions.map(music => (
-                      <option key={music.id} value={music.id}>
-                        {music.name} ({music.duration})
-                      </option>
+                  <p className="mb-2">Selected: <strong>{images.length}</strong> images</p>
+                  
+                  {/* Image previews */}
+                  <div className="d-flex flex-wrap gap-2 mb-3">
+                    {images.map((img, idx) => (
+                      <div key={idx} className="position-relative">
+                        <img
+                          src={URL.createObjectURL(img)}
+                          alt={`Preview ${idx + 1}`}
+                          style={{
+                            width: '80px',
+                            height: '80px',
+                            objectFit: 'cover',
+                            borderRadius: '8px',
+                            border: '2px solid #dee2e6'
+                          }}
+                        />
+                        <span
+                          className="position-absolute top-0 start-0 badge bg-primary"
+                          style={{ fontSize: '10px' }}
+                        >
+                          {idx + 1}
+                        </span>
+                      </div>
                     ))}
-                  </select>
-                </div>
-                
-                <div className="mb-3">
-                  <label className="form-label fw-semibold">Visual Theme *</label>
-                  <select 
-                    className="form-select"
-                    value={selectedTheme}
-                    onChange={(e) => setSelectedTheme(e.target.value)}
-                  >
-                    {themes.map(theme => (
-                      <option key={theme.id} value={theme.id}>
-                        {theme.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-            </div>
-
-            {/* Upload Area */}
-            <div className="card border-0 shadow-sm mb-4">
-              <div className="card-header bg-white border-0 pt-4 pb-3">
-                <h5 className="fw-bold mb-0">Upload Clips</h5>
-              </div>
-              <div className="card-body">
-                <div 
-                  className="upload-zone"
-                  onDrop={handleDrop}
-                  onDragOver={handleDragOver}
-                  onClick={() => fileInputRef.current?.click()}
-                >
-                  <div className="text-center">
-                    <div className="mb-3" style={{ fontSize: '3rem' }}>📹</div>
-                    <h6 className="fw-semibold mb-2">Drag & Drop Videos/Photos Here</h6>
-                    <p className="text-muted small mb-3">or click to browse files</p>
-                    <button className="btn btn-primary btn-sm">
-                      Choose Files
-                    </button>
-                    <input
-                      ref={fileInputRef}
-                      type="file"
-                      multiple
-                      accept="image/*,video/*"
-                      onChange={handleFileUpload}
-                      className="d-none"
-                    />
                   </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Create Reel Button */}
-            <button 
-              className="btn btn-primary w-100 btn-lg"
-              onClick={simulateReelCreation}
-              disabled={isCreating || selectedClips.length === 0}
-            >
-              {isCreating ? (
-                <>
-                  <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
-                  Creating Reel...
-                </>
-              ) : (
-                '🎬 Create Reel'
-              )}
-            </button>
-          </div>
-
-          {/* Main Content - Timeline and Preview */}
-          <div className="col-lg-9">
-            {/* Preview Player */}
-            <div className="card border-0 shadow-sm mb-4">
-              <div className="card-header bg-white border-0 pt-4 pb-3">
-                <div className="d-flex justify-content-between align-items-center">
-                  <h5 className="fw-bold mb-0">Reel Preview</h5>
-                  <div className="d-flex gap-2">
-                    <button 
-                      className="btn btn-outline-primary btn-sm"
-                      onClick={togglePlayback}
-                      disabled={selectedClips.length === 0}
-                    >
-                      {isPlaying ? '⏸️ Pause' : '▶️ Play'}
-                    </button>
-                    <button className="btn btn-outline-secondary btn-sm">
-                      ⚙️ Settings
-                    </button>
-                  </div>
-                </div>
-              </div>
-              <div className="card-body p-4">
-                {selectedClips.length === 0 ? (
-                  <div className="text-center py-5">
-                    <div className="mb-4" style={{ fontSize: '4rem' }}>🎬</div>
-                    <h4 className="fw-bold mb-3">No Clips Added</h4>
-                    <p className="text-muted mb-4">Upload and add clips to start creating your reel</p>
-                    <button 
+                  
+                  {uploadedUrls.length === 0 && (
+                    <button
                       className="btn btn-primary"
-                      onClick={() => fileInputRef.current?.click()}
+                      onClick={handleUploadImages}
+                      disabled={uploading || generating}
                     >
-                      Upload Clips
-                    </button>
-                  </div>
-                ) : (
-                  <div>
-                    {/* Video Preview Area */}
-                    <div className="video-preview-area mb-3 text-center" 
-                         style={{ 
-                           minHeight: '300px', 
-                           backgroundColor: '#000', 
-                           borderRadius: '8px',
-                           position: 'relative',
-                           overflow: 'hidden'
-                         }}>
-                      {selectedClips.length > 0 && (
-                        <div style={{
-                          position: 'absolute',
-                          top: '50%',
-                          left: '50%',
-                          transform: 'translate(-50%, -50%)',
-                          color: 'white',
-                          textAlign: 'center'
-                        }}>
-                          <div style={{ fontSize: '4rem' }}>🎬</div>
-                          <div>{reelTitle || 'My Photo Reel'}</div>
-                          {isPlaying && (
-                            <div className="mt-3">
-                              <div className="spinner-border text-light" role="status">
-                                <span className="visually-hidden">Playing...</span>
-                              </div>
-                            </div>
-                          )}
-                        </div>
+                      {uploading ? (
+                        <>
+                          <span className="spinner-border spinner-border-sm me-2"></span>
+                          Uploading... {uploadProgress}%
+                        </>
+                      ) : (
+                        'Upload Images to Cloud'
                       )}
-                      
-                      {/* Timeline Progress */}
-                      <div className="progress position-absolute bottom-0 w-0" 
-                           style={{ height: '4px', backgroundColor: '#F7931E' }}
+                    </button>
+                  )}
+                  
+                  {uploadedUrls.length > 0 && (
+                    <div className="alert alert-success mb-0">
+                      ✅ {uploadedUrls.length} images uploaded successfully!
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+          
+          {/* Configuration Section */}
+          {uploadedUrls.length > 0 && (
+            <div className="card mb-4">
+              <div className="card-body">
+                <h5 className="card-title">2. Configure Your Reel</h5>
+                
+                <div className="row">
+                  {/* Intro Text */}
+                  <div className="col-md-6 mb-3">
+                    <label className="form-label">Intro Text (Optional)</label>
+                    <input
+                      type="text"
+                      className="form-control"
+                      placeholder="e.g., My Amazing Reel"
+                      value={introText}
+                      onChange={(e) => setIntroText(e.target.value)}
+                      maxLength={50}
+                      disabled={generating}
+                    />
+                    <small className="form-text text-muted">
+                      Displayed for 2.5 seconds at the start
+                    </small>
+                  </div>
+                  
+                  {/* Aspect Ratio */}
+                  <div className="col-md-6 mb-3">
+                    <label className="form-label">Aspect Ratio</label>
+                    <select
+                      className="form-select"
+                      value={aspectRatio}
+                      onChange={(e) => setAspectRatio(e.target.value)}
+                      disabled={generating}
+                    >
+                      <option value="9:16">9:16 (Instagram Reels/Stories)</option>
+                      <option value="16:9">16:9 (YouTube/Landscape)</option>
+                      <option value="1:1">1:1 (Square)</option>
+                    </select>
+                  </div>
+                  
+                  {/* Transition */}
+                  <div className="col-md-6 mb-3">
+                    <label className="form-label">Transition Effect</label>
+                    <select
+                      className="form-select"
+                      value={transition}
+                      onChange={(e) => setTransition(e.target.value)}
+                      disabled={generating}
+                    >
+                      <option value="fade">Fade (Smooth)</option>
+                      <option value="none">None (Cut)</option>
+                    </select>
+                  </div>
+                  
+                  {/* Duration per image */}
+                  <div className="col-md-6 mb-3">
+                    <label className="form-label">Duration per Image: {durationPerImage}s</label>
+                    <input
+                      type="range"
+                      className="form-range"
+                      min="1"
+                      max="5"
+                      step="0.5"
+                      value={durationPerImage}
+                      onChange={(e) => setDurationPerImage(parseFloat(e.target.value))}
+                      disabled={generating}
+                    />
+                    <small className="form-text text-muted">
+                      Total duration: ~{(uploadedUrls.length * durationPerImage).toFixed(1)}s
+                    </small>
+                  </div>
+                  
+                  {/* Fade duration (only if fade transition) */}
+                  {transition === 'fade' && (
+                    <div className="col-md-6 mb-3">
+                      <label className="form-label">Fade Duration: {fadeDuration}s</label>
+                      <input
+                        type="range"
+                        className="form-range"
+                        min="0.1"
+                        max="2"
+                        step="0.1"
+                        value={fadeDuration}
+                        onChange={(e) => setFadeDuration(parseFloat(e.target.value))}
+                        disabled={generating}
                       />
                     </div>
-                    
-                    {/* Timeline */}
-                    <div className="timeline-container">
-                      <div className="d-flex align-items-center mb-2">
-                        <span className="small text-muted me-2">{formatDuration(currentTime)}</span>
-                        <div className="flex-grow-1 bg-light rounded position-relative" 
-                             style={{ height: '8px', cursor: 'pointer' }}
-                             onClick={handleTimelineClick}>
-                          <div className="progress-bar bg-primary" 
-                               style={{ 
-                                 width: `${(currentTime / duration) * 100}%`,
-                                 height: '8px'
-                               }} />
-                        </div>
-                        <span className="small text-muted ms-2">{formatDuration(duration)}</span>
-                      </div>
-                    </div>
-                  </div>
-                )}
+                  )}
+                </div>
+                
+                <div className="d-flex gap-2">
+                  <button
+                    className="btn btn-success"
+                    onClick={handleGenerateReel}
+                    disabled={generating}
+                  >
+                    {generating ? (
+                      <>
+                        <span className="spinner-border spinner-border-sm me-2"></span>
+                        Generating Reel... (This may take 30-60s)
+                      </>
+                    ) : (
+                      '🎬 Generate Reel'
+                    )}
+                  </button>
+                  
+                  <button
+                    className="btn btn-outline-secondary"
+                    onClick={handleReset}
+                    disabled={uploading || generating}
+                  >
+                    Reset
+                  </button>
+                </div>
               </div>
             </div>
-
-            {/* Clips Timeline */}
-            {selectedClips.length > 0 && (
-              <div className="card border-0 shadow-sm mb-4">
-                <div className="card-header bg-white border-0 pt-4 pb-3">
-                  <h6 className="fw-bold mb-0">🎞️ Timeline Clips ({selectedClips.length})</h6>
-                </div>
-                <div className="card-body">
-                  <div className="timeline-clips">
-                    {selectedClips.map((clip, index) => (
-                      <div key={clip.id} className="d-flex align-items-center mb-3">
-                        <div className="me-3 text-primary">
-                          <div className="rounded bg-light d-flex align-items-center justify-content-center" 
-                               style={{ width: '40px', height: '40px' }}>
-                            📸
-                          </div>
-                        </div>
-                        <div className="flex-grow-1">
-                          <div className="d-flex justify-content-between align-items-center">
-                            <div>
-                              <div className="fw-semibold">{clip.name}</div>
-                              <small className="text-muted">
-                                {formatFileSize(clip.size)} • {formatDuration(clip.duration)}
-                              </small>
-                            </div>
-                            <button 
-                              className="btn btn-sm btn-outline-danger"
-                              onClick={() => removeClip(clip.id)}
-                            >
-                              Remove
-                            </button>
-                          </div>
-                          <div className="progress mt-2" style={{ height: '4px' }}>
-                            <div className="progress-bar bg-primary" style={{ width: '100%' }} />
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Effects Panel */}
-            <div className="card border-0 shadow-sm mb-4">
-              <div className="card-header bg-white border-0 pt-4 pb-3">
-                <h6 className="fw-bold mb-0">✨ Visual Effects</h6>
-              </div>
+          )}
+          
+          {/* Preview Section */}
+          {generatedVideo && (
+            <div className="card mb-4">
               <div className="card-body">
-                <div className="row g-2">
-                  {effects.map((effect) => (
-                    <div key={effect.id} className="col-md-4">
-                      <button className="btn btn-outline-primary w-100 btn-sm">
-                        {effect.icon} {effect.name}
-                      </button>
-                    </div>
-                  ))}
+                <h5 className="card-title">3. Preview & Download</h5>
+                
+                <div className="alert alert-success mb-3">
+                  ✅ Reel generated successfully!
+                  <ul className="mb-0 mt-2">
+                    <li>Duration: {generatedVideo.duration?.toFixed(1)}s</li>
+                    <li>Images: {generatedVideo.num_images}</li>
+                    <li>Aspect Ratio: {generatedVideo.aspect_ratio}</li>
+                    {generatedVideo.file_size && (
+                      <li>Size: {(generatedVideo.file_size / (1024 * 1024)).toFixed(2)} MB</li>
+                    )}
+                  </ul>
                 </div>
-                <div className="alert alert-info small mt-3">
-                  <strong>💡 Tip:</strong> Add transitions between clips for smoother flow and professional appearance.
+                
+                {/* Video Preview */}
+                <div className="mb-3">
+                  <video
+                    controls
+                    style={{
+                      width: '100%',
+                      maxWidth: aspectRatio === '9:16' ? '400px' : '100%',
+                      borderRadius: '8px',
+                      border: '2px solid #dee2e6'
+                    }}
+                    src={generatedVideo.video_url}
+                  >
+                    Your browser does not support the video tag.
+                  </video>
                 </div>
+                
+                {/* Download Button */}
+                <button
+                  className="btn btn-primary"
+                  onClick={handleDownload}
+                >
+                  📥 Download Video
+                </button>
               </div>
             </div>
-
-            {/* Quick Templates */}
-            {selectedClips.length > 0 && (
-              <div className="card border-0 shadow-sm">
-                <div className="card-header bg-white border-0 pt-4 pb-3">
-                  <h6 className="fw-bold mb-0">🎨 Quick Reel Templates</h6>
-                </div>
-                <div className="card-body">
-                  <div className="row g-2">
-                    <div className="col-md-4">
-                      <button className="btn btn-outline-primary w-100 btn-sm">
-                        🎓 Graduation Reel
-                      </button>
-                    </div>
-                    <div className="col-md-4">
-                      <button className="btn btn-outline-primary w-100 btn-sm">
-                        💑 Wedding Reel
-                      </button>
-                    </div>
-                    <div className="col-md-4">
-                      <button className="btn btn-outline-primary w-100 btn-sm">
-                        👨‍👩‍👧‍👦 Family Reel
-                      </button>
-                    </div>
-                    <div className="col-md-4">
-                      <button className="btn btn-outline-primary w-100 btn-sm">
-                        🏃‍♀️ Sports Reel
-                      </button>
-                    </div>
-                    <div className="col-md-4">
-                      <button className="btn btn-outline-primary w-100 btn-sm">
-                        🎂 Birthday Reel
-                      </button>
-                    </div>
-                    <div className="col-md-4">
-                      <button className="btn btn-outline-primary w-100 btn-sm">
-                        🏕️ Travel Reel
-                      </button>
-                    </div>
-                  </div>
-                  <div className="alert alert-success small mt-3">
-                    <strong>🎯 Pro Tip:</strong> Templates automatically arrange clips, add transitions, and optimize music timing for your selected theme.
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
+          )}
         </div>
       </div>
     </div>
