@@ -1,6 +1,5 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
-import { supabase } from '../../supabaseClient';
 
 const ReelGenerator = () => {
   const { user } = useAuth();
@@ -20,6 +19,31 @@ const ReelGenerator = () => {
   const [generatedVideo, setGeneratedVideo] = useState(null);
   const [error, setError] = useState('');
   const [uploadProgress, setUploadProgress] = useState(0);
+
+  // Additional state for reel creation
+  const [reelTitle, setReelTitle] = useState('My Photo Reel');
+  const [selectedClips, setSelectedClips] = useState([]);
+  const [uploadedClips, setUploadedClips] = useState([]);
+  const [selectedMusic, setSelectedMusic] = useState(null);
+  const [selectedTheme, setSelectedTheme] = useState('modern');
+  const [isCreating, setIsCreating] = useState(false);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(0);
+
+  // Music options
+  const musicOptions = [
+    { id: 1, name: 'Upbeat Pop', genre: 'Pop', duration: 180 },
+    { id: 2, name: 'Cinematic Epic', genre: 'Epic', duration: 200 },
+    { id: 3, name: 'Chill Vibes', genre: 'Chill', duration: 150 }
+  ];
+
+  // Theme options
+  const themes = [
+    { id: 'modern', name: 'Modern', description: 'Clean and minimalist' },
+    { id: 'vintage', name: 'Vintage', description: 'Classic film look' },
+    { id: 'vibrant', name: 'Vibrant', description: 'Bold and colorful' }
+  ];
 
   // Handle file selection
   const handleFileSelect = (e) => {
@@ -50,7 +74,7 @@ const ReelGenerator = () => {
     setGeneratedVideo(null); // Clear previous video
   };
 
-  // Upload images to Supabase Storage
+  // Upload images to backend
   const handleUploadImages = async () => {
     if (images.length === 0) {
       setError('Please select images first');
@@ -63,32 +87,29 @@ const ReelGenerator = () => {
     
     try {
       const urls = [];
-      const userId = user.id;
-      const timestamp = Date.now();
+      const token = localStorage.getItem('token') || sessionStorage.getItem('token');
       
       for (let i = 0; i < images.length; i++) {
         const file = images[i];
-        const fileName = `${userId}/${timestamp}_${i}_${file.name}`;
-        const filePath = `reels/inputs/${fileName}`;
+        const formData = new FormData();
+        formData.append('file', file);
         
-        // Upload to Supabase
-        const { data, error: uploadError } = await supabase.storage
-          .from('reels')
-          .upload(filePath, file, {
-            cacheControl: '3600',
-            upsert: false
-          });
+        // Upload to backend
+        const response = await fetch('http://localhost:5000/api/reels/upload-image', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`
+          },
+          body: formData
+        });
         
-        if (uploadError) {
-          throw new Error(`Failed to upload ${file.name}: ${uploadError.message}`);
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(`Failed to upload ${file.name}: ${errorData.detail || 'Upload failed'}`);
         }
         
-        // Get public URL
-        const { data: publicUrlData } = supabase.storage
-          .from('reels')
-          .getPublicUrl(filePath);
-        
-        urls.push(publicUrlData.publicUrl);
+        const data = await response.json();
+        urls.push(data.url);
         
         // Update progress
         setUploadProgress(Math.round(((i + 1) / images.length) * 100));
@@ -334,7 +355,7 @@ const ReelGenerator = () => {
                           Uploading... {uploadProgress}%
                         </>
                       ) : (
-                        'Upload Images to Cloud'
+                        'Upload Images'
                       )}
                     </button>
                   )}

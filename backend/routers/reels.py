@@ -1,9 +1,10 @@
-"""
+"""  
 Reel Generator Router - Create video reels from images
-Uses MoviePy for video processing and Supabase for storage
+Uses MoviePy for video processing and local file storage
 """
 
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, UploadFile, File
+from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 from typing import Optional, List
 import requests
@@ -16,12 +17,19 @@ import traceback
 import numpy as np
 
 # MoviePy imports
-from moviepy.editor import ImageClip, TextClip, concatenate_videoclips
-from PIL import Image, ImageDraw, ImageFont, ExifTags
+try:
+    from moviepy.editor import ImageClip, TextClip, concatenate_videoclips
+except ImportError:
+    print("Warning: MoviePy not available. Reel generation will not work.")
+    ImageClip = None
+    TextClip = None
+    concatenate_videoclips = None
 
-# Supabase
-from supabase_client import supabase
-from utils.auth import get_current_user
+from PIL import Image, ImageDraw, ImageFont
+
+# Supabase - fix import path
+from backend.supabase_client import supabase
+from backend.auth import get_current_user
 
 router = APIRouter(prefix="/reels", tags=["Reel Generator"])
 
@@ -174,6 +182,66 @@ def create_intro_clip(text: str, width: int, height: int, duration: float = 2.5)
     return intro_clip
 
 
+@router.post("/upload-image")
+async def upload_image(
+    file: UploadFile = File(...),
+    current_user: dict = Depends(get_current_user)
+):
+    """Upload an image for reel generation"""
+    try:
+        user_id = current_user.get("id")
+        
+        # Validate file type
+        if not file.content_type or not file.content_type.startswith('image/'):
+            raise HTTPException(status_code=400, detail="File must be an image")
+        
+        # Create upload directory
+        upload_dir = Path("storage/reels/uploads") / str(user_id)
+        upload_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Generate unique filename
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+        file_extension = Path(file.filename).suffix
+        filename = f"{timestamp}{file_extension}"
+        file_path = upload_dir / filename
+        
+        # Save file
+        contents = await file.read()
+        with open(file_path, "wb") as f:
+            f.write(contents)
+        
+        # Return URL for accessing the image
+        image_url = f"/api/reels/images/{user_id}/{filename}"
+        
+        return {
+            "url": image_url,
+            "filename": filename,
+            "size": len(contents)
+        }
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to upload image: {str(e)}")
+
+
+@router.get("/images/{user_id}/{filename}")
+async def serve_image(user_id: str, filename: str):
+    """Serve uploaded image file"""
+    try:
+        image_path = Path("storage/reels/uploads") / user_id / filename
+        
+        if not image_path.exists():
+            raise HTTPException(status_code=404, detail="Image not found")
+        
+        return FileResponse(path=str(image_path))
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to serve image: {str(e)}")
+
+
 @router.post("/generate", response_model=ReelResponse)
 async def generate_reel(
     payload: ReelRequest,
@@ -188,8 +256,8 @@ async def generate_reel(
     3. Add intro text if provided
     4. Apply transitions
     5. Export video
-    6. Upload to Supabase storage
-    7. Return public URL
+    6. Save to local storage
+    7. Return local file path/URL
     """
     
     # Create temporary directory for processing
@@ -226,10 +294,26 @@ async def generate_reel(
         # Process each image
         for idx, image_url in enumerate(payload.images):
             try:
-                # Download image
-                response = requests.get(image_url, timeout=30)
-                response.raise_for_status()
-                image_bytes = response.content
+                # Check if it's a local file path
+                if image_url.startswith("/api/reels/images/"):
+                    # Extract user_id and filename from URL
+                    parts = image_url.split("/")
+                    url_user_id = parts[-2]
+                    filename = parts[-1]
+                    image_path = Path("storage/reels/uploads") / url_user_id / filename
+                    
+                    if not image_path.exists():
+                        print(f"Image not found: {image_path}")
+                        continue
+                    
+                    # Read local file
+                    with open(image_path, "rb") as f:
+                        image_bytes = f.read()
+                else:
+                    # Download image from external URL
+                    response = requests.get(image_url, timeout=30)
+                    response.raise_for_status()
+                    image_bytes = response.content
                 
                 # Fix orientation
                 img = fix_image_orientation(image_bytes)
@@ -287,24 +371,22 @@ async def generate_reel(
         for clip in clips:
             clip.close()
         
-        # Upload to Supabase Storage
-        storage_path = f"reels/outputs/{user_id}/{output_filename}"
+        # Create local storage directory if it doesn't exist
+        local_storage_dir = Path("storage/reels") / str(user_id)
+        local_storage_dir.mkdir(parents=True, exist_ok=True)
         
-        with open(output_path, "rb") as video_file:
-            result = supabase.storage.from_("reels").upload(
-                storage_path,
-                video_file,
-                file_options={"content-type": "video/mp4"}
-            )
-        
-        # Get public URL
-        public_url = supabase.storage.from_("reels").get_public_url(storage_path)
+        # Move video to local storage
+        final_output_path = local_storage_dir / output_filename
+        shutil.move(str(output_path), str(final_output_path))
         
         # Get file size
-        file_size = output_path.stat().st_size
+        file_size = final_output_path.stat().st_size
+        
+        # Create absolute URL for accessing the video
+        video_url = f"http://localhost:5000/api/reels/videos/{user_id}/{output_filename}"
         
         return ReelResponse(
-            video_url=public_url,
+            video_url=video_url,
             duration=video_duration,
             num_images=len(payload.images),
             aspect_ratio=payload.ratio,
@@ -328,31 +410,53 @@ async def generate_reel(
 
 @router.get("/user-reels")
 async def get_user_reels(current_user: dict = Depends(get_current_user)):
-    """Get all reels created by the current user"""
+    """Get all reels created by the current user from local storage"""
     try:
         user_id = current_user.get("id")
         
-        # List all files in user's reel folder
-        result = supabase.storage.from_("reels").list(f"outputs/{user_id}")
+        # Check if user's reel folder exists
+        local_storage_dir = Path("storage/reels") / str(user_id)
         
-        if not result:
+        if not local_storage_dir.exists():
             return {"reels": []}
         
-        # Get public URLs for each file
+        # List all video files in user's folder
         reels = []
-        for file in result:
-            if file.get("name"):
-                storage_path = f"outputs/{user_id}/{file['name']}"
-                public_url = supabase.storage.from_("reels").get_public_url(storage_path)
-                
-                reels.append({
-                    "name": file["name"],
-                    "url": public_url,
-                    "created_at": file.get("created_at"),
-                    "size": file.get("metadata", {}).get("size")
-                })
+        for video_file in local_storage_dir.glob("*.mp4"):
+            file_stat = video_file.stat()
+            
+            reels.append({
+                "name": video_file.name,
+                "url": f"/api/reels/videos/{user_id}/{video_file.name}",
+                "created_at": datetime.fromtimestamp(file_stat.st_ctime).isoformat(),
+                "size": file_stat.st_size
+            })
+        
+        # Sort by creation time (newest first)
+        reels.sort(key=lambda x: x["created_at"], reverse=True)
         
         return {"reels": reels}
     
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to fetch user reels: {str(e)}")
+
+
+@router.get("/videos/{user_id}/{filename}")
+async def serve_video(user_id: str, filename: str):
+    """Serve video file from local storage"""
+    try:
+        video_path = Path("storage/reels") / user_id / filename
+        
+        if not video_path.exists():
+            raise HTTPException(status_code=404, detail="Video not found")
+        
+        return FileResponse(
+            path=str(video_path),
+            media_type="video/mp4",
+            filename=filename
+        )
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to serve video: {str(e)}")
