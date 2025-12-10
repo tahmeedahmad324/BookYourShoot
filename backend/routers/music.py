@@ -33,20 +33,20 @@ spotify_token_cache = {
     "expires_at": None
 }
 
-# Playlist mapping for event types (Primary + Backup playlists)
+# Playlist mapping for event types (Custom playlists)
 PLAYLIST_MAP = {
-    'mehndi': ['37i9dQZF1DX5c6ANWn7YpC', '37i9dQZF1DWZLzVWw5YQAW'],  # Desi Wedding + Mehendi Magic
-    'barat': ['37i9dQZF1DX0XUfTFmBREq', '37i9dQZF1DX8mBRYewE6or'],   # Punjabi 101 + Shaadi Vibes
-    'valima': ['37i9dQZF1DXa2SPwy7qbF3', '37i9dQZF1DX0XUfTFmNBRM'],  # Humsafar + Romantic Bollywood
-    'birthday': ['37i9dQZF1DX1uSJ9tTHjJq', '37i9dQZF1DXcP8L7Bx0L0n'], # Happy Birthday + Party Mix
-    'corporate': ['37i9dQZF1DXcBWIGoYBM5M', '37i9dQZF1DWZeKCadgRdKQ']  # Focus Flow + Deep Focus
+    'mehndi': ['4848ZkWeM8Ut3JM3kfcepy'],
+    'barat': ['0Mg9QB6YJyjnmJkTreKWOE'],
+    'walima': ['5uh1m66xZNODbbXunsURCu'],
+    'birthday': ['1YhFtD5duKmrPq50fAf70a1'],
+    'corporate': ['3cgRMNpZOJzmJPLdibErF1']
 }
 
 # Vibe filtering rules for each event type (relaxed thresholds)
 VIBE_RULES = {
     'mehndi': {'energy_min': 0.4, 'danceability_min': 0.4},
     'barat': {'energy_min': 0.5, 'danceability_min': 0.5},
-    'valima': {'energy_max': 0.8, 'valence_min': 0.3},
+    'walima': {'energy_max': 0.8, 'valence_min': 0.3},
     'birthday': {'energy_min': 0.3, 'valence_min': 0.4},
     'corporate': {'energy_min': 0.1, 'energy_max': 0.9}
 }
@@ -55,18 +55,18 @@ VIBE_RULES = {
 SEARCH_FALLBACKS = {
     'mehndi': 'mehndi OR dholki OR sangeet pakistani punjabi bollywood dance',
     'barat': 'barat OR baraat OR dulha entry pakistani wedding high energy',
-    'valima': 'walima OR nikah romantic pakistani bollywood love songs',
+    'walima': 'walima OR nikah romantic pakistani bollywood love songs',
     'birthday': 'happy birthday celebration party cocomelon kids',
     'corporate': 'instrumental background lofi jazz corporate ambient focus'
 }
 
 # Keywords to exclude for each event (prevent cross-contamination)
 EXCLUDE_KEYWORDS = {
-    'mehndi': ['barat', 'baraat', 'valima', 'walima'],
-    'barat': ['mehndi', 'dholki', 'sangeet', 'valima', 'walima'],
-    'valima': ['mehndi', 'dholki', 'barat', 'baraat', 'birthday'],
-    'birthday': ['mehndi', 'barat', 'baraat', 'valima', 'walima'],
-    'corporate': ['mehndi', 'barat', 'baraat', 'valima', 'walima', 'birthday']
+    'mehndi': ['barat', 'baraat', 'walima'],
+    'barat': ['mehndi', 'dholki', 'sangeet', 'walima'],
+    'walima': ['mehndi', 'dholki', 'barat', 'baraat', 'birthday'],
+    'birthday': ['mehndi', 'barat', 'baraat', 'walima'],
+    'corporate': ['mehndi', 'barat', 'baraat', 'walima', 'birthday']
 }
 
 
@@ -302,7 +302,7 @@ def filter_tracks_by_vibe(tracks: list, audio_features: dict, event_type: str):
             # Calculate vibe score based on event type
             if event_type_lower in ["mehndi", "barat"]:
                 track["vibeScore"] = (energy * 0.4 + danceability * 0.4 + valence * 0.2) * 100
-            elif event_type_lower == "valima":
+            elif event_type_lower == "walima":
                 track["vibeScore"] = (valence * 0.5 + (1 - energy) * 0.3 + danceability * 0.2) * 100
             elif event_type_lower == "birthday":
                 track["vibeScore"] = (valence * 0.5 + energy * 0.3 + danceability * 0.2) * 100
@@ -318,7 +318,7 @@ def filter_tracks_by_vibe(tracks: list, audio_features: dict, event_type: str):
 
 @router.get("/suggestions")
 def get_music_suggestions(
-    eventType: Optional[str] = Query(None, description="Event type: mehndi, barat, valima, birthday, corporate"),
+    eventType: Optional[str] = Query(None, description="Event type: mehndi, barat, walima, birthday, corporate"),
     mood: Optional[str] = None,
     genre: Optional[str] = None,
     tempo: Optional[str] = None,

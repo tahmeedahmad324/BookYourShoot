@@ -263,11 +263,6 @@ const OTPVerification = () => {
                   )}
                 </div>
 
-                {/* Demo Info */}
-                <div className="alert alert-info small mt-4" role="alert">
-                  <strong>Demo:</strong> Enter any 6-digit number to verify.
-                </div>
-
                 {/* Contact Support */}
                 <div className="text-center mt-4">
                   <p className="text-muted small mb-2">

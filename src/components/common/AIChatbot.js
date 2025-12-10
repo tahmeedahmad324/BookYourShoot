@@ -155,13 +155,13 @@ ${conversationHistory}
     'How do I book a photographer?',
     'What services do you offer?',
     'How does pricing work?',
-    'Explain something complex simply',
     'What cities do you cover?',
-    'Help me with a coding problem',
     'How does the Album Builder work?',
-    'Give me creative ideas',
     'What is the Reel Generator?',
-    'Tell me an interesting fact'
+    'How do I rent equipment?',
+    'Can I chat with photographers?',
+    'How does payment work?',
+    'What is CNIC verification?'
   ];
 
   const handleQuickQuestion = async (question) => {
@@ -198,8 +198,9 @@ ${conversationHistory}
         className={`chatbot-button ${isOpen ? 'hidden' : ''}`}
         onClick={() => setIsOpen(true)}
         aria-label="Open AI Assistant"
+        title="AI Assistant - Chat with us!"
       >
-        <span className="chatbot-icon">💬</span>
+        <span className="chatbot-icon">🤖</span>
         <span className="chatbot-badge">AI</span>
       </button>
 
