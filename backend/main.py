@@ -1,5 +1,9 @@
 from pathlib import Path
 import sys
+import warnings
+
+# Suppress NumPy warnings on Windows
+warnings.filterwarnings('ignore', category=RuntimeWarning, module='numpy')
 
 # Ensure project root is on sys.path so `import backend.*` works when executing
 # the script as `python backend/main.py` from the project root.
