@@ -3,12 +3,23 @@
 import { useState, useEffect } from "react"
 import { Link } from "react-router-dom"
 import { useAuth } from "../../context/AuthContext"
-import photographersData from "../../data/photographers.json"
+import { 
+  Calendar, 
+  Clock, 
+  CheckCircle2, 
+  DollarSign,
+  Search,
+  ImageIcon,
+  Video,
+  Music,
+  MessageSquare,
+  Star,
+  User,
+  Camera
+} from "lucide-react"
 
 const ClientDashboard = () => {
   const { user } = useAuth()
-  const [recentBookings, setRecentBookings] = useState([])
-  const [recommendedPhotographers, setRecommendedPhotographers] = useState([])
   const [stats, setStats] = useState({
     totalBookings: 0,
     upcomingBookings: 0,
@@ -21,44 +32,20 @@ const ClientDashboard = () => {
     const mockBookings = [
       {
         id: 1,
-        photographer: "Ahmed Photography",
-        photographerId: 1,
-        date: "2024-12-25",
-        time: "2:00 PM",
-        location: "Lahore, Garden Town",
-        service: "Wedding Photography",
         status: "upcoming",
         amount: 15000,
-        image: "/images/photographer1.jpg",
       },
       {
         id: 2,
-        photographer: "Sarah Studios",
-        photographerId: 2,
-        date: "2024-11-15",
-        time: "10:00 AM",
-        location: "Karachi, Clifton",
-        service: "Portrait Photography",
         status: "completed",
         amount: 8000,
-        image: "/images/photographer2.jpg",
       },
       {
         id: 3,
-        photographer: "Elite Photography",
-        photographerId: 4,
-        date: "2024-12-30",
-        time: "4:00 PM",
-        location: "Lahore, Model Town",
-        service: "Product Photography",
         status: "upcoming",
         amount: 12000,
-        image: "/images/photographer4.jpg",
       },
     ]
-
-    setRecentBookings(mockBookings.slice(0, 3))
-    setRecommendedPhotographers(photographersData.photographers.slice(0, 4))
 
     const upcoming = mockBookings.filter((b) => b.status === "upcoming").length
     const completed = mockBookings.filter((b) => b.status === "completed").length
@@ -72,24 +59,84 @@ const ClientDashboard = () => {
     })
   }, [])
 
-  const getStatusBadge = (status) => {
-    const statusClasses = {
-      upcoming: "status-available",
-      completed: "status-premium",
-      cancelled: "status-unavailable",
-    }
-    return statusClasses[status] || "status-unavailable"
-  }
-
-  const formatDate = (dateStr) => {
-    const date = new Date(dateStr)
-    return date.toLocaleDateString("en-US", {
-      weekday: "short",
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-    })
-  }
+  // Client menu options
+  const menuOptions = [
+    {
+      id: "bookings",
+      title: "My Bookings",
+      description: "View and manage all your photography bookings",
+      icon: Calendar,
+      link: "/client/bookings",
+      badge: stats.upcomingBookings,
+      badgeColor: "success",
+    },
+    {
+      id: "search",
+      title: "Find Photographers",
+      description: "Search and discover talented photographers",
+      icon: Search,
+      link: "/search",
+      badge: null,
+    },
+    {
+      id: "equipment",
+      title: "Equipment Rental",
+      description: "Rent camera equipment for your shoot",
+      icon: Camera,
+      link: "/photographer/equipment",
+      badge: null,
+    },
+    {
+      id: "album",
+      title: "Album Builder",
+      description: "Create beautiful photo albums from your shoots",
+      icon: ImageIcon,
+      link: "#",
+      badge: "Coming Soon",
+      badgeColor: "secondary",
+    },
+    {
+      id: "reel",
+      title: "Reel Generator",
+      description: "Turn your photos into stunning video reels",
+      icon: Video,
+      link: "#",
+      badge: "Coming Soon",
+      badgeColor: "secondary",
+    },
+    {
+      id: "music",
+      title: "Music Suggestions",
+      description: "Get perfect music recommendations for your reels",
+      icon: Music,
+      link: "/client/music-discovery",
+      badge: null,
+    },
+    {
+      id: "messages",
+      title: "Messages",
+      description: "Chat with your photographers",
+      icon: MessageSquare,
+      link: "/client/chat",
+      badge: null,
+    },
+    {
+      id: "reviews",
+      title: "My Reviews",
+      description: "Leave reviews for completed bookings",
+      icon: Star,
+      link: "/client/bookings",
+      badge: null,
+    },
+    {
+      id: "profile",
+      title: "My Profile",
+      description: "Update your personal information and settings",
+      icon: User,
+      link: "/client/profile",
+      badge: null,
+    },
+  ]
 
   return (
     <div className="client-dashboard py-4">
@@ -98,237 +145,107 @@ const ClientDashboard = () => {
         <div className="row mb-4">
           <div className="col-12">
             <div className="gradient-header rounded-3 p-4">
-              <div className="d-flex justify-content-between align-items-center">
-                <div>
-                  <h2 className="fw-bold mb-2">Welcome back, {user?.name || "Client"}! 👋</h2>
+              <div className="row align-items-center">
+                <div className="col-md-8">
+                  <h2 className="fw-bold mb-2">Welcome back, {user?.name || "Client"}!</h2>
                   <p className="mb-0">Manage your bookings and discover talented photographers</p>
                 </div>
-                <Link to="/client/profile" className="btn btn-light">
-                  👤 My Profile
-                </Link>
+                <div className="col-md-4 text-md-end">
+                  <Link to="/client/profile" className="btn btn-light btn-sm">
+                    <User size={16} className="me-1" /> My Profile
+                  </Link>
+                </div>
               </div>
             </div>
           </div>
         </div>
 
         {/* Stats Cards */}
-        <div className="row g-4 mb-5">
-          <div className="col-md-3">
+        <div className="row g-3 mb-4">
+          <div className="col-6 col-md-3">
             <div className="card border-0 shadow-sm h-100">
-              <div className="card-body">
-                <div className="d-flex justify-content-between align-items-center">
-                  <div>
-                    <h6 className="text-muted mb-2">Total Bookings</h6>
-                    <h3 className="fw-bold mb-0">{stats.totalBookings}</h3>
-                  </div>
-                  <div className="text-primary" style={{ fontSize: "2rem" }}>
-                    📅
-                  </div>
+              <div className="card-body text-center py-3">
+                <div className="text-primary mb-1">
+                  <Calendar size={28} />
                 </div>
+                <h4 className="fw-bold mb-0">{stats.totalBookings}</h4>
+                <small className="text-muted">Total Bookings</small>
               </div>
             </div>
           </div>
-          <div className="col-md-3">
+          <div className="col-6 col-md-3">
             <div className="card border-0 shadow-sm h-100">
-              <div className="card-body">
-                <div className="d-flex justify-content-between align-items-center">
-                  <div>
-                    <h6 className="text-muted mb-2">Upcoming</h6>
-                    <h3 className="fw-bold mb-0 text-success">{stats.upcomingBookings}</h3>
-                  </div>
-                  <div className="text-primary" style={{ fontSize: "2rem" }}>
-                    ⏰
-                  </div>
+              <div className="card-body text-center py-3">
+                <div className="text-success mb-1">
+                  <Clock size={28} />
                 </div>
+                <h4 className="fw-bold mb-0 text-success">{stats.upcomingBookings}</h4>
+                <small className="text-muted">Upcoming</small>
               </div>
             </div>
           </div>
-          <div className="col-md-3">
+          <div className="col-6 col-md-3">
             <div className="card border-0 shadow-sm h-100">
-              <div className="card-body">
-                <div className="d-flex justify-content-between align-items-center">
-                  <div>
-                    <h6 className="text-muted mb-2">Completed</h6>
-                    <h3 className="fw-bold mb-0 text-info">{stats.completedBookings}</h3>
-                  </div>
-                  <div className="text-primary" style={{ fontSize: "2rem" }}>
-                    ✅
-                  </div>
+              <div className="card-body text-center py-3">
+                <div className="text-info mb-1">
+                  <CheckCircle2 size={28} />
                 </div>
+                <h4 className="fw-bold mb-0 text-info">{stats.completedBookings}</h4>
+                <small className="text-muted">Completed</small>
               </div>
             </div>
           </div>
-          <div className="col-md-3">
+          <div className="col-6 col-md-3">
             <div className="card border-0 shadow-sm h-100">
-              <div className="card-body">
-                <div className="d-flex justify-content-between align-items-center">
-                  <div>
-                    <h6 className="text-muted mb-2">Total Spent</h6>
-                    <h3 className="fw-bold mb-0">PKR {stats.totalSpent.toLocaleString()}</h3>
-                  </div>
-                  <div className="text-primary" style={{ fontSize: "2rem" }}>
-                    💰
-                  </div>
+              <div className="card-body text-center py-3">
+                <div className="text-warning mb-1">
+                  <DollarSign size={28} />
                 </div>
+                <h4 className="fw-bold mb-0">PKR {(stats.totalSpent / 1000).toFixed(0)}k</h4>
+                <small className="text-muted">Total Spent</small>
               </div>
             </div>
           </div>
         </div>
 
-        <div className="row g-4">
-          {/* Recent Bookings */}
-          <div className="col-lg-8">
-            <div className="card border-0 shadow-sm">
-              <div className="card-header bg-white border-0 pt-4 pb-3">
-                <div className="d-flex justify-content-between align-items-center">
-                  <h5 className="fw-bold mb-0">Recent Bookings</h5>
-                  <Link to="/client/bookings" className="btn btn-outline-primary btn-sm" onClick={() => window.scrollTo(0, 0)}>
-                    View All
-                  </Link>
-                </div>
-              </div>
-              <div className="card-body">
-                {recentBookings.length > 0 ? (
-                  <div className="table-responsive">
-                    <table className="table table-hover">
-                      <thead>
-                        <tr>
-                          <th>Photographer</th>
-                          <th>Date & Time</th>
-                          <th>Service</th>
-                          <th>Amount</th>
-                          <th>Status</th>
-                          <th>Action</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {recentBookings.map((booking) => (
-                          <tr key={booking.id}>
-                            <td>
-                              <div className="d-flex align-items-center">
-                                <div
-                                  className="rounded-circle bg-light d-flex align-items-center justify-content-center me-3"
-                                  style={{ width: "40px", height: "40px" }}
-                                >
-                                  <span>📸</span>
-                                </div>
-                                <div>
-                                  <div className="fw-semibold">{booking.photographer}</div>
-                                  <small className="text-muted">{booking.location}</small>
-                                </div>
-                              </div>
-                            </td>
-                            <td>
-                              <div>{formatDate(booking.date)}</div>
-                              <small className="text-muted">{booking.time}</small>
-                            </td>
-                            <td>{booking.service}</td>
-                            <td className="fw-semibold">PKR {booking.amount.toLocaleString()}</td>
-                            <td>
-                              <span className={`status-badge ${getStatusBadge(booking.status)}`}>
-                                {booking.status.charAt(0).toUpperCase() + booking.status.slice(1)}
-                              </span>
-                            </td>
-                            <td>
-                              {booking.status === "upcoming" ? (
-                                <Link
-                                  to={`/client/chat/${booking.photographerId}`}
-                                  className="btn btn-sm btn-outline-primary"
-                                >
-                                  💬 Chat
-                                </Link>
-                              ) : (
-                                <Link
-                                  to={`/client/review/${booking.photographerId}`}
-                                  className="btn btn-sm btn-outline-secondary"
-                                >
-                                  ⭐ Review
-                                </Link>
-                              )}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                ) : (
-                  <div className="text-center py-5">
-                    <div className="mb-3" style={{ fontSize: "3rem" }}>
-                      📸
-                    </div>
-                    <h6 className="text-muted">No bookings yet</h6>
-                    <p className="text-muted mb-4">Book your first photographer to get started</p>
-                    <Link to="/search" className="btn btn-primary" onClick={() => window.scrollTo(0, 0)}>
-                      Find Photographers
+        {/* Menu Options */}
+        <div className="card border-0 shadow-sm">
+          <div className="card-header bg-white border-0 pt-4 pb-2">
+            <h5 className="fw-bold mb-0">Quick Actions</h5>
+            <p className="text-muted small mb-0">Select an option to get started</p>
+          </div>
+          <div className="card-body">
+            <div className="row g-3">
+              {menuOptions.map((option) => {
+                const IconComponent = option.icon
+                return (
+                  <div className="col-md-6 col-lg-4" key={option.id}>
+                    <Link
+                      to={option.link}
+                      className="card h-100 border hover-lift text-decoration-none"
+                      onClick={() => window.scrollTo(0, 0)}
+                    >
+                      <div className="card-body">
+                        <div className="d-flex justify-content-between align-items-start mb-2">
+                          <div className="text-primary">
+                            <IconComponent size={32} />
+                          </div>
+                          {option.badge !== null && option.badge !== undefined && (
+                            <span className={`badge bg-${option.badgeColor || 'secondary'}`}>
+                              {option.badge}
+                            </span>
+                          )}
+                        </div>
+                        <h6 className="fw-bold mb-2">{option.title}</h6>
+                        <p className="text-muted small mb-0">{option.description}</p>
+                        {option.link === "#" && (
+                          <span className="badge bg-light text-muted mt-2">Coming Soon</span>
+                        )}
+                      </div>
                     </Link>
                   </div>
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* Quick Actions & Recommended */}
-          <div className="col-lg-4">
-            {/* Quick Actions */}
-            <div className="card border-0 shadow-sm mb-4">
-              <div className="card-header bg-white border-0 pt-4 pb-3">
-                <h5 className="fw-bold mb-0">Quick Actions</h5>
-              </div>
-              <div className="card-body">
-                <div className="d-grid gap-2">
-                  <Link to="/search" className="btn btn-primary text-start" onClick={() => window.scrollTo(0, 0)}>
-                    🔍 Find Photographers
-                  </Link>
-                  <Link to="/client/bookings" className="btn btn-outline-primary text-start" onClick={() => window.scrollTo(0, 0)}>
-                    📅 View All Bookings
-                  </Link>
-                  <Link to="/client/album-builder" className="btn btn-outline-primary text-start" onClick={() => window.scrollTo(0, 0)}>
-                    🎨 Album Builder
-                  </Link>
-                  <Link to="/client/reel-generator" className="btn btn-outline-primary text-start" onClick={() => window.scrollTo(0, 0)}>
-                    🎬 Reel Generator
-                  </Link>
-                  <Link to="/client/music-suggestion" className="btn btn-outline-primary text-start" onClick={() => window.scrollTo(0, 0)}>
-                    🎵 Music Suggestions
-                  </Link>
-                </div>
-              </div>
-            </div>
-
-            {/* Recommended Photographers */}
-            <div className="card border-0 shadow-sm">
-              <div className="card-header bg-white border-0 pt-4 pb-3">
-                <h5 className="fw-bold mb-0">Recommended for You</h5>
-              </div>
-              <div className="card-body">
-                <div className="space-y-3">
-                  {recommendedPhotographers.slice(0, 3).map((photographer) => (
-                    <div key={photographer.id} className="d-flex align-items-center pb-3 border-bottom">
-                      <div
-                        className="rounded-circle bg-light d-flex align-items-center justify-content-center me-3"
-                        style={{ width: "45px", height: "45px" }}
-                      >
-                        <span>📸</span>
-                      </div>
-                      <div className="flex-grow-1">
-                        <div className="fw-semibold">{photographer.name}</div>
-                        <div className="small text-muted">
-                          ⭐ {photographer.rating} • {photographer.specialty[0]}
-                        </div>
-                      </div>
-                      <div className="text-end">
-                        <div className="small text-primary fw-semibold">PKR {photographer.hourly_rate}/hr</div>
-                        <Link to={`/photographer/${photographer.id}`} className="btn btn-sm btn-outline-primary mt-1" onClick={() => window.scrollTo(0, 0)}>
-                          View
-                        </Link>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-                <Link to="/search" className="btn btn-outline-primary w-100 mt-3" onClick={() => window.scrollTo(0, 0)}>
-                  View All Photographers
-                </Link>
-              </div>
+                )
+              })}
             </div>
           </div>
         </div>
@@ -338,3 +255,49 @@ const ClientDashboard = () => {
 }
 
 export default ClientDashboard
+
+// Add inline styles for hover effects if not already in global CSS
+if (typeof document !== 'undefined') {
+  const styleId = 'dashboard-hover-styles';
+  if (!document.getElementById(styleId)) {
+    const style = document.createElement('style');
+    style.id = styleId;
+    style.textContent = `
+      .hover-lift {
+        transition: transform 0.3s ease, box-shadow 0.3s ease, border-color 0.3s ease !important;
+        position: relative;
+        border: 2px solid transparent !important;
+        background-clip: padding-box;
+      }
+      
+      .hover-lift:hover {
+        transform: translateY(-5px) !important;
+        border-color: #225ea1 !important;
+        box-shadow: 
+          0 8px 25px rgba(34, 94, 161, 0.25),
+          0 0 0 2px #225ea1,
+          0 0 15px rgba(34, 94, 161, 0.4),
+          0 0 30px rgba(247, 147, 30, 0.2) !important;
+        animation: glowPulse 1.5s ease-in-out infinite;
+      }
+      
+      @keyframes glowPulse {
+        0%, 100% {
+          box-shadow: 
+            0 8px 25px rgba(34, 94, 161, 0.25),
+            0 0 0 2px #225ea1,
+            0 0 15px rgba(34, 94, 161, 0.4),
+            0 0 30px rgba(247, 147, 30, 0.2);
+        }
+        50% {
+          box-shadow: 
+            0 8px 25px rgba(34, 94, 161, 0.35),
+            0 0 0 2px #2d75c7,
+            0 0 20px rgba(34, 94, 161, 0.5),
+            0 0 40px rgba(247, 147, 30, 0.3);
+        }
+      }
+    `;
+    document.head.appendChild(style);
+  }
+}

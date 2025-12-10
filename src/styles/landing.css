@@ -1915,3 +1915,32 @@ section[id] {
     page-break-inside: avoid;
   }
 }
+
+/* Custom 5-card layout for Features section */
+@media (min-width: 1200px) {
+  .col-lg-custom-5 {
+    flex: 0 0 20%;
+    max-width: 20%;
+  }
+}
+
+@media (min-width: 992px) and (max-width: 1199px) {
+  .col-lg-custom-5 {
+    flex: 0 0 33.333%;
+    max-width: 33.333%;
+  }
+}
+
+@media (max-width: 991px) {
+  .col-lg-custom-5 {
+    flex: 0 0 50%;
+    max-width: 50%;
+  }
+}
+
+@media (max-width: 575px) {
+  .col-lg-custom-5 {
+    flex: 0 0 100%;
+    max-width: 100%;
+  }
+}

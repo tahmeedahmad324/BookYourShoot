@@ -19,10 +19,17 @@ const Features = () => {
     },
     {
       imageSrc: '/illustrations/Generatereel.jpg',
-      title: 'Reels & Music',
-      description: 'Turn your photos into stunning video reels with perfect music suggestions. Professional effects and transitions included.',
+      title: 'Reel Generator',
+      description: 'Turn your photos into stunning video reels with professional effects and transitions. Perfect for social media sharing.',
       link: '/client/reel-generator',
       color: 'warning'
+    },
+    {
+      imageSrc: '/illustrations/musicSuggestion.jpg',
+      title: 'Music Suggestions',
+      description: 'Get event-specific music recommendations from Spotify. Perfect playlists for Mehndi, Wedding, Birthday, and more.',
+      link: '/client/music-suggestion',
+      color: 'danger'
     },
     {
       imageSrc: '/illustrations/equipment.jpg',
@@ -45,9 +52,9 @@ const Features = () => {
         </div>
 
         {/* Features grid */}
-        <div className="row g-4">
+        <div className="row g-4 justify-content-center">
           {features.map((feature, index) => (
-            <div key={index} className="col-md-6 col-lg-3">
+            <div key={index} className="col-sm-6 col-md-4 col-lg-custom-5">
               <Link to={feature.link} className="feature-card-link" onClick={() => window.scrollTo(0, 0)}>
                 <div className="card feature-card h-100">
                   {/* Header Image */}

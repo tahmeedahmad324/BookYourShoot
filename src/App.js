@@ -31,7 +31,7 @@ import ClientChat from "./pages/client/ClientChat"
 import ReviewSubmission from "./pages/client/ReviewSubmission"
 import AlbumBuilder from "./pages/client/AlbumBuilder"
 import ReelGenerator from "./pages/client/ReelGenerator"
-import MusicSuggestion from "./pages/client/MusicSuggestion"
+import MusicDiscoveryUI from "./pages/client/MusicDiscoveryUI"
 
 // Photographer Pages
 import PhotographerDashboard from "./pages/photographer/PhotographerDashboard"
@@ -146,7 +146,15 @@ function App() {
                 path="/client/music-suggestion"
                 element={
                   <ProtectedRoute allowedRoles={["client"]}>
-                    <MusicSuggestion />
+                    <MusicDiscoveryUI />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/client/music-discovery"
+                element={
+                  <ProtectedRoute allowedRoles={["client"]}>
+                    <MusicDiscoveryUI />
                   </ProtectedRoute>
                 }
               />
@@ -187,7 +195,7 @@ function App() {
               <Route
                 path="/photographer/equipment"
                 element={
-                  <ProtectedRoute allowedRoles={["photographer"]}>
+                  <ProtectedRoute allowedRoles={["photographer", "client"]}>
                     <EquipmentList />
                   </ProtectedRoute>
                 }

@@ -4,6 +4,20 @@ import { useState, useEffect } from "react"
 import { Link } from "react-router-dom"
 import { useAuth } from "../../context/AuthContext"
 import photographersData from "../../data/photographers.json"
+import { 
+  Camera, 
+  Users, 
+  Calendar, 
+  DollarSign, 
+  CheckCircle, 
+  AlertTriangle, 
+  Flag, 
+  UserCheck, 
+  BarChart3, 
+  Settings, 
+  Shield, 
+  User 
+} from "lucide-react"
 
 const AdminDashboard = () => {
   const { user } = useAuth()
@@ -36,7 +50,7 @@ const AdminDashboard = () => {
       id: "verifications",
       title: "Photographer Verifications",
       description: "Review and approve pending photographer registrations",
-      icon: "✅",
+      icon: CheckCircle,
       link: "/admin/verifications",
       badge: stats.pendingVerifications,
       badgeColor: "warning",
@@ -45,7 +59,7 @@ const AdminDashboard = () => {
       id: "complaints",
       title: "Complaints & Disputes",
       description: "Handle customer complaints and resolve disputes",
-      icon: "📢",
+      icon: AlertTriangle,
       link: "/admin/complaints",
       badge: stats.openComplaints,
       badgeColor: "danger",
@@ -54,7 +68,7 @@ const AdminDashboard = () => {
       id: "reviews",
       title: "Reported Reviews",
       description: "Moderate reviews flagged by photographers",
-      icon: "🚩",
+      icon: Flag,
       link: "/admin/reported-reviews",
       badge: stats.reportedReviews,
       badgeColor: "warning",
@@ -63,49 +77,52 @@ const AdminDashboard = () => {
       id: "users",
       title: "User Management",
       description: "View and manage all users on the platform",
-      icon: "👥",
+      icon: Users,
       link: "#",
-      badge: null,
+      badge: "Coming Soon",
+      badgeColor: "secondary",
     },
     {
       id: "photographers",
       title: "All Photographers",
       description: "View verified photographers and their profiles",
-      icon: "📸",
+      icon: Camera,
       link: "#",
-      badge: stats.totalPhotographers,
-      badgeColor: "primary",
+      badge: "Coming Soon",
+      badgeColor: "secondary",
     },
     {
       id: "bookings",
       title: "All Bookings",
       description: "View and monitor all platform bookings",
-      icon: "📅",
+      icon: Calendar,
       link: "#",
-      badge: stats.totalBookings,
-      badgeColor: "info",
+      badge: "Coming Soon",
+      badgeColor: "secondary",
     },
     {
       id: "analytics",
       title: "Analytics & Reports",
       description: "View platform statistics and generate reports",
-      icon: "📊",
+      icon: BarChart3,
       link: "#",
-      badge: null,
+      badge: "Coming Soon",
+      badgeColor: "secondary",
     },
     {
       id: "finances",
       title: "Financial Overview",
       description: "Revenue, payouts, and transaction history",
-      icon: "💰",
+      icon: DollarSign,
       link: "#",
-      badge: null,
+      badge: "Coming Soon",
+      badgeColor: "secondary",
     },
     {
       id: "settings",
       title: "Platform Settings",
       description: "Configure platform fees, limits, and operations",
-      icon: "⚙️",
+      icon: Settings,
       link: "/admin/platform-settings",
       badge: null,
     },
@@ -125,10 +142,12 @@ const AdminDashboard = () => {
                 </div>
                 <div className="col-md-4 text-md-end">
                   <div className="mb-2">
-                    <span className="badge bg-danger me-2">🔐 Super Admin</span>
+                    <span className="badge bg-danger me-2 d-inline-flex align-items-center gap-1">
+                      <Shield size={14} /> Super Admin
+                    </span>
                   </div>
-                  <Link to="/admin/settings" className="btn btn-light btn-sm">
-                    👤 My Profile
+                  <Link to="/admin/settings" className="btn btn-light btn-sm d-inline-flex align-items-center gap-1">
+                    <User size={16} /> My Profile
                   </Link>
                 </div>
               </div>
@@ -141,7 +160,9 @@ const AdminDashboard = () => {
           <div className="col-6 col-md-3">
             <div className="card border-0 shadow-sm h-100">
               <div className="card-body text-center py-3">
-                <div className="text-primary mb-1" style={{ fontSize: "1.5rem" }}>📸</div>
+                <div className="text-primary mb-1">
+                  <Camera size={32} />
+                </div>
                 <h4 className="fw-bold mb-0">{stats.totalPhotographers}</h4>
                 <small className="text-muted">Photographers</small>
               </div>
@@ -150,7 +171,9 @@ const AdminDashboard = () => {
           <div className="col-6 col-md-3">
             <div className="card border-0 shadow-sm h-100">
               <div className="card-body text-center py-3">
-                <div className="text-primary mb-1" style={{ fontSize: "1.5rem" }}>👥</div>
+                <div className="text-primary mb-1">
+                  <Users size={32} />
+                </div>
                 <h4 className="fw-bold mb-0">{stats.totalClients.toLocaleString()}</h4>
                 <small className="text-muted">Clients</small>
               </div>
@@ -159,7 +182,9 @@ const AdminDashboard = () => {
           <div className="col-6 col-md-3">
             <div className="card border-0 shadow-sm h-100">
               <div className="card-body text-center py-3">
-                <div className="text-primary mb-1" style={{ fontSize: "1.5rem" }}>📅</div>
+                <div className="text-primary mb-1">
+                  <Calendar size={32} />
+                </div>
                 <h4 className="fw-bold mb-0">{stats.totalBookings.toLocaleString()}</h4>
                 <small className="text-muted">Bookings</small>
               </div>
@@ -168,7 +193,9 @@ const AdminDashboard = () => {
           <div className="col-6 col-md-3">
             <div className="card border-0 shadow-sm h-100">
               <div className="card-body text-center py-3">
-                <div className="text-success mb-1" style={{ fontSize: "1.5rem" }}>💰</div>
+                <div className="text-success mb-1">
+                  <DollarSign size={32} />
+                </div>
                 <h4 className="fw-bold mb-0 text-success">PKR {(stats.totalRevenue / 1000000).toFixed(1)}M</h4>
                 <small className="text-muted">Revenue</small>
               </div>
@@ -184,75 +211,74 @@ const AdminDashboard = () => {
           </div>
           <div className="card-body">
             <div className="row g-3">
-              {menuOptions.map((option) => (
-                <div className="col-md-6 col-lg-4" key={option.id}>
-                  <Link
-                    to={option.link}
-                    className="card h-100 border hover-lift text-decoration-none"
-                    onClick={() => window.scrollTo(0, 0)}
-                    style={{ cursor: option.link === "#" ? "not-allowed" : "pointer" }}
-                  >
-                    <div className="card-body">
-                      <div className="d-flex justify-content-between align-items-start mb-2">
-                        <span style={{ fontSize: "2rem" }}>{option.icon}</span>
-                        {option.badge !== null && option.badge > 0 && (
-                          <span className={`badge bg-${option.badgeColor}`}>
-                            {option.badge}
-                          </span>
+              {menuOptions.map((option) => {
+                const IconComponent = option.icon
+                return (
+                  <div className="col-md-6 col-lg-4" key={option.id}>
+                    <Link
+                      to={option.link}
+                      className="card h-100 border hover-lift text-decoration-none"
+                      onClick={() => window.scrollTo(0, 0)}
+                      style={{ cursor: option.link === "#" ? "not-allowed" : "pointer" }}
+                    >
+                      <div className="card-body">
+                        <div className="d-flex justify-content-between align-items-start mb-2">
+                          <div className="text-primary">
+                            <IconComponent size={32} />
+                          </div>
+                          {option.badge !== null && option.badge !== undefined && option.badge !== "Coming Soon" && (
+                            <span className={`badge bg-${option.badgeColor}`}>
+                              {option.badge}
+                            </span>
+                          )}
+                        </div>
+                        <h6 className="fw-bold text-dark mb-1">{option.title}</h6>
+                        <p className="text-muted small mb-0">{option.description}</p>
+                        {option.link === "#" && (
+                          <span className="badge bg-light text-muted mt-2">Coming Soon</span>
                         )}
                       </div>
-                      <h6 className="fw-bold text-dark mb-1">{option.title}</h6>
-                      <p className="text-muted small mb-0">{option.description}</p>
-                      {option.link === "#" && (
-                        <span className="badge bg-light text-muted mt-2">Coming Soon</span>
-                      )}
-                    </div>
-                  </Link>
-                </div>
-              ))}
+                    </Link>
+                  </div>
+                )
+              })}
             </div>
           </div>
         </div>
-
-        {/* Quick Actions Alert */}
-        {(stats.pendingVerifications > 0 || stats.openComplaints > 0 || stats.reportedReviews > 0) && (
-          <div className="alert alert-warning mt-4 d-flex align-items-center">
-            <span className="me-2">⚠️</span>
-            <div>
-              <strong>Action Required:</strong>
-              {stats.pendingVerifications > 0 && (
-                <span className="ms-2">
-                  <Link to="/admin/verifications" className="alert-link">
-                    {stats.pendingVerifications} pending verification{stats.pendingVerifications > 1 ? "s" : ""}
-                  </Link>
-                </span>
-              )}
-              {stats.openComplaints > 0 && (
-                <span className="ms-2">
-                  • <Link to="/admin/complaints" className="alert-link">
-                    {stats.openComplaints} open complaint{stats.openComplaints > 1 ? "s" : ""}
-                  </Link>
-                </span>
-              )}
-              {stats.reportedReviews > 0 && (
-                <span className="ms-2">
-                  • <Link to="/admin/settings" className="alert-link">
-                    {stats.reportedReviews} reported review{stats.reportedReviews > 1 ? "s" : ""}
-                  </Link>
-                </span>
-              )}
-            </div>
-          </div>
-        )}
       </div>
 
       <style jsx>{`
         .hover-lift {
-          transition: transform 0.2s ease, box-shadow 0.2s ease;
+          transition: transform 0.3s ease, box-shadow 0.3s ease, border-color 0.3s ease !important;
+          position: relative;
+          border: 2px solid transparent !important;
+          background-clip: padding-box;
         }
         .hover-lift:hover {
-          transform: translateY(-4px);
-          box-shadow: 0 8px 25px rgba(0,0,0,0.1) !important;
+          transform: translateY(-5px) !important;
+          border-color: #225ea1 !important;
+          box-shadow: 
+            0 8px 25px rgba(34, 94, 161, 0.25),
+            0 0 0 2px #225ea1,
+            0 0 15px rgba(34, 94, 161, 0.4),
+            0 0 30px rgba(247, 147, 30, 0.2) !important;
+          animation: glowPulse 1.5s ease-in-out infinite;
+        }
+        @keyframes glowPulse {
+          0%, 100% {
+            box-shadow: 
+              0 8px 25px rgba(34, 94, 161, 0.25),
+              0 0 0 2px #225ea1,
+              0 0 15px rgba(34, 94, 161, 0.4),
+              0 0 30px rgba(247, 147, 30, 0.2);
+          }
+          50% {
+            box-shadow: 
+              0 8px 25px rgba(34, 94, 161, 0.35),
+              0 0 0 2px #2d75c7,
+              0 0 20px rgba(34, 94, 161, 0.5),
+              0 0 40px rgba(247, 147, 30, 0.3);
+          }
         }
       `}</style>
     </div>

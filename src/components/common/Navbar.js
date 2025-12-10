@@ -43,7 +43,6 @@ const Navbar = () => {
 
   const adminLinks = [
     { path: "/admin/dashboard", label: "Dashboard" },
-    { path: "/admin/verifications", label: "Verifications" },
   ]
 
   const getNavLinks = () => {
