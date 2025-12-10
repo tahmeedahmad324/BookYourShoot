@@ -28,8 +28,8 @@ const MusicDiscoveryUI = () => {
       searchQuery: 'barat shaadi pakistani wedding baraat'
     },
     {
-      id: 'valima',
-      name: 'Valima',
+      id: 'walima',
+      name: 'Walima',
       image: '/illustrations/valima.jpg',
       searchQuery: 'walima romantic pakistani love songs'
     },

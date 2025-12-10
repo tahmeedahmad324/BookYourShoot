@@ -154,7 +154,7 @@ const Register = () => {
               <h2 className="fw-bold mb-3" style={{ fontSize: '2.5rem' }}>Join BookYourShoot</h2>
               <p className="text-muted" style={{ fontSize: '1.1rem' }}>Choose your role and start your photography journey</p>
               
-              <div className="row g-4 mt-3">
+              <div className="row g-4 mt-3 justify-content-center">
                 {Object.entries(roleDescriptions).map(([role, desc]) => {
                   const isSelected = selectedRole === role;
                   const borderCol = isSelected ? 'var(--primary-purple)' : 'var(--soft-gray)';
@@ -281,9 +281,12 @@ const Register = () => {
                           type="password"
                           className={`form-control ${errors.password ? 'is-invalid' : ''}`}
                           id="password"
-                          placeholder="Min 8 chars, with uppercase, lowercase, number & special char"
+                          placeholder="Enter your password"
                           {...register('password')}
                         />
+                        <small className="text-muted d-block mt-1">
+                          Must be at least 8 characters with uppercase, lowercase, number and special character (@$!%*?&#)
+                        </small>
                         {errors.password && (
                           <div className="text-danger small mt-1">{errors.password.message}</div>
                         )}
