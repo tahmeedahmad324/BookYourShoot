@@ -1,4 +1,5 @@
 import React from 'react';
+import { MessageCircle, MapPin, ShieldCheck, Camera } from 'lucide-react';
 
 const AppDownloads = () => {
   return (
@@ -15,23 +16,31 @@ const AppDownloads = () => {
                 Access our complete photography booking service directly in your web browser. No download required - works on any device, anywhere.
               </p>
 
-              {/* Web platform features */}
-              <div className="app-features">
-                <div className="app-feature">
-                  <span className="feature-icon">💬</span>
-                  <span>Real-time photographer chat and messaging</span>
+              {/* Web platform features - 2x2 Grid */}
+              <div className="app-features-grid">
+                <div className="app-feature-item">
+                  <div className="app-feature-icon-wrapper">
+                    <MessageCircle size={24} strokeWidth={2} className="app-feature-icon" />
+                  </div>
+                  <span className="app-feature-text">Real-time Chat</span>
                 </div>
-                <div className="app-feature">
-                  <span className="feature-icon">📍</span>
-                  <span>Location-based photographer discovery</span>
+                <div className="app-feature-item">
+                  <div className="app-feature-icon-wrapper">
+                    <MapPin size={24} strokeWidth={2} className="app-feature-icon" />
+                  </div>
+                  <span className="app-feature-text">Location-based Search</span>
                 </div>
-                <div className="app-feature">
-                  <span className="feature-icon">💰</span>
-                  <span>Secure online payment processing</span>
+                <div className="app-feature-item">
+                  <div className="app-feature-icon-wrapper">
+                    <ShieldCheck size={24} strokeWidth={2} className="app-feature-icon" />
+                  </div>
+                  <span className="app-feature-text">Secure Payments</span>
                 </div>
-                <div className="app-feature">
-                  <span className="feature-icon">📷</span>
-                  <span>Professional equipment rental marketplace</span>
+                <div className="app-feature-item">
+                  <div className="app-feature-icon-wrapper">
+                    <Camera size={24} strokeWidth={2} className="app-feature-icon" />
+                  </div>
+                  <span className="app-feature-text">Equipment Rental</span>
                 </div>
               </div>
 

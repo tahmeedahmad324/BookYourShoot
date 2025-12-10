@@ -1,11 +1,12 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
+import { Search, MessageSquare, CheckCircle2 } from 'lucide-react';
 
 const HowItWorks = () => {
   const steps = [
     {
       number: 1,
-      icon: '🔍',
+      icon: Search,
       title: 'Search',
       description: 'Enter your location and service type. Browse through our network of verified photographers with detailed portfolios and reviews.',
       link: '/search',
@@ -13,7 +14,7 @@ const HowItWorks = () => {
     },
     {
       number: 2,
-      icon: '📝',
+      icon: MessageSquare,
       title: 'Request',
       description: 'Send booking requests to your chosen photographers. Discuss your requirements, get quotes, and compare offers before deciding.',
       link: '/register',
@@ -21,7 +22,7 @@ const HowItWorks = () => {
     },
     {
       number: 3,
-      icon: '✅',
+      icon: CheckCircle2,
       title: 'Confirm',
       description: 'Book your photographer securely through our platform. Make payments safely and track your booking status until completion.',
       link: '/client/bookings',
@@ -51,8 +52,8 @@ const HowItWorks = () => {
                 </div>
 
                 {/* Step icon */}
-                <div className="step-icon">
-                  {step.icon}
+                <div className="step-icon-wrapper">
+                  <step.icon size={40} strokeWidth={2.5} className="step-icon-svg" />
                 </div>
 
                 {/* Step content */}

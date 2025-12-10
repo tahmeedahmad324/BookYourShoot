@@ -22,9 +22,8 @@ const Navbar = () => {
 
   const publicLinks = [
     { path: "/", label: "Home" },
-    { path: "/search", label: "Find Photographers" },
-    { path: "#services", label: "Services", sectionId: 'services' },
     { path: "#how-it-works", label: "How it Works", sectionId: 'how-it-works' },
+    { path: "#services", label: "Services", sectionId: 'services' },
     { path: "#for-photographers", label: "For Photographers", sectionId: 'for-photographers' }
   ]
 
@@ -44,7 +43,6 @@ const Navbar = () => {
 
   const adminLinks = [
     { path: "/admin/dashboard", label: "Dashboard" },
-    { path: "/admin/verifications", label: "Verifications" },
   ]
 
   const getNavLinks = () => {
@@ -62,6 +60,20 @@ const Navbar = () => {
     const easeOutCubic = t => 1 - Math.pow(1 - t, 3)
     function step(ts){ if(!start) start = ts; const elapsed = ts - start; const progress = Math.min(elapsed/duration,1); window.scrollTo(0,startY + diff*easeOutCubic(progress)); if(elapsed<duration) requestAnimationFrame(step) }
     requestAnimationFrame(step)
+  }
+
+  const handleHomeClick = (e) => {
+    e.preventDefault()
+    // If already on home page, animate scroll to top
+    if (location.pathname === '/' || location.pathname === '') {
+      animateScroll(0, 600)
+    } else {
+      // Navigate to home page
+      navigate('/')
+      // Scroll to top after navigation
+      setTimeout(() => animateScroll(0, 600), 100)
+    }
+    setExpanded(false)
   }
 
   const handleSectionLink = (e, id) => {
@@ -98,10 +110,11 @@ const Navbar = () => {
   return (
     <nav className="navbar navbar-expand-lg navbar-light bg-white shadow-sm sticky-top">
       <div className="container">
-        <Link
+        <a
           className="navbar-brand fw-bold text-primary d-flex align-items-center gap-2"
-          to="/"
-          onClick={() => setExpanded(false)}
+          href="/"
+          onClick={handleHomeClick}
+          style={{ cursor: 'pointer' }}
         >
           <img src="/logo.png" alt="BookYourShoot" style={{ height: "40px" }} />
           <div>
@@ -110,7 +123,7 @@ const Navbar = () => {
               Shoot Smart
             </div>
           </div>
-        </Link>
+        </a>
 
         <button
           className="navbar-toggler"
@@ -134,6 +147,14 @@ const Navbar = () => {
                     href={link.path}
                     className="nav-link"
                     onClick={(e) => handleSectionLink(e, link.sectionId)}
+                  >
+                    {link.label}
+                  </a>
+                ) : link.path === "/" ? (
+                  <a
+                    href="/"
+                    className={`nav-link ${isActive(link.path) ? "active" : ""}`}
+                    onClick={handleHomeClick}
                   >
                     {link.label}
                   </a>

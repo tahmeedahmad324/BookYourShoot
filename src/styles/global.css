@@ -219,12 +219,41 @@ h1, h2, h3, h4, h5, h6 {
 
 /* Landing Page Hover Effects */
 .hover-lift {
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  transition: transform 0.3s ease, box-shadow 0.3s ease, border-color 0.3s ease;
+  position: relative;
+  border: 2px solid transparent !important;
+  background-clip: padding-box;
 }
 
 .hover-lift:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.12);
+  transform: translateY(-5px);
+  border-color: transparent !important;
+  box-shadow: 
+    0 8px 25px rgba(34, 94, 161, 0.25),
+    0 0 0 2px #225ea1,
+    0 0 15px rgba(34, 94, 161, 0.4),
+    0 0 30px rgba(247, 147, 30, 0.2);
+}
+
+@keyframes glowPulse {
+  0%, 100% {
+    box-shadow: 
+      0 8px 25px rgba(34, 94, 161, 0.25),
+      0 0 0 2px #225ea1,
+      0 0 15px rgba(34, 94, 161, 0.4),
+      0 0 30px rgba(247, 147, 30, 0.2);
+  }
+  50% {
+    box-shadow: 
+      0 8px 25px rgba(34, 94, 161, 0.35),
+      0 0 0 2px #2d75c7,
+      0 0 20px rgba(34, 94, 161, 0.5),
+      0 0 40px rgba(247, 147, 30, 0.3);
+  }
+}
+
+.hover-lift:hover {
+  animation: glowPulse 1.5s ease-in-out infinite;
 }
 
 /* Travel Estimator */

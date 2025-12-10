@@ -1,10 +1,12 @@
 "use client"
 
-import { useState, useRef } from "react"
+import { useState, useRef, useEffect } from "react"
 import { useAuth } from "../../context/AuthContext"
+import { useLocation } from "react-router-dom"
 
 const PhotographerProfile = () => {
   const { user } = useAuth()
+  const location = useLocation()
   const fileInputRef = useRef(null)
   const portfolioFileRef = useRef(null)
 
@@ -33,6 +35,15 @@ const PhotographerProfile = () => {
   const [isEditing, setIsEditing] = useState(false)
   const [editedProfile, setEditedProfile] = useState({ ...profile })
   const [activeTab, setActiveTab] = useState("profile")
+
+  // Read tab from URL query parameter
+  useEffect(() => {
+    const params = new URLSearchParams(location.search)
+    const tab = params.get('tab')
+    if (tab && ['profile', 'services', 'portfolio', 'reviews', 'availability', 'settings'].includes(tab)) {
+      setActiveTab(tab)
+    }
+  }, [location.search])
   const [showPasswordModal, setShowPasswordModal] = useState(false)
   const [showDeleteModal, setShowDeleteModal] = useState(false)
 

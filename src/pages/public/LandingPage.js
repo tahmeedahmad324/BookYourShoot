@@ -193,7 +193,7 @@ const LandingPage = () => {
               { icon: '🎓', name: 'Graduation Photography', desc: 'Celebrate academic achievements with style' }
             ].map((service, index) => (
               <div className="col-md-6 col-lg-4" key={index}>
-                <div className="card h-100 border-0 shadow-sm">
+                <div className="card h-100 border-0 shadow-sm hover-lift">
                   <div className="card-body text-center p-4">
                     <div className="text-primary mb-3" style={{ fontSize: '2.5rem' }}>
                       {service.icon}
