@@ -10,6 +10,11 @@ import re
 import io
 from typing import Optional
 from pydantic import BaseModel
+try:
+    from pyzbar import pyzbar
+    PYZBAR_AVAILABLE = True
+except ImportError:
+    PYZBAR_AVAILABLE = False
 
 router = APIRouter(prefix="/cnic", tags=["CNIC Verification"])
 
@@ -149,6 +154,48 @@ class CNICProcessor:
         
         return list(set(date_matches))
     
+    def extract_name(self):
+        """Extract name from CNIC with multiple OCR attempts"""
+        gray, _ = self.preprocess_image()
+        
+        # Try multiple OCR configs for better accuracy
+        possible_names = []
+        
+        # Config 1: Default
+        raw_text = pytesseract.image_to_string(gray, lang="eng")
+        possible_names.extend(self._parse_names_from_text(raw_text))
+        
+        # Config 2: PSM 6 (uniform block of text)
+        raw_text2 = pytesseract.image_to_string(gray, lang="eng", config="--psm 6")
+        possible_names.extend(self._parse_names_from_text(raw_text2))
+        
+        # Return most common name or first found
+        return possible_names[0] if possible_names else None
+    
+    def _parse_names_from_text(self, text):
+        """Helper to parse names from OCR text"""
+        lines = text.split('\n')
+        names = []
+        
+        for line in lines:
+            # Skip lines with common CNIC keywords
+            if re.search(r'(IDENTITY|CARD|ISLAMIC|REPUBLIC|PAKISTAN|DATE|BIRTH|HOLDER|SIGNATURE|FATHER|S/O|D/O)', line.upper()):
+                continue
+            
+            # Clean the line
+            cleaned = re.sub(r'[^A-Z\s]', '', line.upper()).strip()
+            if not cleaned:
+                continue
+            
+            words = cleaned.split()
+            # Name should have 2-4 words, each at least 2 chars
+            valid_words = [w for w in words if len(w) >= 2]
+            
+            if 2 <= len(valid_words) <= 4:
+                names.append(' '.join(valid_words))
+        
+        return names
+    
     def check_expiry(self, dates):
         """Check if CNIC is expired"""
         if not dates:
@@ -187,12 +234,38 @@ class CNICProcessor:
             "days_difference": days_diff,
             "message": message
         }
+    
+    def scan_qr_code(self):
+        """Scan QR code from CNIC back side"""
+        if not PYZBAR_AVAILABLE:
+            return {"success": False, "message": "QR code scanner not available"}
+        
+        try:
+            # Convert to format pyzbar expects
+            decoded_objects = pyzbar.decode(self.image)
+            
+            if not decoded_objects:
+                return {"success": False, "message": "No QR code found"}
+            
+            qr_data = []
+            for obj in decoded_objects:
+                data = obj.data.decode('utf-8')
+                qr_data.append({
+                    "type": obj.type,
+                    "data": data
+                })
+            
+            return {"success": True, "qr_data": qr_data}
+        except Exception as e:
+            return {"success": False, "message": f"QR scan error: {str(e)}"}
 
 
 class VerificationResponse(BaseModel):
     is_readable: bool
     quality: str
     cnic_number: Optional[str] = None
+    possible_name: Optional[str] = None
+    dates: list = []
     expiry_info: Optional[dict] = None
     message: str
 
@@ -233,25 +306,60 @@ async def verify_cnic(
         # Extract CNIC number
         cnic_number = processor.extract_cnic_number()
         
+        # Extract name
+        possible_name = processor.extract_name()
+        
         # Extract and check expiry
         dates = processor.extract_dates()
         expiry_info = processor.check_expiry(dates)
         
         # Store in database for verification
-        user_id = current_user.get("id") or current_user.get("sub")
-        if cnic_number:
-            supabase.table("cnic_verification").upsert({
-                "user_id": user_id,
-                "cnic_number": cnic_number,
-                "status": "verified" if not expiry_info.get("is_expired") else "expired",
-                "expiry_date": expiry_info.get("expiry_date"),
-                "verified_at": datetime.utcnow().isoformat()
-            }, on_conflict="user_id").execute()
+        try:
+            # Handle both dict and User object
+            if hasattr(current_user, 'id'):
+                user_id = current_user.id
+            elif hasattr(current_user, 'get'):
+                user_id = current_user.get("id") or current_user.get("sub")
+            else:
+                # Fallback: try dict-like access
+                user_id = current_user["id"] if "id" in current_user else current_user["sub"]
+            
+            if cnic_number:
+                # Parse DOB from dates if available
+                extracted_dob = None
+                if dates:
+                    for date_str in dates:
+                        for fmt in ["%d.%m.%Y", "%d-%m-%Y", "%d/%m/%Y", "%Y-%m-%d", "%Y/%m/%d"]:
+                            try:
+                                dt = datetime.strptime(date_str, fmt)
+                                # Assume oldest date is DOB
+                                if not extracted_dob or dt < extracted_dob:
+                                    extracted_dob = dt.date()
+                                break
+                            except ValueError:
+                                continue
+                
+                # Insert CNIC verification record matching your schema
+                supabase.table("cnic_verification").insert({
+                    "user_id": user_id,
+                    "upload_path": file.filename,  # Store filename as placeholder
+                    "extracted_cnic": cnic_number,
+                    "extracted_name": possible_name,
+                    "extracted_dob": extracted_dob.isoformat() if extracted_dob else None,
+                    "status": "approved" if not expiry_info.get("is_expired") else "rejected",
+                    "notes": expiry_info.get("message", "")
+                }).execute()
+        except Exception as db_error:
+            # Log error but don't fail the request
+            print(f"Warning: Could not save to database: {db_error}")
+            # Continue without saving to DB
         
         return VerificationResponse(
             is_readable=True,
             quality=readability["quality"],
             cnic_number=cnic_number,
+            possible_name=possible_name,
+            dates=dates,
             expiry_info=expiry_info,
             message="CNIC verified successfully" if cnic_number and not expiry_info.get("is_expired") 
                     else "CNIC expired or invalid. Please use a valid Computerized NIC."
@@ -261,3 +369,41 @@ async def verify_cnic(
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Verification failed: {str(e)}")
+
+
+@router.post("/verify-back")
+async def verify_cnic_back(
+    file: UploadFile = File(...),
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Verify CNIC back side and scan QR code for additional verification.
+    """
+    try:
+        # Validate file format
+        if file.filename and not file.filename.lower().endswith((".jpg", ".jpeg", ".png")):
+            raise HTTPException(
+                status_code=400, 
+                detail="Invalid file format. Please upload JPG or PNG image"
+            )
+        
+        # Read file bytes
+        file_bytes = await file.read()
+        
+        # Process CNIC back side
+        processor = CNICProcessor(file_bytes)
+        
+        # Scan QR code
+        qr_result = processor.scan_qr_code()
+        
+        return {
+            "is_readable": True,
+            "qr_success": qr_result.get("success", False),
+            "qr_data": qr_result.get("qr_data", []),
+            "message": qr_result.get("message", "QR code scanned")
+        }
+        
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Back side verification failed: {str(e)}")

@@ -21,11 +21,19 @@ const getAuthHeaders = async () => {
     'Content-Type': 'application/json',
   };
 
+  // Try to get token from Supabase session first
   if (supabase) {
     const { data: { session } } = await supabase.auth.getSession();
     if (session?.access_token) {
       headers['Authorization'] = `Bearer ${session.access_token}`;
+      return headers;
     }
+  }
+
+  // Fallback to localStorage/sessionStorage token
+  const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
   }
 
   return headers;
@@ -521,14 +529,20 @@ export const cnicAPI = {
   uploadCNIC: async (imageFile, side = 'front') => {
     const formData = new FormData();
     formData.append('file', imageFile);
-    formData.append('side', side);
 
+    // Get auth headers but remove Content-Type for FormData
     const headers = await getAuthHeaders();
-    delete headers['Content-Type']; // Let browser set it with boundary
+    const authHeaders = {};
+    if (headers['Authorization']) {
+      authHeaders['Authorization'] = headers['Authorization'];
+    }
 
-    const response = await fetch(`${API_BASE_URL}/api/cnic/upload`, {
+    // Use different endpoint for back side
+    const endpoint = side === 'back' ? '/api/cnic/verify-back' : '/api/cnic/verify';
+
+    const response = await fetch(`${API_BASE_URL}${endpoint}`, {
       method: 'POST',
-      headers,
+      headers: authHeaders, // Only include Authorization, let browser set Content-Type
       body: formData,
     });
 
@@ -537,7 +551,30 @@ export const cnicAPI = {
       throw new Error(data.detail || data.error || 'CNIC upload failed');
     }
 
-    return data;
+    // Return data based on side
+    if (side === 'back') {
+      return {
+        success: true,
+        data: {
+          qr_success: data.qr_success,
+          qr_data: data.qr_data || [],
+          message: data.message
+        }
+      };
+    }
+
+    return {
+      success: true,
+      data: {
+        is_readable: data.is_readable,
+        cnic_number: data.cnic_number,
+        possible_name: data.possible_name,
+        dates: data.dates || [],
+        expiry_info: data.expiry_info,
+        readability_score: data.is_readable ? 80 : 30, // Estimate based on is_readable
+        quality: data.quality
+      }
+    };
   },
 
   // Get CNIC verification status

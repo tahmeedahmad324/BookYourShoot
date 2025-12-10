@@ -1,9 +1,9 @@
-const API_BASE = process.env.REACT_APP_API_URL || "http://localhost:5000/api"
+const API_BASE = process.env.REACT_APP_API_URL || "http://localhost:5000"
 
 // Send OTP
 export const sendOTP = async (email) => {
   try {
-    const response = await fetch(`${API_BASE}/auth/send-otp`, {
+    const response = await fetch(`${API_BASE}/api/auth/send-otp`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email }),
@@ -20,7 +20,7 @@ export const sendOTP = async (email) => {
 // Verify OTP
 export const verifyOTP = async (email, otp) => {
   try {
-    const response = await fetch(`${API_BASE}/auth/verify-otp`, {
+    const response = await fetch(`${API_BASE}/api/auth/verify-otp`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email, otp }),
@@ -37,7 +37,7 @@ export const verifyOTP = async (email, otp) => {
 // Register with OTP
 export const registerWithOTP = async (userData, otp) => {
   try {
-    const response = await fetch(`${API_BASE}/auth/register`, {
+    const response = await fetch(`${API_BASE}/api/auth/register`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ ...userData, otp }),
@@ -54,7 +54,7 @@ export const registerWithOTP = async (userData, otp) => {
 // Login with OTP
 export const loginWithOTP = async (email, otp) => {
   try {
-    const response = await fetch(`${API_BASE}/auth/login`, {
+    const response = await fetch(`${API_BASE}/api/auth/login`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email, otp }),
