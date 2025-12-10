@@ -24,7 +24,7 @@ class SpotifyService:
                         client_secret=client_secret
                     )
                 )
-                print("✓ Spotify service initialized successfully")
+                print("SUCCESS: Spotify service initialized successfully")
             except Exception as e:
                 print(f"ERROR: Failed to initialize Spotify service: {e}")
                 self.client = None
