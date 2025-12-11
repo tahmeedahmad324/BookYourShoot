@@ -18,12 +18,14 @@ import numpy as np
 
 # MoviePy imports
 try:
-    from moviepy.editor import ImageClip, TextClip, concatenate_videoclips
+    from moviepy.editor import ImageClip, TextClip, concatenate_videoclips, ColorClip, CompositeVideoClip
 except ImportError:
     print("Warning: MoviePy not available. Reel generation will not work.")
     ImageClip = None
     TextClip = None
     concatenate_videoclips = None
+    ColorClip = None
+    CompositeVideoClip = None
 
 from PIL import Image, ImageDraw, ImageFont
 
@@ -41,6 +43,8 @@ class ReelRequest(BaseModel):
     intro_text: Optional[str] = Field(default=None, description="Optional intro text")
     duration_per_image: float = Field(default=3.0, ge=1.0, le=5.0, description="Duration per image in seconds")
     fade_duration: float = Field(default=0.5, ge=0.1, le=2.0, description="Fade transition duration")
+    fit_mode: str = Field(default="fit", description="Image fit mode: 'fit' (letterbox) or 'fill' (crop)")
+    ken_burns: bool = Field(default=False, description="Apply Ken Burns effect (zoom/pan animation)")
 
 
 class ReelResponse(BaseModel):
@@ -81,8 +85,14 @@ def fix_image_orientation(image_bytes: bytes) -> Image.Image:
         return Image.open(BytesIO(image_bytes))
 
 
-def resize_to_aspect_ratio(clip, ratio: str):
-    """Resize clip to match aspect ratio with center crop"""
+def resize_to_aspect_ratio(clip, ratio: str, fit_mode: str = "fit"):
+    """Resize clip to match aspect ratio with letterboxing or cropping
+    
+    Args:
+        clip: Video clip to resize
+        ratio: Target aspect ratio ('9:16', '16:9', '1:1')
+        fit_mode: 'fit' for letterbox (no crop) or 'fill' for crop to fill
+    """
     current_width = clip.w
     current_height = clip.h
     
@@ -100,28 +110,101 @@ def resize_to_aspect_ratio(clip, ratio: str):
     target_aspect = target_width / target_height
     current_aspect = current_width / current_height
     
-    # Scale and crop
-    if current_aspect > target_aspect:
-        # Image is wider - scale by height and crop width
-        new_height = target_height
-        new_width = int(current_width * (target_height / current_height))
+    if fit_mode == "fill":
+        # FILL MODE: Scale and crop to fill entire frame
+        if current_aspect > target_aspect:
+            # Image is wider - scale by height and crop width
+            new_height = target_height
+            new_width = int(current_width * (target_height / current_height))
+        else:
+            # Image is taller - scale by width and crop height
+            new_width = target_width
+            new_height = int(current_height * (target_width / current_width))
+        
+        # Resize
+        clip = clip.resize(width=new_width, height=new_height)
+        
+        # Crop to exact target size from center
+        clip = clip.crop(
+            x_center=clip.w / 2,
+            y_center=clip.h / 2,
+            width=target_width,
+            height=target_height
+        )
+        
+        return clip
+    
     else:
-        # Image is taller - scale by width and crop height
-        new_width = target_width
-        new_height = int(current_height * (target_width / current_width))
+        # FIT MODE: Scale to fit with letterboxing (no cropping)
+        if current_aspect > target_aspect:
+            # Image is wider - fit to width, add bars top/bottom
+            new_width = target_width
+            new_height = int(current_height * (target_width / current_width))
+        else:
+            # Image is taller - fit to height, add bars left/right
+            new_height = target_height
+            new_width = int(current_width * (target_height / current_height))
+        
+        # Resize to fit
+        clip = clip.resize(width=new_width, height=new_height)
+        
+        # Add black padding to center the image
+        # Create black background
+        background = ColorClip(size=(target_width, target_height), color=(0, 0, 0))
+        background = background.set_duration(clip.duration)
+        
+        # Center the clip on the background
+        clip = clip.set_position(('center', 'center'))
+        
+        # Composite
+        final_clip = CompositeVideoClip([background, clip], size=(target_width, target_height))
+        
+        return final_clip
+
+
+def apply_ken_burns_effect(clip, zoom_ratio=1.2):
+    """Apply Ken Burns effect (slow zoom and pan)
     
-    # Resize
-    clip = clip.resize(width=new_width, height=new_height)
+    Args:
+        clip: Video clip to apply effect to
+        zoom_ratio: How much to zoom (1.2 = 20% zoom)
     
-    # Crop to exact target size from center
-    clip = clip.crop(
-        x_center=clip.w / 2,
-        y_center=clip.h / 2,
-        width=target_width,
-        height=target_height
-    )
+    Returns:
+        Clip with Ken Burns effect applied
+    """
+    def zoom_in_effect(get_frame, t):
+        """Zoom in from 1.0x to zoom_ratio over duration"""
+        frame = get_frame(t)
+        h, w = frame.shape[:2]
+        
+        # Calculate progress (0 to 1)
+        progress = t / clip.duration
+        
+        # Current zoom level
+        current_zoom = 1.0 + (zoom_ratio - 1.0) * progress
+        
+        # New dimensions after zoom
+        new_h = int(h / current_zoom)
+        new_w = int(w / current_zoom)
+        
+        # Center crop
+        y1 = (h - new_h) // 2
+        x1 = (w - new_w) // 2
+        y2 = y1 + new_h
+        x2 = x1 + new_w
+        
+        # Crop and resize back to original size
+        cropped = frame[y1:y2, x1:x2]
+        
+        # Resize back using PIL for better quality
+        from PIL import Image
+        img = Image.fromarray(cropped)
+        img = img.resize((w, h), Image.LANCZOS)
+        
+        return np.array(img)
     
-    return clip
+    # Apply the zoom effect
+    return clip.fl(zoom_in_effect)
 
 
 def apply_fade_transition(clips, fade_duration=0.5):
@@ -143,35 +226,82 @@ def apply_fade_transition(clips, fade_duration=0.5):
 
 
 def create_intro_clip(text: str, width: int, height: int, duration: float = 2.5) -> ImageClip:
-    """Create intro text clip using PIL"""
+    """Create intro text clip using PIL with auto text wrapping and sizing"""
     # Create black background
     intro_img = Image.new('RGB', (width, height), color='black')
     draw = ImageDraw.Draw(intro_img)
     
-    # Try to use a nice font, fallback to default
-    try:
-        font_size = 100
-        font = ImageFont.truetype("arial.ttf", font_size)
-    except:
+    # Calculate max text width (80% of screen width for padding)
+    max_text_width = int(width * 0.8)
+    
+    # Start with a base font size and adjust
+    font_size = 120 if width > height else 80  # Larger for landscape
+    font = None
+    
+    # Try to load font
+    for font_path in ["arial.ttf", "C:/Windows/Fonts/arial.ttf", 
+                      "C:/Windows/Fonts/arialbd.ttf", "/System/Library/Fonts/Helvetica.ttc"]:
+        try:
+            font = ImageFont.truetype(font_path, font_size)
+            break
+        except:
+            continue
+    
+    if font is None:
+        font = ImageFont.load_default()
+    
+    # Function to wrap text
+    def wrap_text(text, font, max_width):
+        words = text.split()
+        lines = []
+        current_line = []
+        
+        for word in words:
+            test_line = ' '.join(current_line + [word])
+            bbox = draw.textbbox((0, 0), test_line, font=font)
+            test_width = bbox[2] - bbox[0]
+            
+            if test_width <= max_width:
+                current_line.append(word)
+            else:
+                if current_line:
+                    lines.append(' '.join(current_line))
+                    current_line = [word]
+                else:
+                    # Word itself is too long, add it anyway
+                    lines.append(word)
+        
+        if current_line:
+            lines.append(' '.join(current_line))
+        
+        return lines
+    
+    # Wrap text and adjust font size if needed
+    lines = wrap_text(text, font, max_text_width)
+    
+    # If text is too large (more than 3 lines), reduce font size
+    while len(lines) > 3 and font_size > 40:
+        font_size -= 10
         try:
             font = ImageFont.truetype("C:/Windows/Fonts/arial.ttf", font_size)
         except:
-            try:
-                font = ImageFont.truetype("/System/Library/Fonts/Helvetica.ttc", font_size)
-            except:
-                font = ImageFont.load_default()
+            font = ImageFont.load_default()
+        lines = wrap_text(text, font, max_text_width)
     
-    # Get text bounding box for centering
-    bbox = draw.textbbox((0, 0), text, font=font)
-    text_width = bbox[2] - bbox[0]
-    text_height = bbox[3] - bbox[1]
+    # Calculate total text height
+    line_height = font_size + 10
+    total_text_height = len(lines) * line_height
     
-    # Center the text
-    x = (width - text_width) // 2
-    y = (height - text_height) // 2
+    # Start y position (centered vertically)
+    y = (height - total_text_height) // 2
     
-    # Draw text
-    draw.text((x, y), text, fill='white', font=font)
+    # Draw each line centered
+    for line in lines:
+        bbox = draw.textbbox((0, 0), line, font=font)
+        line_width = bbox[2] - bbox[0]
+        x = (width - line_width) // 2
+        draw.text((x, y), line, fill='white', font=font)
+        y += line_height
     
     # Convert PIL image to numpy array for MoviePy
     intro_array = np.array(intro_img)
@@ -325,11 +455,15 @@ async def generate_reel(
                 # Create clip
                 img_clip = ImageClip(str(temp_img_path))
                 
-                # Resize to aspect ratio
-                img_clip = resize_to_aspect_ratio(img_clip, payload.ratio)
+                # Resize to aspect ratio with selected fit mode
+                img_clip = resize_to_aspect_ratio(img_clip, payload.ratio, payload.fit_mode)
                 
                 # Set duration
                 img_clip = img_clip.set_duration(payload.duration_per_image)
+                
+                # Apply Ken Burns effect if enabled
+                if payload.ken_burns:
+                    img_clip = apply_ken_burns_effect(img_clip, zoom_ratio=1.10)
                 
                 clips.append(img_clip)
                 

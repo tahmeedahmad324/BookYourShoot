@@ -28,10 +28,7 @@ const Navbar = () => {
   ]
 
   const clientLinks = [
-    { path: "/client/dashboard", label: "Dashboard" },
-    { path: "/client/bookings", label: "My Bookings" },
-    { path: "/client/album-builder", label: "Album Builder" },
-    { path: "/client/reel-generator", label: "Reel Generator" },
+    { path: "/client/dashboard", label: "Dashboard" }
   ]
 
   const photographerLinks = [
