@@ -18,7 +18,7 @@ import numpy as np
 
 # MoviePy imports
 try:
-    from moviepy.editor import ImageClip, TextClip, concatenate_videoclips, ColorClip, CompositeVideoClip
+    from moviepy.editor import ImageClip, TextClip, concatenate_videoclips, ColorClip, CompositeVideoClip, AudioFileClip
 except ImportError:
     print("Warning: MoviePy not available. Reel generation will not work.")
     ImageClip = None
@@ -26,8 +26,9 @@ except ImportError:
     concatenate_videoclips = None
     ColorClip = None
     CompositeVideoClip = None
+    AudioFileClip = None
 
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw, ImageFont, ImageEnhance
 
 # Supabase - fix import path
 from backend.supabase_client import supabase
@@ -45,6 +46,10 @@ class ReelRequest(BaseModel):
     fade_duration: float = Field(default=0.5, ge=0.1, le=2.0, description="Fade transition duration")
     fit_mode: str = Field(default="fit", description="Image fit mode: 'fit' (letterbox) or 'fill' (crop)")
     ken_burns: bool = Field(default=False, description="Apply Ken Burns effect (zoom/pan animation)")
+    music_upload_url: Optional[str] = Field(default=None, description="URL to uploaded music file")
+    spotify_preview_url: Optional[str] = Field(default=None, description="Spotify preview URL")
+    music_volume: int = Field(default=70, ge=0, le=100, description="Music volume (0-100%)")
+    filter: str = Field(default="none", description="Color filter: 'none', 'vintage', 'bw', 'vibrant', 'warm', 'cool'")
 
 
 class ReelResponse(BaseModel):
@@ -53,6 +58,91 @@ class ReelResponse(BaseModel):
     num_images: int
     aspect_ratio: str
     file_size: Optional[int] = None
+
+
+def apply_filter(img: Image.Image, filter_name: str) -> Image.Image:
+    """Apply color filter to image
+    
+    Args:
+        img: PIL Image
+        filter_name: Filter name ('none', 'vintage', 'bw', 'vibrant', 'warm', 'cool')
+    
+    Returns:
+        Filtered PIL Image
+    """
+    if filter_name == "none":
+        return img
+    
+    elif filter_name == "bw":
+        # Black and White - convert to grayscale
+        return img.convert('L').convert('RGB')
+    
+    elif filter_name == "vintage":
+        # Vintage - sepia tone with reduced saturation
+        # Convert to grayscale first
+        grayscale = img.convert('L')
+        
+        # Apply sepia tone
+        sepia = Image.new('RGB', img.size)
+        pixels = sepia.load()
+        gray_pixels = grayscale.load()
+        
+        for y in range(img.size[1]):
+            for x in range(img.size[0]):
+                gray = gray_pixels[x, y]
+                # Sepia formula
+                r = min(255, int(gray * 1.0))
+                g = min(255, int(gray * 0.85))
+                b = min(255, int(gray * 0.65))
+                pixels[x, y] = (r, g, b)
+        
+        # Reduce contrast slightly
+        enhancer = ImageEnhance.Contrast(sepia)
+        sepia = enhancer.enhance(0.85)
+        
+        return sepia
+    
+    elif filter_name == "vibrant":
+        # Vibrant - increase saturation and brightness
+        enhancer = ImageEnhance.Color(img)
+        img = enhancer.enhance(1.4)  # Increase saturation
+        
+        enhancer = ImageEnhance.Brightness(img)
+        img = enhancer.enhance(1.1)  # Slight brightness boost
+        
+        enhancer = ImageEnhance.Contrast(img)
+        img = enhancer.enhance(1.1)  # Slight contrast boost
+        
+        return img
+    
+    elif filter_name == "warm":
+        # Warm - add orange/red tones
+        pixels = img.load()
+        for y in range(img.size[1]):
+            for x in range(img.size[0]):
+                r, g, b = pixels[x, y]
+                # Increase red, slightly increase green, keep blue
+                r = min(255, int(r * 1.15))
+                g = min(255, int(g * 1.05))
+                pixels[x, y] = (r, g, b)
+        
+        return img
+    
+    elif filter_name == "cool":
+        # Cool - add blue tones
+        pixels = img.load()
+        for y in range(img.size[1]):
+            for x in range(img.size[0]):
+                r, g, b = pixels[x, y]
+                # Keep red, slightly increase green, increase blue
+                g = min(255, int(g * 1.05))
+                b = min(255, int(b * 1.15))
+                pixels[x, y] = (r, g, b)
+        
+        return img
+    
+    else:
+        return img
 
 
 def fix_image_orientation(image_bytes: bytes) -> Image.Image:
@@ -225,6 +315,53 @@ def apply_fade_transition(clips, fade_duration=0.5):
     return faded_clips
 
 
+def process_audio(music_url: str, video_duration: float, volume: int, temp_dir: str):
+    """Download and process audio to match video duration
+    
+    Args:
+        music_url: URL to music file (uploaded or Spotify preview)
+        video_duration: Target video duration in seconds
+        volume: Volume level (0-100)
+        temp_dir: Temporary directory for audio file
+    
+    Returns:
+        AudioFileClip with adjusted duration and volume
+    """
+    try:
+        # Download audio file
+        audio_response = requests.get(music_url, timeout=30)
+        if audio_response.status_code != 200:
+            raise Exception(f"Failed to download audio: {audio_response.status_code}")
+        
+        # Save to temp file
+        audio_path = Path(temp_dir) / "music.mp3"
+        with open(audio_path, 'wb') as f:
+            f.write(audio_response.content)
+        
+        # Load audio clip
+        audio_clip = AudioFileClip(str(audio_path))
+        
+        # Adjust duration
+        if audio_clip.duration < video_duration:
+            # Loop audio if shorter than video
+            loops_needed = int(video_duration / audio_clip.duration) + 1
+            from moviepy.audio.AudioClip import concatenate_audioclips
+            audio_clip = concatenate_audioclips([audio_clip] * loops_needed)
+        
+        # Trim to exact video duration
+        audio_clip = audio_clip.subclip(0, video_duration)
+        
+        # Adjust volume (0-100 to 0.0-1.0)
+        volume_factor = volume / 100.0
+        audio_clip = audio_clip.volumex(volume_factor)
+        
+        return audio_clip
+    
+    except Exception as e:
+        print(f"Error processing audio: {e}")
+        return None
+
+
 def create_intro_clip(text: str, width: int, height: int, duration: float = 2.5) -> ImageClip:
     """Create intro text clip using PIL with auto text wrapping and sizing"""
     # Create black background
@@ -310,6 +447,54 @@ def create_intro_clip(text: str, width: int, height: int, duration: float = 2.5)
     intro_clip = ImageClip(intro_array).set_duration(duration)
     
     return intro_clip
+
+
+@router.post("/upload-music")
+async def upload_music(
+    file: UploadFile = File(...),
+    current_user: dict = Depends(get_current_user)
+):
+    """Upload a music file for reel generation"""
+    try:
+        user_id = current_user.get("id")
+        
+        # Validate file type
+        allowed_types = ['audio/mpeg', 'audio/mp3', 'audio/wav', 'audio/x-wav']
+        if not file.content_type or file.content_type not in allowed_types:
+            raise HTTPException(status_code=400, detail="File must be MP3 or WAV audio")
+        
+        # Validate file extension
+        file_ext = Path(file.filename).suffix.lower()
+        if file_ext not in ['.mp3', '.wav']:
+            raise HTTPException(status_code=400, detail="Only MP3 and WAV files are supported")
+        
+        # Create upload directory
+        upload_dir = Path("storage/reels/music") / str(user_id)
+        upload_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Generate unique filename
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = f"music_{timestamp}{file_ext}"
+        file_path = upload_dir / filename
+        
+        # Save file
+        with open(file_path, "wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
+        
+        # Create URL
+        music_url = f"http://localhost:5000/api/reels/music/{user_id}/{filename}"
+        
+        return {
+            "url": music_url,
+            "filename": filename,
+            "message": "Music uploaded successfully"
+        }
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error uploading music: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to upload music: {str(e)}")
 
 
 @router.post("/upload-image")
@@ -448,6 +633,9 @@ async def generate_reel(
                 # Fix orientation
                 img = fix_image_orientation(image_bytes)
                 
+                # Apply filter
+                img = apply_filter(img, payload.filter)
+                
                 # Save to temporary file
                 temp_img_path = Path(temp_dir) / f"image_{idx}.png"
                 img.save(temp_img_path, format='PNG')
@@ -481,7 +669,16 @@ async def generate_reel(
         # Concatenate clips
         final_video = concatenate_videoclips(clips, method="compose")
         
-        # Generate output filename
+        # Add background music if provided
+        audio_clip = None
+        if payload.music_upload_url or payload.spotify_preview_url:
+            music_url = payload.music_upload_url or payload.spotify_preview_url
+            audio_clip = process_audio(music_url, final_video.duration, payload.music_volume, temp_dir)
+            
+            if audio_clip:
+                final_video = final_video.set_audio(audio_clip)
+        
+        # Generate timestamp for unique filename
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         output_filename = f"reel_{payload.ratio.replace(':', 'x')}_{timestamp}.mp4"
         output_path = Path(temp_dir) / output_filename
@@ -491,7 +688,7 @@ async def generate_reel(
             str(output_path),
             fps=30,
             codec='libx264',
-            audio=False,
+            audio=True if audio_clip else False,
             preset='medium',
             threads=4,
             logger=None  # Suppress MoviePy logs
@@ -504,6 +701,8 @@ async def generate_reel(
         final_video.close()
         for clip in clips:
             clip.close()
+        if audio_clip:
+            audio_clip.close()
         
         # Create local storage directory if it doesn't exist
         local_storage_dir = Path("storage/reels") / str(user_id)
@@ -573,6 +772,30 @@ async def get_user_reels(current_user: dict = Depends(get_current_user)):
     
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to fetch user reels: {str(e)}")
+
+
+@router.get("/music/{user_id}/{filename}")
+async def serve_music(user_id: str, filename: str):
+    """Serve music file from local storage"""
+    try:
+        music_path = Path("storage/reels/music") / user_id / filename
+        
+        if not music_path.exists():
+            raise HTTPException(status_code=404, detail="Music file not found")
+        
+        # Determine media type based on file extension
+        media_type = "audio/mpeg" if filename.endswith('.mp3') else "audio/wav"
+        
+        return FileResponse(
+            path=str(music_path),
+            media_type=media_type,
+            filename=filename
+        )
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to serve music: {str(e)}")
 
 
 @router.get("/videos/{user_id}/{filename}")

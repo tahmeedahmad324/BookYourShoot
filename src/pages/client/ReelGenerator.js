@@ -16,6 +16,17 @@ const ReelGenerator = () => {
   const [fitMode, setFitMode] = useState('fit');
   const [kenBurns, setKenBurns] = useState(false);
   
+  // Music state
+  const [musicOption, setMusicOption] = useState('none'); // 'none', 'upload', 'spotify'
+  const [uploadedMusicUrl, setUploadedMusicUrl] = useState(null);
+  const [spotifyPreviewUrl, setSpotifyPreviewUrl] = useState(null);
+  const [musicVolume, setMusicVolume] = useState(70);
+  const [uploadingMusic, setUploadingMusic] = useState(false);
+  const musicInputRef = useRef(null);
+  
+  // Filter state
+  const [filter, setFilter] = useState('none');
+  
   const [uploading, setUploading] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [generatedVideo, setGeneratedVideo] = useState(null);
@@ -109,6 +120,50 @@ const ReelGenerator = () => {
     if (newImages.length === 0) {
       setError('Please select at least 1 image');
       setGeneratedVideo(null);
+    }
+  };
+
+  // Handle music file upload
+  const handleMusicUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    // Validate file type
+    const validTypes = ['audio/mpeg', 'audio/mp3', 'audio/wav'];
+    if (!validTypes.includes(file.type) && !file.name.match(/\.(mp3|wav)$/i)) {
+      setError('Only MP3 and WAV files are supported');
+      return;
+    }
+
+    setUploadingMusic(true);
+    setError('');
+
+    try {
+      const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const response = await fetch('http://localhost:5000/api/reels/upload-music', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        },
+        body: formData
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || 'Failed to upload music');
+      }
+
+      const data = await response.json();
+      setUploadedMusicUrl(data.url);
+      setMusicOption('upload');
+    } catch (err) {
+      setError(err.message || 'Failed to upload music');
+      console.error('Music upload error:', err);
+    } finally {
+      setUploadingMusic(false);
     }
   };
 
@@ -240,7 +295,11 @@ const ReelGenerator = () => {
           duration_per_image: durationPerImage,
           fade_duration: fadeDuration,
           fit_mode: fitMode,
-          ken_burns: kenBurns
+          ken_burns: kenBurns,
+          music_upload_url: musicOption === 'upload' ? uploadedMusicUrl : null,
+          spotify_preview_url: musicOption === 'spotify' ? spotifyPreviewUrl : null,
+          music_volume: musicVolume,
+          filter: filter
         })
       });
       
@@ -757,6 +816,153 @@ const ReelGenerator = () => {
                         ? 'Adds smooth zoom and motion to photos for a professional look' 
                         : 'Photos will remain static without zoom'}
                     </small>
+                  </div>
+                </div>
+
+                {/* Color Filter */}
+                <div className="mb-4">
+                  <h6 className="fw-semibold mb-3">Visual Style</h6>
+                  <div className="row g-2">
+                    <div className="col-12">
+                      <label className="form-label fw-semibold">Color Filter</label>
+                      <select
+                        className="form-select form-select-lg"
+                        value={filter}
+                        onChange={(e) => setFilter(e.target.value)}
+                        disabled={generating}
+                        style={{ borderRadius: '10px' }}
+                      >
+                        <option value="none">None - Original Colors</option>
+                        <option value="vibrant">Vibrant - Bold & Colorful</option>
+                        <option value="vintage">Vintage - Classic Sepia</option>
+                        <option value="bw">Black & White - Timeless</option>
+                        <option value="warm">Warm - Sunset Tones</option>
+                        <option value="cool">Cool - Blue Tones</option>
+                      </select>
+                      <small className="form-text text-muted d-block mt-1">
+                        {filter === 'none' && 'Keep original photo colors'}
+                        {filter === 'vibrant' && 'Boosts colors and contrast for eye-catching visuals'}
+                        {filter === 'vintage' && 'Classic sepia tone with reduced saturation'}
+                        {filter === 'bw' && 'Elegant black and white look'}
+                        {filter === 'warm' && 'Adds orange/red tones for a cozy feel'}
+                        {filter === 'cool' && 'Adds blue tones for a calm, professional look'}
+                      </small>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Music Section */}
+                <div className="mb-4">
+                  <h6 className="fw-semibold mb-3">Background Music (Optional)</h6>
+                  
+                  <div className="row g-3">
+                    {/* Music Option Selector */}
+                    <div className="col-12">
+                      <div className="btn-group w-100" role="group">
+                        <input 
+                          type="radio" 
+                          className="btn-check" 
+                          name="musicOption" 
+                          id="noMusic" 
+                          checked={musicOption === 'none'}
+                          onChange={() => setMusicOption('none')}
+                          disabled={generating}
+                        />
+                        <label className="btn btn-outline-primary" htmlFor="noMusic">No Music</label>
+                        
+                        <input 
+                          type="radio" 
+                          className="btn-check" 
+                          name="musicOption" 
+                          id="uploadMusic" 
+                          checked={musicOption === 'upload'}
+                          onChange={() => setMusicOption('upload')}
+                          disabled={generating}
+                        />
+                        <label className="btn btn-outline-primary" htmlFor="uploadMusic">Upload File</label>
+                        
+                        <input 
+                          type="radio" 
+                          className="btn-check" 
+                          name="musicOption" 
+                          id="spotifyMusic" 
+                          checked={musicOption === 'spotify'}
+                          onChange={() => setMusicOption('spotify')}
+                          disabled={generating}
+                        />
+                        <label className="btn btn-outline-primary" htmlFor="spotifyMusic">Spotify (Preview)</label>
+                      </div>
+                    </div>
+
+                    {/* Upload Music File */}
+                    {musicOption === 'upload' && (
+                      <div className="col-12">
+                        <input
+                          ref={musicInputRef}
+                          type="file"
+                          className="form-control d-none"
+                          id="musicUploadInput"
+                          accept="audio/mpeg,audio/mp3,audio/wav"
+                          onChange={handleMusicUpload}
+                          disabled={uploadingMusic || generating}
+                        />
+                        <label 
+                          htmlFor="musicUploadInput" 
+                          className="btn btn-outline-secondary w-100"
+                          style={{ cursor: uploadingMusic || generating ? 'not-allowed' : 'pointer' }}
+                        >
+                          {uploadingMusic ? (
+                            <>
+                              <span className="spinner-border spinner-border-sm me-2"></span>
+                              Uploading...
+                            </>
+                          ) : uploadedMusicUrl ? (
+                            <>
+                              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="me-2">
+                                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                                <polyline points="22 4 12 14.01 9 11.01"></polyline>
+                              </svg>
+                              Music Uploaded - Click to Change
+                            </>
+                          ) : (
+                            <>Choose Music File (MP3, WAV)</>
+                          )}
+                        </label>
+                        <small className="form-text text-muted d-block mt-1">
+                          Ensure you have rights to use this music
+                        </small>
+                      </div>
+                    )}
+
+                    {/* Spotify Music (Coming Soon) */}
+                    {musicOption === 'spotify' && (
+                      <div className="col-12">
+                        <div className="alert alert-info mb-0">
+                          <strong>Note:</strong> Only 30-second preview available (perfect for most reels!)
+                          <br/>
+                          <small className="text-muted">Spotify integration coming soon</small>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Volume Control */}
+                    {musicOption !== 'none' && (
+                      <div className="col-12">
+                        <label className="form-label fw-semibold">
+                          Volume: <span className="text-primary">{musicVolume}%</span>
+                        </label>
+                        <input
+                          type="range"
+                          className="form-range"
+                          min="0"
+                          max="100"
+                          step="5"
+                          value={musicVolume}
+                          onChange={(e) => setMusicVolume(parseInt(e.target.value))}
+                          disabled={generating}
+                        />
+                      </div>
+                    )}
                   </div>
                 </div>
                 
