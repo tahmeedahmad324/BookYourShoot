@@ -11,8 +11,10 @@ project_root = str(Path(__file__).resolve().parent.parent)
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
 
 # Import routers via package-qualified names
 from backend.routers import (
@@ -33,6 +35,17 @@ from backend.routers import (
 )
 
 app = FastAPI(title="BookYourShoot API", version="1.0.0")
+
+# Add global exception handler for validation errors
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    print(f"Validation error for {request.url.path}:")
+    print(f"Request body: {await request.body()}")
+    print(f"Errors: {exc.errors()}")
+    return JSONResponse(
+        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+        content={"detail": exc.errors(), "body": exc.body},
+    )
 
 app.add_middleware(
     CORSMiddleware,

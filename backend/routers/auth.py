@@ -106,14 +106,17 @@ def verify_otp(payload: VerifyOtpRequest):
 class RegisterRequest(BaseModel):
     email: str
     otp: str
-    full_name: str
-    phone: str
-    city: str
+    full_name: str = None  # Make optional
+    phone: str = None  # Make optional
+    city: str = None  # Make optional
 
 
 @router.post("/register")
 def register(payload: RegisterRequest):
     try:
+        print(f"Registration attempt for email: {payload.email}")
+        print(f"OTP received: {payload.otp}")
+        
         # Verify OTP and create session
         response = supabase.auth.verify_otp({
             "email": payload.email,
@@ -121,15 +124,19 @@ def register(payload: RegisterRequest):
             "type": "email"
         })
 
+        print(f"Supabase response - Session: {response.session is not None}, User: {response.user is not None}")
+
         if response.session is None or response.user is None:
             raise HTTPException(status_code=400, detail="Invalid OTP code. Please check and try again.")
 
         user_id = response.user.id
+        print(f"User ID from Supabase: {user_id}")
 
         # Check if user already exists
         existing_user = supabase.table("users").select("*").eq("id", user_id).execute()
         
         if not existing_user.data:
+            print(f"Creating new user in database")
             # Insert user into our users table
             supabase.table("users").insert({
                 "id": user_id,
@@ -139,11 +146,16 @@ def register(payload: RegisterRequest):
                 "city": payload.city,
                 "role": "client"
             }).execute()
+        else:
+            print(f"User already exists in database")
 
         return {"message": "User registered successfully.", "access_token": response.session.access_token, "user_id": user_id}
     except HTTPException:
         raise
     except Exception as e:
+        print(f"Registration error: {str(e)}")
+        import traceback
+        print(traceback.format_exc())
         raise HTTPException(status_code=400, detail=f"Registration failed: {str(e)}")
 
 
