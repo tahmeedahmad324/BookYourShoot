@@ -328,37 +328,72 @@ def process_audio(music_url: str, video_duration: float, volume: int, temp_dir: 
         AudioFileClip with adjusted duration and volume
     """
     try:
-        # Download audio file
-        audio_response = requests.get(music_url, timeout=30)
-        if audio_response.status_code != 200:
-            raise Exception(f"Failed to download audio: {audio_response.status_code}")
+        print(f"Processing audio from URL: {music_url}")
         
-        # Save to temp file
         audio_path = Path(temp_dir) / "music.mp3"
-        with open(audio_path, 'wb') as f:
-            f.write(audio_response.content)
+        
+        # Check if it's a local file (localhost URL or relative path)
+        if "localhost:5000/api/reels/music/" in music_url or music_url.startswith("/api/reels/music/"):
+            # Local file - extract path and read directly to avoid HTTP timeout
+            # Parse URL to get user_id and filename
+            if "localhost:5000" in music_url:
+                # Extract from full URL: http://localhost:5000/api/reels/music/{user_id}/{filename}
+                path_part = music_url.split("/api/reels/music/")[1]
+            else:
+                # Extract from relative path: /api/reels/music/{user_id}/{filename}
+                path_part = music_url.split("/api/reels/music/")[1]
+            
+            parts = path_part.split("/")
+            url_user_id = parts[0]
+            filename = parts[1]
+            local_music_path = Path("storage/reels/music") / url_user_id / filename
+            
+            if not local_music_path.exists():
+                print(f"ERROR: Local music file not found: {local_music_path}")
+                return None
+            
+            # Copy to temp directory
+            shutil.copy(local_music_path, audio_path)
+            print(f"✓ Loaded local music file: {local_music_path}")
+        else:
+            # Download audio file from external URL (Spotify preview, etc.)
+            print(f"Downloading audio from external URL: {music_url}")
+            audio_response = requests.get(music_url, timeout=30)
+            if audio_response.status_code != 200:
+                raise Exception(f"Failed to download audio: {audio_response.status_code}")
+            
+            # Save to temp file
+            with open(audio_path, 'wb') as f:
+                f.write(audio_response.content)
+            print(f"✓ Downloaded audio, size: {len(audio_response.content)} bytes")
         
         # Load audio clip
+        print(f"Loading audio clip from: {audio_path}")
         audio_clip = AudioFileClip(str(audio_path))
+        print(f"Audio loaded successfully, duration: {audio_clip.duration:.2f}s")
         
         # Adjust duration
         if audio_clip.duration < video_duration:
             # Loop audio if shorter than video
             loops_needed = int(video_duration / audio_clip.duration) + 1
+            print(f"Looping audio {loops_needed} times to match video duration")
             from moviepy.audio.AudioClip import concatenate_audioclips
             audio_clip = concatenate_audioclips([audio_clip] * loops_needed)
         
         # Trim to exact video duration
         audio_clip = audio_clip.subclip(0, video_duration)
+        print(f"Audio trimmed to {video_duration:.2f}s")
         
         # Adjust volume (0-100 to 0.0-1.0)
         volume_factor = volume / 100.0
         audio_clip = audio_clip.volumex(volume_factor)
+        print(f"Audio volume adjusted to {volume}% (factor: {volume_factor})")
         
         return audio_clip
     
     except Exception as e:
-        print(f"Error processing audio: {e}")
+        print(f"ERROR processing audio: {e}")
+        print(traceback.format_exc())
         return None
 
 
@@ -671,28 +706,41 @@ async def generate_reel(
         
         # Add background music if provided
         audio_clip = None
-        if payload.music_upload_url or payload.spotify_preview_url:
-            music_url = payload.music_upload_url or payload.spotify_preview_url
+        has_audio = False
+        if payload.music_upload_url:
+            music_url = payload.music_upload_url
+            print(f"Attempting to add music: {music_url}")
             audio_clip = process_audio(music_url, final_video.duration, payload.music_volume, temp_dir)
             
             if audio_clip:
+                print("Setting audio on video clip...")
                 final_video = final_video.set_audio(audio_clip)
+                has_audio = True
+                print(f"Audio set successfully. Video duration: {final_video.duration:.2f}s, Audio duration: {audio_clip.duration:.2f}s")
+            else:
+                print("WARNING: Failed to process audio, video will have no sound")
         
         # Generate timestamp for unique filename
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         output_filename = f"reel_{payload.ratio.replace(':', 'x')}_{timestamp}.mp4"
         output_path = Path(temp_dir) / output_filename
         
-        # Export video
+        # Export video with proper audio settings
+        print(f"Exporting video to: {output_path}")
+        print(f"Audio enabled: {has_audio}")
+        
         final_video.write_videofile(
             str(output_path),
             fps=30,
             codec='libx264',
-            audio=True if audio_clip else False,
+            audio=has_audio,
+            audio_codec='aac' if has_audio else None,
             preset='medium',
             threads=4,
             logger=None  # Suppress MoviePy logs
         )
+        
+        print(f"Video exported successfully: {output_path}")
         
         # Get video duration
         video_duration = final_video.duration

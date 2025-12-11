@@ -17,9 +17,8 @@ const ReelGenerator = () => {
   const [kenBurns, setKenBurns] = useState(false);
   
   // Music state
-  const [musicOption, setMusicOption] = useState('none'); // 'none', 'upload', 'spotify'
+  const [musicOption, setMusicOption] = useState('none'); // 'none', 'upload'
   const [uploadedMusicUrl, setUploadedMusicUrl] = useState(null);
-  const [spotifyPreviewUrl, setSpotifyPreviewUrl] = useState(null);
   const [musicVolume, setMusicVolume] = useState(70);
   const [uploadingMusic, setUploadingMusic] = useState(false);
   const musicInputRef = useRef(null);
@@ -297,7 +296,6 @@ const ReelGenerator = () => {
           fit_mode: fitMode,
           ken_burns: kenBurns,
           music_upload_url: musicOption === 'upload' ? uploadedMusicUrl : null,
-          spotify_preview_url: musicOption === 'spotify' ? spotifyPreviewUrl : null,
           music_volume: musicVolume,
           filter: filter
         })
@@ -879,18 +877,7 @@ const ReelGenerator = () => {
                           onChange={() => setMusicOption('upload')}
                           disabled={generating}
                         />
-                        <label className="btn btn-outline-primary" htmlFor="uploadMusic">Upload File</label>
-                        
-                        <input 
-                          type="radio" 
-                          className="btn-check" 
-                          name="musicOption" 
-                          id="spotifyMusic" 
-                          checked={musicOption === 'spotify'}
-                          onChange={() => setMusicOption('spotify')}
-                          disabled={generating}
-                        />
-                        <label className="btn btn-outline-primary" htmlFor="spotifyMusic">Spotify (Preview)</label>
+                        <label className="btn btn-outline-primary" htmlFor="uploadMusic">Upload Music File</label>
                       </div>
                     </div>
 
@@ -931,17 +918,6 @@ const ReelGenerator = () => {
                         <small className="form-text text-muted d-block mt-1">
                           Ensure you have rights to use this music
                         </small>
-                      </div>
-                    )}
-
-                    {/* Spotify Music (Coming Soon) */}
-                    {musicOption === 'spotify' && (
-                      <div className="col-12">
-                        <div className="alert alert-info mb-0">
-                          <strong>Note:</strong> Only 30-second preview available (perfect for most reels!)
-                          <br/>
-                          <small className="text-muted">Spotify integration coming soon</small>
-                        </div>
                       </div>
                     )}
 

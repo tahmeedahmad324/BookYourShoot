@@ -458,12 +458,23 @@ def get_music_suggestions(
                 # Filter out tracks with excluded keywords
                 search_formatted = filter_by_excluded_keywords(search_formatted, eventType)
                 all_tracks.extend(search_formatted)
-                
-                source = "search_fallback"
-                # Sort by relevance score (prioritizes title matches over popularity)
-                all_tracks.sort(key=lambda x: x["relevance"], reverse=True)
+            
+            source = "search_fallback"
+            # Sort by relevance score (prioritizes title matches over popularity)
+            all_tracks.sort(key=lambda x: x["relevance"], reverse=True)
         
-        # PHASE 3: Shuffle for variety (keep top tracks but add randomness)
+        # PHASE 3: Remove duplicates (keep first occurrence)
+        seen_ids = set()
+        unique_tracks = []
+        for track in all_tracks:
+            if track["id"] not in seen_ids:
+                seen_ids.add(track["id"])
+                unique_tracks.append(track)
+        
+        all_tracks = unique_tracks
+        print(f"After deduplication: {len(all_tracks)} unique tracks")
+        
+        # PHASE 4: Shuffle for variety (keep top tracks but add randomness)
         import random
         if len(all_tracks) > limit:
             # Keep top 70% by score, shuffle the rest
@@ -481,7 +492,8 @@ def get_music_suggestions(
             "tracks": final_tracks,
             "vibeMatched": vibe_matched,
             "source": source,
-            "total": len(final_tracks)
+            "total": len(final_tracks),
+            "previewAvailable": len(final_tracks)
         }
         
     except HTTPException:
