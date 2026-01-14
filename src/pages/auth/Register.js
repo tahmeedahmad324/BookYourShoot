@@ -14,17 +14,65 @@ const registerSchema = yup.object().shape({
     .min(2, 'Name must be at least 2 characters')
     .max(50, 'Name must be less than 50 characters')
     .matches(/^[A-Za-z\s]+$/, 'Name can only contain alphabets and spaces')
+    .test('valid-name-structure', 'Please enter a valid full name (e.g., John Doe)', function(value) {
+      if (!value) return false;
+      const trimmed = value.trim();
+      // Must contain at least one space (first and last name)
+      if (!trimmed.includes(' ')) {
+        return this.createError({ message: 'Please enter your full name (first and last name)' });
+      }
+      // Split into words
+      const words = trimmed.split(/\s+/);
+      // Must have at least 2 words
+      if (words.length < 2) {
+        return this.createError({ message: 'Please enter your full name (first and last name)' });
+      }
+      // Each word must be at least 2 characters and contain vowels (to avoid nonsense like 'dsf dsfds')
+      const vowelRegex = /[aeiouAEIOU]/;
+      for (const word of words) {
+        if (word.length < 2) {
+          return this.createError({ message: 'Each name part must be at least 2 characters' });
+        }
+        if (!vowelRegex.test(word)) {
+          return this.createError({ message: 'Please enter a valid name (names should contain vowels)' });
+        }
+      }
+      return true;
+    })
     .required('Full name is required')
     .transform((value) => {
       if (!value) return value;
       // Capitalize first letter of each word
-      return value.split(' ')
+      return value.trim().split(/\s+/)
         .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
         .join(' ');
     }),
   email: yup.string()
     .email('Please enter a valid email address')
-    .matches(/^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/, 'Invalid email format')
+    .matches(
+      /^[a-zA-Z0-9][a-zA-Z0-9._%-]*[a-zA-Z0-9]@[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?)*\.[a-zA-Z]{2,}$/,
+      'Invalid email format. Please use a valid email address'
+    )
+    .test('no-consecutive-dots', 'Email cannot contain consecutive dots', function(value) {
+      if (!value) return true;
+      return !value.includes('..');
+    })
+    .test('valid-domain', 'Email domain must be valid (e.g., gmail.com, not xyz.xyz.com)', function(value) {
+      if (!value) return true;
+      const domain = value.split('@')[1];
+      if (!domain) return false;
+      // Reject domains like xyz.xyz.com where subdomain equals domain
+      const parts = domain.split('.');
+      if (parts.length >= 3) {
+        // Check if any two consecutive parts are identical (case-insensitive)
+        for (let i = 0; i < parts.length - 1; i++) {
+          if (parts[i].toLowerCase() === parts[i + 1].toLowerCase()) {
+            return false;
+          }
+        }
+      }
+      return true;
+    })
     .required('Email is required'),
   phone: yup.string()
     .required('Phone number is required')
