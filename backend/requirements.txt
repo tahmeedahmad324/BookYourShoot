@@ -14,3 +14,9 @@ pyzbar>=0.1.9
 
 # Optional: Spotify integration
 spotipy>=2.23.0
+
+# PDF Generation
+fpdf2>=2.7.0
+
+# QR Code Generation
+qrcode>=7.4.0

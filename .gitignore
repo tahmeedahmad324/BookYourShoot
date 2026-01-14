@@ -5,6 +5,13 @@ backend/__pycache__
 backend/routers/__pycache__
 backend/services/__pycache__
 
+# Lock files
+pnpm-lock.yaml
+
+# Python cache
+*.pyc
+__pycache__/
+
 # Storage - user uploads and generated files
 backend/storage/reels/uploads/
 backend/storage/reels/

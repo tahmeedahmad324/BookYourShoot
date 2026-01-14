@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react"
 import { Link, useNavigate, useLocation } from "react-router-dom"
 import { useAuth } from "../../context/AuthContext"
+import NotificationDropdown from "../NotificationDropdown"
 
 const Navbar = () => {
   const { user, isAuthenticated, logout } = useAuth()
@@ -33,9 +34,6 @@ const Navbar = () => {
 
   const photographerLinks = [
     { path: "/photographer/dashboard", label: "Dashboard" },
-    { path: "/photographer/bookings", label: "Bookings" },
-    { path: "/photographer/equipment", label: "Equipment Rental" },
-    { path: "/photographer/travel", label: "Travel Estimator" },
   ]
 
   const adminLinks = [
@@ -168,7 +166,10 @@ const Navbar = () => {
             ))}
           </ul>
 
-          <div className="d-flex align-items-center">
+          <div className="d-flex align-items-center gap-3">
+            {isAuthenticated && (
+              <NotificationDropdown userId={user?.email} />
+            )}
             {isAuthenticated ? (
               <div className="dropdown">
                 <button
@@ -189,6 +190,15 @@ const Navbar = () => {
                       onClick={() => setExpanded(false)}
                     >
                       Profile
+                    </Link>
+                  </li>
+                  <li>
+                    <Link 
+                      className="dropdown-item" 
+                      to="/settings/notifications"
+                      onClick={() => setExpanded(false)}
+                    >
+                      🔔 Notification Settings
                     </Link>
                   </li>
                   <li><hr className="dropdown-divider" /></li>

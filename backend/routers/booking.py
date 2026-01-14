@@ -2,6 +2,7 @@ from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
 from backend.supabase_client import supabase
 from backend.auth import get_current_user
+from backend.services.reminder_service import reminder_service
 
 router = APIRouter(prefix="/bookings", tags=["Booking"])
 
@@ -180,4 +181,76 @@ def update_booking_status(booking_id: str, payload: UpdateBookingStatusRequest, 
         raise
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+
+# ============ REMINDER ENDPOINTS ============
+
+class ScheduleReminderRequest(BaseModel):
+    booking_id: str
+    booking_datetime: str
+    client_id: str
+    photographer_id: str
+    service_type: str = "Photography Session"
+    client_name: str = "Client"
+    photographer_name: str = "Photographer"
+
+
+@router.post("/reminders/schedule")
+def schedule_booking_reminders(payload: ScheduleReminderRequest):
+    """Schedule reminders for an upcoming booking"""
+    try:
+        scheduled = reminder_service.schedule_reminders_for_booking(
+            booking_id=payload.booking_id,
+            booking_datetime=payload.booking_datetime,
+            client_id=payload.client_id,
+            photographer_id=payload.photographer_id,
+            service_type=payload.service_type,
+            client_name=payload.client_name,
+            photographer_name=payload.photographer_name
+        )
+        return {"success": True, "scheduled_reminders": scheduled}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.get("/reminders/pending")
+def get_pending_reminders(booking_id: str = None):
+    """Get all pending reminders, optionally filtered by booking ID"""
+    reminders = reminder_service.get_pending_reminders(booking_id)
+    return {"success": True, "reminders": reminders}
+
+
+@router.post("/reminders/check-and-send")
+def check_and_send_reminders():
+    """Check for due reminders and send them (for demo/testing)"""
+    sent = reminder_service.check_and_send_due_reminders()
+    return {"success": True, "sent_count": len(sent), "sent_reminders": sent}
+
+
+@router.delete("/reminders/{booking_id}")
+def cancel_booking_reminders(booking_id: str):
+    """Cancel all pending reminders for a booking"""
+    cancelled = reminder_service.cancel_reminders_for_booking(booking_id)
+    return {"success": True, "cancelled_count": cancelled}
+
+
+class DemoReminderRequest(BaseModel):
+    booking_id: str = "DEMO-001"
+    client_id: str = "client@example.com"
+    photographer_id: str = "photographer@example.com"
+    service_type: str = "Wedding Photography"
+    reminder_type: str = "24h"  # "24h" or "2h"
+
+
+@router.post("/reminders/demo")
+def send_demo_reminder(payload: DemoReminderRequest):
+    """Send a demo reminder immediately for testing"""
+    result = reminder_service.send_demo_reminder(
+        booking_id=payload.booking_id,
+        client_id=payload.client_id,
+        photographer_id=payload.photographer_id,
+        service_type=payload.service_type,
+        reminder_type=payload.reminder_type
+    )
+    return result
 
