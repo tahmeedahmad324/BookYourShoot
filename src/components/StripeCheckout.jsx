@@ -9,7 +9,7 @@ const stripePromise = loadStripe(
   'pk_test_51QivafP8o5TaCBpE8EpQKKqYG5o2iJ3lOMxMVDpJUWoSGSxUf6lOVEMEZbqD6aIqlH0UbxDCGOzrfuTvvATVP0iO00GBjmh0Bo'
 );
 
-export default function StripeCheckout({ bookingId, amount, photographerName, onSuccess, onCancel, isEquipmentRental = false }) {
+export default function StripeCheckout({ bookingId, amount, photographerName, onSuccess, onCancel, isEquipmentRental = false, bookingData = null }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
@@ -29,8 +29,17 @@ export default function StripeCheckout({ bookingId, amount, photographerName, on
           amount: amount,
           currency: 'PKR', // Pakistani Rupees
           payment_method: 'card',
-          customer_phone: '1234567890',
-          customer_email: 'test@example.com'
+          customer_phone: bookingData?.phone || '1234567890',
+          customer_email: bookingData?.clientEmail || 'client@example.com',
+          // Pass metadata for receipt and notifications
+          client_name: bookingData?.clientName || 'Client',
+          photographer_name: bookingData?.photographerName || photographerName || 'Photographer',
+          photographer_id: bookingData?.photographerEmail || bookingData?.photographerId || '',
+          service_type: bookingData?.service || 'Photography Service',
+          event_date: bookingData?.date || '',
+          // Pass full price info for email
+          total_price: bookingData?.price || amount,
+          advance_payment: bookingData?.advancePayment || amount
         })
       });
 
@@ -43,8 +52,11 @@ export default function StripeCheckout({ bookingId, amount, photographerName, on
 
       // Redirect to Stripe Checkout
       if (data.checkout_url) {
-        // Save booking ID to localStorage to retrieve after redirect
+        // Save booking ID and data to localStorage to retrieve after redirect
         localStorage.setItem('pending_booking', bookingId);
+        if (bookingData) {
+          localStorage.setItem('pending_booking_data', JSON.stringify(bookingData));
+        }
         // Redirect to Stripe Checkout
         window.location.href = data.checkout_url;
       } else {
@@ -71,8 +83,20 @@ export default function StripeCheckout({ bookingId, amount, photographerName, on
             <span>Booking Reference:</span>
             <span className="detail-value">{bookingId}</span>
           </div>
+          {bookingData?.price && bookingData.price !== amount && (
+            <>
+              <div className="detail-row">
+                <span>Total Booking Price:</span>
+                <span className="detail-value">Rs. {bookingData.price.toLocaleString()}</span>
+              </div>
+              <div className="detail-row">
+                <span>Remaining Balance:</span>
+                <span className="detail-value text-muted">Rs. {(bookingData.price - amount).toLocaleString()} (due on event day)</span>
+              </div>
+            </>
+          )}
           <div className="detail-row total">
-            <span>Total Amount:</span>
+            <span>{bookingData?.price && bookingData.price !== amount ? 'Deposit to Pay Now:' : 'Total Amount:'}</span>
             <span className="detail-value">Rs. {amount.toLocaleString()}</span>
           </div>
           <div className="text-muted small text-center mt-2">

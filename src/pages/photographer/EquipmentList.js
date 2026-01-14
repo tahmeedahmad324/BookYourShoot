@@ -300,25 +300,35 @@ const EquipmentList = () => {
       totalAmount: calculateCartTotal(),
       depositAmount: calculateDepositTotal(),
       rentalDate: new Date().toISOString(),
-      status: 'pending_payment'
+      status: 'pending_payment',
+      // Add client info for emails/notifications
+      clientName: user?.name || 'Client',
+      clientEmail: user?.email || 'client@example.com',
+      phone: user?.phone || '',
+      isEquipmentRental: true,
+      // Equipment summary for email
+      equipmentSummary: rentalCart.map(item => item.name).join(', ')
     };
+    
+    // Store pending rental for BookingSuccess to process
+    localStorage.setItem('pending_rental', JSON.stringify(bookingData));
     
     setRentalBookingData(bookingData);
     setShowPayment(true);
+    
+    // Scroll to top when showing payment
+    window.scrollTo(0, 0);
   };
 
   const handlePaymentSuccess = () => {
-    // In real app, save rental booking to database
-    alert(`Equipment rental confirmed!\nRental ID: ${rentalBookingData.id}\nTotal Paid: Rs. ${rentalBookingData.totalAmount.toLocaleString()}\nDeposit: Rs. ${rentalBookingData.depositAmount.toLocaleString()} (Refundable)`);
-    setRentalCart([]);
-    setShowCart(false);
-    setShowPayment(false);
-    setRentalBookingData(null);
+    // Navigate to success page - it will handle the confirmation
+    window.location.href = `/booking/success?session_id=${rentalBookingData.id}`;
   };
 
   const handlePaymentCancel = () => {
     setShowPayment(false);
     setRentalBookingData(null);
+    localStorage.removeItem('pending_rental');
   };
 
   const getAvailabilityBadge = (available) => {
@@ -365,6 +375,7 @@ const EquipmentList = () => {
         onSuccess={handlePaymentSuccess}
         onCancel={handlePaymentCancel}
         isEquipmentRental={true}
+        bookingData={rentalBookingData}
       />
     );
   }

@@ -282,6 +282,17 @@ class EscrowService:
         
         return earnings
     
+    def get_transaction_by_booking(self, booking_id: str) -> Optional[Dict]:
+        """Get escrow transaction by booking ID"""
+        for escrow in self.transactions.values():
+            if escrow.booking_id == booking_id:
+                return escrow.to_dict()
+        return None
+    
+    def get_all_transactions(self) -> List[Dict]:
+        """Get all transactions (for admin)"""
+        return [escrow.to_dict() for escrow in self.transactions.values()]
+    
     def auto_release_payments(self) -> List[Dict]:
         """
         Auto-release payments after X days of booking completion

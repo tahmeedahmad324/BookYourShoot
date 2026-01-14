@@ -57,7 +57,7 @@ class StripeGateway(PaymentGateway):
         except ImportError:
             raise ImportError("Please install stripe: pip install stripe")
     
-    def create_checkout(self, amount: float, booking_id: str, customer_info: Dict, currency: str = "pkr") -> Dict:
+    def create_checkout(self, amount: float, booking_id: str, customer_info: Dict, currency: str = "pkr", metadata: Dict = None) -> Dict:
         """
         Create Stripe Checkout Session
         For demo, use test card: 4242 4242 4242 4242
@@ -66,6 +66,12 @@ class StripeGateway(PaymentGateway):
         try:
             # Convert amount to smallest currency unit (paisa for PKR, cents for USD)
             amount_cents = int(amount * 100)
+            
+            # Build metadata including all booking details
+            checkout_metadata = {
+                'booking_id': booking_id,
+                **(metadata or {})
+            }
             
             session = self.stripe.checkout.Session.create(
                 payment_method_types=['card'],
@@ -83,9 +89,7 @@ class StripeGateway(PaymentGateway):
                 mode='payment',
                 success_url=f'http://localhost:3000/booking/success?session_id={{CHECKOUT_SESSION_ID}}',
                 cancel_url=f'http://localhost:3000/booking/request/{booking_id}',
-                metadata={
-                    'booking_id': booking_id,
-                }
+                metadata=checkout_metadata
             )
             
             return {
@@ -104,13 +108,27 @@ class StripeGateway(PaymentGateway):
         """Verify Stripe payment using session ID"""
         try:
             session = self.stripe.checkout.Session.retrieve(transaction_id)
+            print(f"🔍 Stripe session retrieved: payment_status={session.payment_status}")
+            print(f"🔍 Session metadata: {session.metadata}")
+            
+            # Get customer email safely
+            customer_email = None
+            if session.customer_email:
+                customer_email = session.customer_email
+            elif session.customer_details and session.customer_details.email:
+                customer_email = session.customer_details.email
+            
             return {
                 "status": "success" if session.payment_status == "paid" else "pending",
                 "transaction_id": transaction_id,
                 "payment_intent": session.payment_intent,
-                "amount": session.amount_total / 100  # Convert back from cents
+                "amount": session.amount_total / 100,  # Convert back from cents
+                "amount_total": session.amount_total,
+                "metadata": dict(session.metadata) if session.metadata else {},  # Convert StripeObject to dict
+                "customer_email": customer_email
             }
         except Exception as e:
+            print(f"❌ Error verifying payment: {e}")
             return {"status": "failed", "error": str(e)}
     
     def verify_webhook(self, payload: Dict, signature: str) -> bool:

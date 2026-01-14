@@ -13,7 +13,12 @@ import {
   MessageSquare,
   Star,
   User,
-  Camera
+  Camera,
+  Wallet,
+  Shield,
+  Receipt,
+  CreditCard,
+  Bell
 } from "lucide-react"
 
 const ClientDashboard = () => {
@@ -23,6 +28,8 @@ const ClientDashboard = () => {
     upcomingBookings: 0,
     completedBookings: 0,
     totalSpent: 0,
+    pendingPayments: 0,
+    activeEscrows: 0,
   })
 
   useEffect(() => {
@@ -54,6 +61,8 @@ const ClientDashboard = () => {
       upcomingBookings: upcoming,
       completedBookings: completed,
       totalSpent: totalSpent,
+      pendingPayments: 1,
+      activeEscrows: 2,
     })
   }, [])
 
@@ -106,6 +115,23 @@ const ClientDashboard = () => {
       description: "Rent camera equipment for your shoot",
       icon: Camera,
       link: "/photographer/equipment",
+      badge: null,
+    },
+    {
+      id: "payments",
+      title: "Payment History",
+      description: "View all transactions, receipts, and payment status",
+      icon: Receipt,
+      link: "/client/payments",
+      badge: stats.activeEscrows > 0 ? stats.activeEscrows : null,
+      badgeColor: "warning",
+    },
+    {
+      id: "notifications",
+      title: "Notification Settings",
+      description: "Manage your email and push notification preferences",
+      icon: Bell,
+      link: "/settings/notifications",
       badge: null,
     },
     {
@@ -183,6 +209,45 @@ const ClientDashboard = () => {
                 </div>
                 <h4 className="fw-bold mb-0">PKR {(stats.totalSpent / 1000).toFixed(0)}k</h4>
                 <small className="text-muted">Total Spent</small>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Payment Stats Row */}
+        <div className="row g-3 mb-4">
+          <div className="col-12">
+            <div className="card border-0 shadow-sm">
+              <div className="card-body py-3">
+                <div className="row align-items-center">
+                  <div className="col-auto">
+                    <div className="d-flex align-items-center gap-2">
+                      <Shield size={24} className="text-primary" />
+                      <div>
+                        <h6 className="mb-0 fw-bold">Payment Status</h6>
+                        <small className="text-muted">Your secured payments</small>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="col">
+                    <div className="d-flex justify-content-end gap-4">
+                      <div className="text-center">
+                        <span className="badge bg-warning text-dark px-3 py-2 fs-6">
+                          <Wallet size={16} className="me-1" />
+                          {stats.activeEscrows} Active
+                        </span>
+                        <div className="small text-muted mt-1">Payments Secured</div>
+                      </div>
+                      <div className="text-center">
+                        <span className="badge bg-info text-white px-3 py-2 fs-6">
+                          <CreditCard size={16} className="me-1" />
+                          {stats.pendingPayments} Pending
+                        </span>
+                        <div className="small text-muted mt-1">Awaiting Confirmation</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           </div>

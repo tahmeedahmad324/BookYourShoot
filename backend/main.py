@@ -61,12 +61,20 @@ else:
 # Add global exception handler for validation errors
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request: Request, exc: RequestValidationError):
-    print(f"Validation error for {request.url.path}:")
-    print(f"Request body: {await request.body()}")
-    print(f"Errors: {exc.errors()}")
+    body = None
+    try:
+        body = await request.body()
+        body = body.decode('utf-8')[:500] if body else None
+    except:
+        pass
+    print(f"\n❌ Validation error for {request.url.path}:")
+    for error in exc.errors():
+        print(f"   Field: {error.get('loc')} - {error.get('msg')} (type: {error.get('type')})")
+    if body:
+        print(f"   Body preview: {body[:200]}...")
     return JSONResponse(
         status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-        content={"detail": exc.errors(), "body": exc.body},
+        content={"detail": exc.errors(), "body": str(exc.body)[:500] if exc.body else None},
     )
 
 app.add_middleware(

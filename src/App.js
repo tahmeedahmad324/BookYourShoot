@@ -25,6 +25,8 @@ import Contact from "./pages/help/Contact"
 // Client Pages
 import ClientDashboard from "./pages/client/ClientDashboard"
 import ClientProfile from "./pages/client/ClientProfile"
+import ClientPayments from "./pages/client/ClientPayments"
+import PaymentSuccess from "./pages/client/PaymentSuccess"
 import PhotographerProfile from "./pages/client/PhotographerProfile"
 import BookingRequest from "./pages/client/BookingRequest"
 import BookingSuccess from "./pages/client/BookingSuccess"
@@ -37,10 +39,12 @@ import MusicDiscoveryUI from "./pages/client/MusicDiscoveryUI"
 import PaymentTestPage from "./pages/PaymentTestPage"
 import EscrowDemoPage from "./pages/EscrowDemoPage"
 import BookingSummaryDemo from "./pages/BookingSummaryDemo"
+import NotificationSettings from "./pages/NotificationSettings"
 
 // Photographer Pages
 import PhotographerDashboard from "./pages/photographer/PhotographerDashboard"
 import PhotographerProfilePage from "./pages/photographer/PhotographerProfile"
+import PhotographerPayments from "./pages/photographer/PhotographerPayments"
 import BookingRequests from "./pages/photographer/BookingRequests"
 import EquipmentList from "./pages/photographer/EquipmentList"
 import EquipmentDetail from "./pages/photographer/EquipmentDetail"
@@ -54,6 +58,8 @@ import AdminComplaints from "./pages/admin/AdminComplaints"
 import AdminSettings from "./pages/admin/AdminSettings"
 import AdminReportedReviews from "./pages/admin/AdminReportedReviews"
 import AdminPlatformSettings from "./pages/admin/AdminPlatformSettings"
+import AdminPaymentManagement from "./pages/admin/AdminPaymentManagement"
+import WebhookSimulator from "./pages/admin/WebhookSimulator"
 
 // Context Providers
 import { AuthProvider } from "./context/AuthContext"
@@ -85,6 +91,14 @@ function App() {
               <Route path="/payment-test" element={<PaymentTestPage />} />
               <Route path="/escrow-demo" element={<EscrowDemoPage />} />
               <Route path="/booking-summary-demo" element={<BookingSummaryDemo />} />
+              <Route
+                path="/settings/notifications"
+                element={
+                  <ProtectedRoute allowedRoles={["client", "photographer", "admin"]}>
+                    <NotificationSettings />
+                  </ProtectedRoute>
+                }
+              />
 
               {/* Protected Client Routes */}
               <Route
@@ -124,6 +138,22 @@ function App() {
                 element={
                   <ProtectedRoute allowedRoles={["client"]}>
                     <ClientBookings />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/client/payments"
+                element={
+                  <ProtectedRoute allowedRoles={["client"]}>
+                    <ClientPayments />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/client/payment-success/:bookingId"
+                element={
+                  <ProtectedRoute allowedRoles={["client"]}>
+                    <PaymentSuccess />
                   </ProtectedRoute>
                 }
               />
@@ -214,6 +244,14 @@ function App() {
                 }
               />
               <Route
+                path="/photographer/payments"
+                element={
+                  <ProtectedRoute allowedRoles={["photographer"]}>
+                    <PhotographerPayments />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
                 path="/photographer/equipment"
                 element={
                   <ProtectedRoute allowedRoles={["photographer", "client"]}>
@@ -268,6 +306,22 @@ function App() {
                 element={
                   <ProtectedRoute allowedRoles={["admin"]}>
                     <AdminComplaints />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/admin/payments"
+                element={
+                  <ProtectedRoute allowedRoles={["admin"]}>
+                    <AdminPaymentManagement />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/admin/webhooks"
+                element={
+                  <ProtectedRoute allowedRoles={["admin"]}>
+                    <WebhookSimulator />
                   </ProtectedRoute>
                 }
               />

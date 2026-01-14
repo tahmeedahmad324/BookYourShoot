@@ -3,6 +3,8 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import EscrowStatus from '../../components/EscrowStatus';
 
+const API_BASE = 'http://localhost:5000/api';
+
 const ClientBookings = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -12,6 +14,15 @@ const ClientBookings = () => {
   const [filter, setFilter] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [viewMode, setViewMode] = useState('all'); // 'all', 'bookings', 'rentals'
+  
+  // Tip Modal State
+  const [showTipModal, setShowTipModal] = useState(false);
+  const [selectedBooking, setSelectedBooking] = useState(null);
+  const [tipAmount, setTipAmount] = useState(1000);
+  const [tipMessage, setTipMessage] = useState('');
+  const [tipSuggestions, setTipSuggestions] = useState(null);
+  const [tippedBookings, setTippedBookings] = useState({});
+  const [tipLoading, setTipLoading] = useState(false);
 
   // Mock bookings data
   const mockBookings = [
@@ -170,6 +181,62 @@ const ClientBookings = () => {
           : booking
       ));
       alert('Booking cancelled successfully');
+    }
+  };
+
+  // Tip Functions
+  const openTipModal = async (booking) => {
+    setSelectedBooking(booking);
+    setTipAmount(1000);
+    setTipMessage('');
+    setShowTipModal(true);
+    
+    // Fetch tip suggestions based on booking amount
+    try {
+      const res = await fetch(`${API_BASE}/payments/tips/suggestions/${booking.totalAmount}`);
+      const data = await res.json();
+      if (data.status === 'success') {
+        setTipSuggestions(data);
+      }
+    } catch (err) {
+      console.error('Failed to fetch tip suggestions:', err);
+    }
+  };
+
+  const handleSendTip = async () => {
+    if (!selectedBooking || tipAmount < 100) return;
+    
+    setTipLoading(true);
+    try {
+      const res = await fetch(`${API_BASE}/payments/tips/send`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          booking_id: String(selectedBooking.id),
+          client_id: user?.id || user?.email || 'client-1',
+          client_name: user?.name || 'Client',
+          photographer_id: String(selectedBooking.photographerId),
+          photographer_name: selectedBooking.photographerName,
+          amount: tipAmount,
+          message: tipMessage || null,
+          payment_method: 'card'
+        })
+      });
+      
+      const data = await res.json();
+      
+      if (data.status === 'success') {
+        setTippedBookings(prev => ({ ...prev, [selectedBooking.id]: data.tip }));
+        setShowTipModal(false);
+        alert(`💝 Tip of PKR ${tipAmount.toLocaleString()} sent successfully to ${selectedBooking.photographerName}!`);
+      } else {
+        alert(data.message || 'Failed to send tip');
+      }
+    } catch (err) {
+      console.error('Failed to send tip:', err);
+      alert('Failed to send tip. Please try again.');
+    } finally {
+      setTipLoading(false);
     }
   };
 
@@ -429,6 +496,18 @@ const ClientBookings = () => {
                             >
                               ⭐ Leave Review
                             </button>
+                            {tippedBookings[booking.id] ? (
+                              <span className="btn btn-success btn-sm disabled">
+                                💝 Tip Sent (Rs. {tippedBookings[booking.id].amount.toLocaleString()})
+                              </span>
+                            ) : (
+                              <button 
+                                className="btn btn-outline-success btn-sm"
+                                onClick={() => openTipModal(booking)}
+                              >
+                                💝 Send Tip
+                              </button>
+                            )}
                           </>
                         )}
                         {(booking.status === 'pending' || booking.status === 'confirmed') && (
@@ -574,6 +653,130 @@ const ClientBookings = () => {
                 ))}
               </>
             )}
+          </div>
+        )}
+
+        {/* Tip Modal */}
+        {showTipModal && selectedBooking && (
+          <div className="modal fade show d-block" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
+            <div className="modal-dialog modal-dialog-centered">
+              <div className="modal-content">
+                <div className="modal-header border-0 pb-0">
+                  <h5 className="modal-title fw-bold">💝 Send a Tip</h5>
+                  <button 
+                    type="button" 
+                    className="btn-close" 
+                    onClick={() => setShowTipModal(false)}
+                  />
+                </div>
+                <div className="modal-body">
+                  <div className="text-center mb-4">
+                    <div className="rounded-circle bg-primary text-white d-inline-flex align-items-center justify-content-center mb-3" 
+                         style={{ width: '80px', height: '80px', fontSize: '2.5rem' }}>
+                      {selectedBooking.photographerImage}
+                    </div>
+                    <h5 className="fw-bold mb-1">{selectedBooking.photographerName}</h5>
+                    <p className="text-muted mb-0">{selectedBooking.serviceType}</p>
+                  </div>
+
+                  <div className="alert alert-success d-flex align-items-center">
+                    <span className="me-2">✨</span>
+                    <small>100% of your tip goes directly to the photographer!</small>
+                  </div>
+
+                  {/* Quick Tip Amounts */}
+                  <div className="mb-4">
+                    <label className="form-label fw-semibold">Quick Select</label>
+                    <div className="d-flex gap-2 flex-wrap">
+                      {(tipSuggestions?.preset_amounts || [500, 1000, 2000, 5000]).map(amount => (
+                        <button
+                          key={amount}
+                          className={`btn ${tipAmount === amount ? 'btn-primary' : 'btn-outline-primary'}`}
+                          onClick={() => setTipAmount(amount)}
+                        >
+                          Rs. {amount.toLocaleString()}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Percentage Tips */}
+                  {tipSuggestions?.percentage_tips && (
+                    <div className="mb-4">
+                      <label className="form-label fw-semibold">Or choose by percentage</label>
+                      <div className="d-flex gap-2 flex-wrap">
+                        {tipSuggestions.percentage_tips.map(tip => (
+                          <button
+                            key={tip.percentage}
+                            className={`btn btn-sm ${tipAmount === tip.amount ? 'btn-success' : 'btn-outline-success'}`}
+                            onClick={() => setTipAmount(tip.amount)}
+                          >
+                            {tip.label} (Rs. {tip.amount.toLocaleString()})
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Custom Amount */}
+                  <div className="mb-4">
+                    <label className="form-label fw-semibold">Custom Amount</label>
+                    <div className="input-group">
+                      <span className="input-group-text">Rs.</span>
+                      <input
+                        type="number"
+                        className="form-control"
+                        value={tipAmount}
+                        onChange={(e) => setTipAmount(Math.max(100, Math.min(50000, parseInt(e.target.value) || 0)))}
+                        min="100"
+                        max="50000"
+                      />
+                    </div>
+                    <small className="text-muted">Min: Rs. 100 | Max: Rs. 50,000</small>
+                  </div>
+
+                  {/* Message */}
+                  <div className="mb-3">
+                    <label className="form-label fw-semibold">Add a message (optional)</label>
+                    <textarea
+                      className="form-control"
+                      rows="2"
+                      placeholder="Thank you for the amazing photos!"
+                      value={tipMessage}
+                      onChange={(e) => setTipMessage(e.target.value)}
+                      maxLength={200}
+                    />
+                    <small className="text-muted">{tipMessage.length}/200 characters</small>
+                  </div>
+                </div>
+                <div className="modal-footer border-0 pt-0">
+                  <button 
+                    type="button" 
+                    className="btn btn-outline-secondary" 
+                    onClick={() => setShowTipModal(false)}
+                  >
+                    Cancel
+                  </button>
+                  <button 
+                    type="button" 
+                    className="btn btn-success d-flex align-items-center gap-2"
+                    onClick={handleSendTip}
+                    disabled={tipLoading || tipAmount < 100}
+                  >
+                    {tipLoading ? (
+                      <>
+                        <span className="spinner-border spinner-border-sm" />
+                        Sending...
+                      </>
+                    ) : (
+                      <>
+                        💝 Send Rs. {tipAmount.toLocaleString()} Tip
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+            </div>
           </div>
         )}
       </div>
