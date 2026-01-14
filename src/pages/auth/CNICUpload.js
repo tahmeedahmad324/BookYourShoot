@@ -71,22 +71,28 @@ const CNICUpload = () => {
       setBackData(null);
 
       try {
-        // Upload and process CNIC back image
-        const response = await cnicAPI.uploadCNIC(file, 'back');
-        
+        if (!uploadedFrontFile) {
+          setError('Please upload CNIC front side first');
+          setProcessingBack(false);
+          return;
+        }
+
+        // Verify BOTH sides together (front CNIC number must match CNIC embedded in QR)
+        const response = await cnicAPI.verifyPair(uploadedFrontFile, file);
         if (response.success) {
           const data = response.data;
           setBackData({
-            qrData: data.qr_data || [],
-            qrSuccess: data.qr_success || false,
+            qrSuccess: !!data.cnic_number_from_qr,
+            cnicFromQr: data.cnic_number_from_qr || null,
+            cnicMatch: !!data.cnic_match,
             message: data.message || ''
           });
         } else {
-          setError(response.error || 'Failed to process CNIC back image');
+          setError(response.error || 'Failed to verify CNIC');
         }
       } catch (err) {
-        console.error('CNIC Back QR Error:', err);
-        setError(err.message || 'Failed to scan QR code. Please ensure the back side is clear.');
+        console.error('CNIC Pair Verification Error:', err);
+        setError(err.message || 'Failed to verify CNIC. Please ensure both images are clear and try again.');
       } finally {
         setProcessingBack(false);
       }
@@ -96,6 +102,12 @@ const CNICUpload = () => {
   const handleSubmit = async () => {
     if (!frontData || !frontData.isReadable) {
       setError('Please upload a clear CNIC front image first');
+      setLoading(false);
+      return;
+    }
+
+    if (!backData || !backData.cnicMatch) {
+      setError('CNIC verification requires back-side QR match. Please upload a clear back image so we can confirm it is your CNIC.');
       setLoading(false);
       return;
     }
@@ -321,29 +333,19 @@ const CNICUpload = () => {
                 {/* Back Side QR Data */}
                 {backData && (
                   <div className="alert alert-light fade-in">
-                    <h6 className="fw-bold mb-3">🔍 Back Side - QR Code Verification:</h6>
+                    <h6 className="fw-bold mb-3">🔍 Back Side - Identity Verification:</h6>
                     
-                    {backData.qrSuccess ? (
-                      <>
-                        <div className="alert alert-success mb-2">
-                          <strong>✅ QR Code scanned successfully!</strong>
-                        </div>
-                        {backData.qrData && backData.qrData.length > 0 && (
-                          <div className="mb-2">
-                            <strong>QR Code Data:</strong>
-                            {backData.qrData.map((qr, idx) => (
-                              <div key={idx} className="border p-2 mt-2 rounded">
-                                <small className="text-muted">Type: {qr.type}</small><br />
-                                <code className="small">{qr.data}</code>
-                              </div>
-                            ))}
-                          </div>
+                    {backData.cnicMatch ? (
+                      <div className="alert alert-success mb-0">
+                        <strong>✅ Verified:</strong> Front CNIC matches back QR.<br />
+                        {backData.cnicFromQr && (
+                          <small className="text-muted">QR CNIC: {backData.cnicFromQr}</small>
                         )}
-                      </>
+                      </div>
                     ) : (
-                      <div className="alert alert-warning mb-0">
-                        <strong>⚠️ {backData.message || 'QR code not found'}</strong><br />
-                        <small>You can still proceed, but QR verification is recommended.</small>
+                      <div className="alert alert-danger mb-0">
+                        <strong>❌ Verification failed:</strong> {backData.message || 'CNIC mismatch or QR not readable.'}<br />
+                        <small>Please upload a clearer back image with the QR fully visible.</small>
                       </div>
                     )}
                   </div>
@@ -368,7 +370,7 @@ const CNICUpload = () => {
                   <button 
                     className="btn btn-primary w-100 py-3"
                     onClick={handleSubmit}
-                    disabled={loading || !frontData.isReadable || frontData.cnicNumber === 'Not detected'}
+                    disabled={loading || !frontData.isReadable || frontData.cnicNumber === 'Not detected' || !backData || !backData.cnicMatch}
                   >
                     {loading ? (
                       <>
@@ -377,6 +379,8 @@ const CNICUpload = () => {
                       </>
                     ) : !frontData.isReadable || frontData.cnicNumber === 'Not detected' ? (
                       '⚠️ Please Upload Clearer Front Image'
+                    ) : !backData || !backData.cnicMatch ? (
+                      '⚠️ Please Verify Back Side'
                     ) : (
                       '✓ Confirm & Submit for Verification'
                     )}

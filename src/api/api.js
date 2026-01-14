@@ -557,7 +557,8 @@ export const cnicAPI = {
         success: true,
         data: {
           qr_success: data.qr_success,
-          qr_data: data.qr_data || [],
+          // Backend intentionally does not return raw QR payload for privacy.
+          cnic_number_from_qr: data.cnic_number_from_qr || null,
           message: data.message
         }
       };
@@ -575,6 +576,32 @@ export const cnicAPI = {
         quality: data.quality
       }
     };
+  },
+
+  // Verify CNIC using BOTH sides: front OCR CNIC number must match CNIC embedded in back QR
+  verifyPair: async (frontFile, backFile) => {
+    const formData = new FormData();
+    formData.append('front_file', frontFile);
+    formData.append('back_file', backFile);
+
+    const headers = await getAuthHeaders();
+    const authHeaders = {};
+    if (headers['Authorization']) {
+      authHeaders['Authorization'] = headers['Authorization'];
+    }
+
+    const response = await fetch(`${API_BASE_URL}/api/cnic/verify-pair`, {
+      method: 'POST',
+      headers: authHeaders,
+      body: formData,
+    });
+
+    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(data.detail || data.error || 'CNIC pair verification failed');
+    }
+
+    return { success: true, data };
   },
 
   // Get CNIC verification status
