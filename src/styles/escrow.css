@@ -1,0 +1,90 @@
+/* Escrow Status Component Styles */
+
+.escrow-status-container {
+  margin: 1rem 0;
+}
+
+.escrow-status-container .card {
+  transition: all 0.3s ease;
+}
+
+.escrow-status-container .card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15) !important;
+}
+
+.escrow-status-container .alert {
+  border-radius: 8px;
+  border-left: 4px solid;
+}
+
+.escrow-status-container .alert-warning {
+  border-left-color: #ffc107;
+  background-color: #fff3cd;
+}
+
+.escrow-status-container .alert-info {
+  border-left-color: #0dcaf0;
+  background-color: #cff4fc;
+}
+
+.escrow-status-container .alert-success {
+  border-left-color: #198754;
+  background-color: #d1e7dd;
+}
+
+.escrow-status-container .btn {
+  border-radius: 8px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+
+.escrow-status-container .btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 0.25rem 0.5rem rgba(0, 0, 0, 0.15);
+}
+
+.escrow-status-container .btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.escrow-status-container .modal {
+  z-index: 1050;
+}
+
+.escrow-status-container .modal-content {
+  border-radius: 12px;
+  border: none;
+  box-shadow: 0 1rem 3rem rgba(0, 0, 0, 0.3);
+}
+
+.escrow-status-container .modal-header {
+  border-bottom: 1px solid #dee2e6;
+  padding: 1.5rem;
+}
+
+.escrow-status-container .modal-body {
+  padding: 1.5rem;
+}
+
+.escrow-status-container .modal-footer {
+  border-top: 1px solid #dee2e6;
+  padding: 1rem 1.5rem;
+}
+
+.escrow-status-container .bg-light {
+  background-color: #f8f9fa !important;
+}
+
+.escrow-status-container .badge {
+  padding: 0.5rem 1rem;
+  border-radius: 20px;
+  font-weight: 500;
+}
+
+@media (max-width: 768px) {
+  .escrow-status-container .modal-dialog {
+    margin: 0.5rem;
+  }
+}

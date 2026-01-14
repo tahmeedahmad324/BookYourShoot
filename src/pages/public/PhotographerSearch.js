@@ -216,13 +216,25 @@ const PhotographerSearch = () => {
     params.set("sort", sortBy)
     setSearchParams(params)
     fetchPhotographers()
-  };  const clearFilters = () => {
+  }
+
+  const getActiveFilterCount = () => {
+    let count = 0
+    if (location) count++
+    if (service) count++
+    if (searchTerm) count++
+    if (priceRange[0] > 0 || priceRange[1] < 10000) count++
+    return count
+  }
+
+  const clearFilters = () => {
     setSearchTerm("")
     setLocation("")
     setService("")
     setPriceRange([0, 10000])
     setSortBy("rating")
     setSearchParams({})
+    fetchPhotographers()
   }
 
   const getStarRating = (rating) => {
@@ -351,7 +363,12 @@ const PhotographerSearch = () => {
             <div className="col-lg-3 mb-4">
               <div className="card border-0 shadow-sm sticky-top" style={{ top: "20px" }}>
                 <div className="card-header bg-white border-0 pt-4 pb-3">
-                  <h5 className="fw-bold mb-0">🔍 Advanced Filters</h5>
+                  <div className="d-flex justify-content-between align-items-center">
+                    <h5 className="fw-bold mb-0">🔍 Advanced Filters</h5>
+                    {getActiveFilterCount() > 0 && (
+                      <span className="badge bg-primary">{getActiveFilterCount()}</span>
+                    )}
+                  </div>
                 </div>
                 <div className="card-body">
                   {/* Price Range */}
@@ -427,9 +444,14 @@ const PhotographerSearch = () => {
                     </div>
                   </div>
 
-                  <button className="btn btn-primary w-100" onClick={handleSearch}>
+                  <button className="btn btn-primary w-100 mb-2" onClick={handleSearch}>
                     Apply Filters
                   </button>
+                  {getActiveFilterCount() > 0 && (
+                    <button className="btn btn-outline-secondary w-100" onClick={clearFilters}>
+                      Clear All Filters
+                    </button>
+                  )}
                 </div>
               </div>
             </div>
@@ -451,11 +473,32 @@ const PhotographerSearch = () => {
 
             {/* Loading State */}
             {loading && (
-              <div className="text-center py-5">
-                <div className="spinner-border text-primary" role="status">
-                  <span className="visually-hidden">Loading...</span>
-                </div>
-                <p className="mt-3">Finding the perfect photographers for you...</p>
+              <div className="row g-4">
+                {[1, 2, 3, 4].map((i) => (
+                  <div key={i} className="col-lg-6">
+                    <div className="card border-0 shadow-sm h-100">
+                      <div className="card-body p-4">
+                        <div className="row align-items-start">
+                          <div className="col-auto">
+                            <div className="bg-light rounded-circle" style={{ width: "80px", height: "80px" }}>
+                              <div className="placeholder-glow h-100">
+                                <span className="placeholder col-12 h-100 rounded-circle"></span>
+                              </div>
+                            </div>
+                          </div>
+                          <div className="col">
+                            <div className="placeholder-glow">
+                              <span className="placeholder col-6"></span>
+                              <span className="placeholder col-4"></span>
+                              <span className="placeholder col-8"></span>
+                              <span className="placeholder col-5"></span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
               </div>
             )}
 
@@ -468,12 +511,16 @@ const PhotographerSearch = () => {
                       <div className="card-body p-4">
                         <div className="row align-items-start">
                           <div className="col-auto">
-                            <div
-                              className="rounded-circle bg-light d-flex align-items-center justify-content-center"
-                              style={{ width: "80px", height: "80px", fontSize: "2rem" }}
-                            >
-                              📸
-                            </div>
+                            <img
+                              src={photographer.profile_image}
+                              alt={photographer.name}
+                              className="rounded-circle"
+                              style={{ width: "80px", height: "80px", objectFit: "cover" }}
+                              onError={(e) => {
+                                e.target.onerror = null
+                                e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(photographer.name)}&size=200&background=1A73E8&color=fff&bold=true`
+                              }}
+                            />
                           </div>
                           <div className="col">
                             <div className="d-flex justify-content-between align-items-start mb-2">
@@ -539,17 +586,37 @@ const PhotographerSearch = () => {
               </div>
             )}
 
+            {/* Error State */}
+            {!loading && error && (
+              <div className="text-center py-5">
+                <div className="mb-4" style={{ fontSize: "4rem" }}>
+                  ⚠️
+                </div>
+                <h4 className="fw-bold mb-3 text-danger">Oops! Something went wrong</h4>
+                <p className="text-muted mb-4">{error}</p>
+                <button className="btn btn-primary" onClick={fetchPhotographers}>
+                  🔄 Try Again
+                </button>
+              </div>
+            )}
+
             {/* No Results */}
-            {!loading && filteredPhotographers.length === 0 && (
+            {!loading && !error && filteredPhotographers.length === 0 && (
               <div className="text-center py-5">
                 <div className="mb-4" style={{ fontSize: "4rem" }}>
                   🔍
                 </div>
                 <h4 className="fw-bold mb-3">No photographers found</h4>
-                <p className="text-muted mb-4">Try adjusting your filters or search terms</p>
-                <button className="btn btn-outline-primary" onClick={clearFilters}>
-                  Clear All Filters
-                </button>
+                <p className="text-muted mb-4">
+                  {getActiveFilterCount() > 0 
+                    ? "Try adjusting your filters or search terms"
+                    : "No photographers available at the moment"}
+                </p>
+                {getActiveFilterCount() > 0 && (
+                  <button className="btn btn-outline-primary" onClick={clearFilters}>
+                    Clear All Filters
+                  </button>
+                )}
               </div>
             )}
           </div>

@@ -1,14 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import EscrowStatus from '../../components/EscrowStatus';
 
 const ClientBookings = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [bookings, setBookings] = useState([]);
+  const [equipmentRentals, setEquipmentRentals] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
+  const [viewMode, setViewMode] = useState('all'); // 'all', 'bookings', 'rentals'
 
   // Mock bookings data
   const mockBookings = [
@@ -95,6 +98,11 @@ const ClientBookings = () => {
     setTimeout(() => {
       const userBookings = mockBookings.filter(booking => booking.clientId === user?.id || true); // Mock filter
       setBookings(userBookings);
+      
+      // Load equipment rentals from localStorage
+      const savedRentals = JSON.parse(localStorage.getItem('equipmentRentals') || '[]');
+      setEquipmentRentals(savedRentals);
+      
       setLoading(false);
     }, 1000);
   }, [user]);
@@ -123,6 +131,19 @@ const ClientBookings = () => {
                          booking.location.toLowerCase().includes(searchTerm.toLowerCase());
     return matchesFilter && matchesSearch;
   });
+
+  const filteredRentals = equipmentRentals.filter(rental => {
+    const matchesFilter = filter === 'all' || rental.status === filter;
+    const matchesSearch = searchTerm === '' ||
+      rental.equipmentName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      rental.equipmentCategory?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      rental.ownerName?.toLowerCase().includes(searchTerm.toLowerCase());
+    return matchesFilter && matchesSearch;
+  });
+
+  // Determine what to display based on view mode
+  const showBookings = viewMode === 'all' || viewMode === 'bookings';
+  const showRentals = viewMode === 'all' || viewMode === 'rentals';
 
   const handlePayRemaining = (bookingId) => {
     navigate(`/payment/${bookingId}`);
@@ -186,13 +207,13 @@ const ClientBookings = () => {
         <div className="gradient-header rounded-3 p-4 mb-4">
           <div className="row align-items-center">
             <div className="col-md-8">
-              <h1 className="fw-bold mb-2">📅 My Bookings</h1>
-              <p className="mb-0">Manage and track all your photography bookings</p>
+              <h1 className="fw-bold mb-2">📅 My Bookings & Rentals</h1>
+              <p className="mb-0">Manage and track all your photography bookings and equipment rentals</p>
             </div>
             <div className="col-md-4 text-md-end">
               <div className="text-white">
                 <div className="small opacity-75">Total Bookings</div>
-                <div className="h4 fw-bold">{bookings.length}</div>
+                <div className="h4 fw-bold">{bookings.length + equipmentRentals.length}</div>
               </div>
             </div>
           </div>
@@ -241,6 +262,30 @@ const ClientBookings = () => {
         {/* Filters and Search */}
         <div className="card border-0 shadow-sm mb-4">
           <div className="card-body">
+            {/* View Mode Toggle */}
+            <div className="mb-3">
+              <div className="btn-group w-100" role="group">
+                <button
+                  className={`btn ${viewMode === 'all' ? 'btn-primary' : 'btn-outline-primary'}`}
+                  onClick={() => setViewMode('all')}
+                >
+                  📋 All ({bookings.length + equipmentRentals.length})
+                </button>
+                <button
+                  className={`btn ${viewMode === 'bookings' ? 'btn-primary' : 'btn-outline-primary'}`}
+                  onClick={() => setViewMode('bookings')}
+                >
+                  📸 Photographer Bookings ({bookings.length})
+                </button>
+                <button
+                  className={`btn ${viewMode === 'rentals' ? 'btn-primary' : 'btn-outline-primary'}`}
+                  onClick={() => setViewMode('rentals')}
+                >
+                  🎥 Equipment Rentals ({equipmentRentals.length})
+                </button>
+              </div>
+            </div>
+            
             <div className="row align-items-center">
               <div className="col-md-4">
                 <label className="form-label fw-semibold">Filter by Status</label>
@@ -261,7 +306,7 @@ const ClientBookings = () => {
                 <input
                   type="text"
                   className="form-control"
-                  placeholder="Search by photographer, service, or location..."
+                  placeholder="Search by photographer, service, equipment, or location..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                 />
@@ -271,7 +316,7 @@ const ClientBookings = () => {
         </div>
 
         {/* Bookings List */}
-        {filteredBookings.length === 0 ? (
+        {(showBookings && filteredBookings.length === 0) && (showRentals && filteredRentals.length === 0) ? (
           <div className="card border-0 shadow-sm">
             <div className="card-body text-center py-5">
               <div className="text-muted mb-3" style={{ fontSize: '3rem' }}>📅</div>
@@ -289,7 +334,13 @@ const ClientBookings = () => {
           </div>
         ) : (
           <div className="space-y-3">
-            {filteredBookings.map((booking) => (
+            {/* Photographer Bookings */}
+            {showBookings && filteredBookings.length > 0 && (
+              <>
+                {viewMode === 'all' && (
+                  <h4 className="fw-bold mb-3 mt-4">📸 Photographer Bookings</h4>
+                )}
+                {filteredBookings.map((booking) => (
               <div key={booking.id} className="card border-0 shadow-sm">
                 <div className="card-body">
                   <div className="row align-items-start">
@@ -399,9 +450,130 @@ const ClientBookings = () => {
                       <div className="text-muted small mt-1">{booking.specialRequests}</div>
                     </div>
                   )}
+
+                  {/* Escrow Status - Show payment escrow info */}
+                  {booking.paidAmount > 0 && (
+                    <div className="mt-3">
+                      <EscrowStatus
+                        booking={{
+                          ...booking,
+                          transactionId: booking.transactionId || `txn_${booking.id}`,
+                          escrowStatus: booking.escrowStatus || 'held',
+                          paymentDate: booking.createdAt
+                        }}
+                        userRole="client"
+                        onRelease={(bookingId) => {
+                          console.log('Payment released for booking:', bookingId);
+                          // Refresh bookings list
+                          window.location.reload();
+                        }}
+                        onRefund={(bookingId, result) => {
+                          console.log('Refund processed for booking:', bookingId, result);
+                          // Refresh bookings list
+                          window.location.reload();
+                        }}
+                      />
+                    </div>
+                  )}
                 </div>
               </div>
             ))}
+              </>
+            )}
+
+            {/* Equipment Rentals */}
+            {showRentals && filteredRentals.length > 0 && (
+              <>
+                {viewMode === 'all' && (
+                  <h4 className="fw-bold mb-3 mt-4">🎥 Equipment Rentals</h4>
+                )}
+                {filteredRentals.map((rental) => (
+                  <div key={rental.id} className="card border-0 shadow-sm">
+                    <div className="card-body">
+                      <div className="row align-items-start">
+                        {/* Equipment Info */}
+                        <div className="col-md-3">
+                          <div className="d-flex align-items-center mb-3">
+                            <div className="rounded-circle bg-info text-white d-flex align-items-center justify-content-center me-3" 
+                                 style={{ width: '50px', height: '50px', fontSize: '1.5rem' }}>
+                              {rental.equipmentImage || '🎥'}
+                            </div>
+                            <div>
+                              <h6 className="fw-bold mb-1">{rental.equipmentName}</h6>
+                              <div className="text-muted small">{rental.equipmentCategory}</div>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Rental Details */}
+                        <div className="col-md-4">
+                          <div className="mb-2">
+                            <span className="text-muted small">Rental Period:</span>
+                            <div className="fw-semibold">
+                              📅 {new Date(rental.startDate).toLocaleDateString()} ({rental.rentalDays} days)
+                            </div>
+                          </div>
+                          <div className="mb-2">
+                            <span className="text-muted small">Rental Type:</span>
+                            <div className="fw-semibold">⏱️ {rental.period.charAt(0).toUpperCase() + rental.period.slice(1)}</div>
+                          </div>
+                          <div>
+                            <span className="text-muted small">Owner:</span>
+                            <div className="fw-semibold">📍 {rental.ownerName}</div>
+                          </div>
+                        </div>
+
+                        {/* Payment Info */}
+                        <div className="col-md-2">
+                          <div className="mb-2">
+                            <span className="text-muted small">Rental Cost:</span>
+                            <div className="fw-semibold text-primary">Rs. {rental.rentalCost.toLocaleString()}</div>
+                          </div>
+                          <div className="mb-2">
+                            <span className="text-muted small">Deposit:</span>
+                            <div className="fw-semibold text-warning">Rs. {rental.deposit.toLocaleString()}</div>
+                          </div>
+                          <div className="mb-2">
+                            <span className="text-muted small">Total Paid:</span>
+                            <div className="fw-bold text-success">Rs. {rental.totalAmount.toLocaleString()}</div>
+                          </div>
+                        </div>
+
+                        {/* Actions */}
+                        <div className="col-md-3 text-end">
+                          <div className="mb-2">
+                            {getStatusBadge(rental.status)}
+                          </div>
+                          <div className="d-flex flex-column gap-1">
+                            {rental.status === 'confirmed' && (
+                              <>
+                                <Link
+                                  to={`/photographer/equipment/${rental.equipmentId}`}
+                                  className="btn btn-outline-primary btn-sm"
+                                >
+                                  📋 View Equipment
+                                </Link>
+                                <button 
+                                  className="btn btn-outline-primary btn-sm"
+                                  onClick={() => alert(`Contact: ${rental.ownerPhone}`)}
+                                >
+                                  📞 Contact Owner
+                                </button>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Rental ID */}
+                      <div className="mt-3 pt-3 border-top">
+                        <small className="text-muted">Rental ID: {rental.id}</small>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </>
+            )}
           </div>
         )}
       </div>

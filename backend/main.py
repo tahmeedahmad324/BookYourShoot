@@ -1,6 +1,11 @@
 from pathlib import Path
 import sys
 import warnings
+import os
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 # Suppress NumPy warnings on Windows
 warnings.filterwarnings('ignore', category=RuntimeWarning, module='numpy')
@@ -31,10 +36,27 @@ from backend.routers import (
     complaints, 
     support, 
     travel,
-    reels
+    reels,
+    payments
 )
+from backend.services.payment_service import payment_service, StripeGateway
 
 app = FastAPI(title="BookYourShoot API", version="1.0.0")
+
+# Initialize Stripe for payments (FYP Demo)
+stripe_secret = os.getenv("STRIPE_SECRET_KEY", "")
+stripe_publishable = os.getenv("STRIPE_PUBLISHABLE_KEY", "")
+
+if stripe_secret and stripe_publishable:
+    payment_service.register_gateway(
+        "stripe",
+        StripeGateway(secret_key=stripe_secret, publishable_key=stripe_publishable)
+    )
+    print(f"✅ Stripe gateway registered successfully")
+else:
+    print("⚠️  WARNING: Stripe keys not found in .env file!")
+    print("   Payment endpoints will return 503 errors.")
+    print("   Please add STRIPE_SECRET_KEY and STRIPE_PUBLISHABLE_KEY to backend/.env")
 
 # Add global exception handler for validation errors
 @app.exception_handler(RequestValidationError)
@@ -70,6 +92,8 @@ app.include_router(complaints.router, prefix="/api")
 app.include_router(support.router, prefix="/api")
 app.include_router(travel.router, prefix="/api")
 app.include_router(reels.router, prefix="/api")
+app.include_router(payments.router, prefix="/api")
+app.include_router(payments.router, prefix="/api")
 
 
 @app.get("/")
@@ -92,7 +116,9 @@ def root():
             "support": "/api/support",
             "travel": "/api/travel",
             "cnic": "/api/cnic",
-            "reels": "/api/reels"
+            "reels": "/api/reels",
+            "payments": "/api/payments",
+            "payments": "/api/payments"
         }
     }
 

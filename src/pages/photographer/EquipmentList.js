@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
+import StripeCheckout from '../../components/StripeCheckout';
 
 const EquipmentList = () => {
   const { user } = useAuth();
@@ -12,6 +13,8 @@ const EquipmentList = () => {
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [rentalCart, setRentalCart] = useState([]);
   const [showCart, setShowCart] = useState(false);
+  const [showPayment, setShowPayment] = useState(false);
+  const [rentalBookingData, setRentalBookingData] = useState(null);
 
   // Mock equipment data
   const mockEquipment = [
@@ -290,9 +293,32 @@ const EquipmentList = () => {
   };
 
   const handleProceedToBooking = () => {
-    alert(`Equipment rental request submitted!\nTotal: Rs. ${calculateCartTotal().toLocaleString()}\nDeposit: Rs. ${calculateDepositTotal().toLocaleString()}`);
+    // Create rental booking data
+    const bookingData = {
+      id: `RENT-${Date.now()}`,
+      items: rentalCart,
+      totalAmount: calculateCartTotal(),
+      depositAmount: calculateDepositTotal(),
+      rentalDate: new Date().toISOString(),
+      status: 'pending_payment'
+    };
+    
+    setRentalBookingData(bookingData);
+    setShowPayment(true);
+  };
+
+  const handlePaymentSuccess = () => {
+    // In real app, save rental booking to database
+    alert(`Equipment rental confirmed!\nRental ID: ${rentalBookingData.id}\nTotal Paid: Rs. ${rentalBookingData.totalAmount.toLocaleString()}\nDeposit: Rs. ${rentalBookingData.depositAmount.toLocaleString()} (Refundable)`);
     setRentalCart([]);
     setShowCart(false);
+    setShowPayment(false);
+    setRentalBookingData(null);
+  };
+
+  const handlePaymentCancel = () => {
+    setShowPayment(false);
+    setRentalBookingData(null);
   };
 
   const getAvailabilityBadge = (available) => {
@@ -326,6 +352,20 @@ const EquipmentList = () => {
           </div>
         </div>
       </div>
+    );
+  }
+
+  // Show payment screen if rental booking is ready
+  if (showPayment && rentalBookingData) {
+    return (
+      <StripeCheckout
+        bookingId={rentalBookingData.id}
+        amount={rentalBookingData.totalAmount + rentalBookingData.depositAmount}
+        photographerName={`Equipment Rental - ${rentalBookingData.items.length} items`}
+        onSuccess={handlePaymentSuccess}
+        onCancel={handlePaymentCancel}
+        isEquipmentRental={true}
+      />
     );
   }
 
@@ -410,7 +450,7 @@ const EquipmentList = () => {
                       className="btn btn-success w-100"
                       onClick={handleProceedToBooking}
                     >
-                      📅 Proceed to Rental Booking
+                      � Proceed to Payment
                     </button>
                   </div>
                 </>
@@ -539,32 +579,12 @@ const EquipmentList = () => {
 
                     {/* Action Buttons */}
                     <div className="mt-auto">
-                      {item.available ? (
-                        <div className="btn-group w-100" role="group">
-                          <button 
-                            className="btn btn-outline-primary btn-sm"
-                            onClick={() => addToCart(item, 'daily')}
-                          >
-                            Rent Daily
-                          </button>
-                          <button 
-                            className="btn btn-outline-primary btn-sm"
-                            onClick={() => addToCart(item, 'weekly')}
-                          >
-                            Rent Weekly
-                          </button>
-                          <button 
-                            className="btn btn-primary btn-sm"
-                            onClick={() => addToCart(item, 'monthly')}
-                          >
-                            Rent Monthly
-                          </button>
-                        </div>
-                      ) : (
-                        <button className="btn btn-secondary w-100" disabled>
-                          ❌ Currently Unavailable
-                        </button>
-                      )}
+                      <Link 
+                        to={`/photographer/equipment/${item.id}`}
+                        className="btn btn-primary w-100"
+                      >
+                        View Details & Rent 📋
+                      </Link>
                     </div>
                   </div>
                 </div>

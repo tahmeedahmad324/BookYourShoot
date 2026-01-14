@@ -5,6 +5,7 @@ import { yupResolver } from "@hookform/resolvers/yup"
 import * as yup from "yup"
 import { useAuth } from "../../context/AuthContext"
 import photographersData from "../../data/photographers.json"
+import StripeCheckout from "../../components/StripeCheckout"
 
 const BookingRequest = () => {
   const { id } = useParams()
@@ -20,6 +21,8 @@ const BookingRequest = () => {
   const [selectedDate, setSelectedDate] = useState("")
   const [selectedTime, setSelectedTime] = useState("")
   const [selectedDuration, setSelectedDuration] = useState(1)
+  const [showPayment, setShowPayment] = useState(false)
+  const [bookingData, setBookingData] = useState(null)
 
   // Photographer services data
   const photographerServices = {
@@ -112,12 +115,9 @@ const BookingRequest = () => {
     setSubmitting(true)
 
     try {
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 2000))
-
-      // Mock successful booking
-      const bookingData = {
-        id: Date.now(),
+      // Create booking data
+      const newBookingData = {
+        id: `BOOK-${Date.now()}`,
         photographerId: photographer.id,
         photographerName: photographer.name,
         clientId: user.id,
@@ -128,28 +128,51 @@ const BookingRequest = () => {
         duration: data.duration,
         location: data.location,
         price: calculatedPrice,
-        status: "pending",
+        advancePayment: calculatedPrice * 0.5, // 50% advance
+        status: "pending_payment",
         specialRequests: data.specialRequests,
         createdAt: new Date().toISOString(),
       }
 
-      // Store booking data (in real app, this would be sent to API)
-      const existingBookings = JSON.parse(localStorage.getItem("userBookings") || "[]")
-      existingBookings.push(bookingData)
-      localStorage.setItem("userBookings", JSON.stringify(existingBookings))
-
-      // Redirect to success page or dashboard
-      navigate("/client/dashboard", {
-        state: {
-          bookingSuccess: true,
-          message: "Booking request submitted successfully! The photographer will review and respond within 24 hours.",
-        },
-      })
+      // Store booking data temporarily
+      setBookingData(newBookingData)
+      
+      // Show payment screen
+      setShowPayment(true)
+      
     } catch (error) {
       console.error("Booking error:", error)
     } finally {
       setSubmitting(false)
     }
+  }
+
+  const handlePaymentSuccess = () => {
+    // Update booking status to confirmed
+    const confirmedBooking = {
+      ...bookingData,
+      status: "confirmed",
+      paymentStatus: "advance_paid",
+      paymentDate: new Date().toISOString()
+    }
+    
+    // Store in localStorage (in real app, send to API)
+    const existingBookings = JSON.parse(localStorage.getItem("userBookings") || "[]")
+    existingBookings.push(confirmedBooking)
+    localStorage.setItem("userBookings", JSON.stringify(existingBookings))
+
+    // Redirect to success
+    navigate("/client/dashboard", {
+      state: {
+        bookingSuccess: true,
+        message: "Payment successful! Your booking has been confirmed. The photographer will contact you soon.",
+      },
+    })
+  }
+
+  const handlePaymentCancel = () => {
+    setShowPayment(false)
+    setBookingData(null)
   }
 
   const generateTimeSlots = () => {
@@ -197,6 +220,19 @@ const BookingRequest = () => {
           </div>
         </div>
       </div>
+    )
+  }
+
+  // Show payment screen if booking data is ready
+  if (showPayment && bookingData) {
+    return (
+      <StripeCheckout
+        bookingId={bookingData.id}
+        amount={bookingData.advancePayment}
+        photographerName={`${bookingData.photographerName} - ${bookingData.service}`}
+        onSuccess={handlePaymentSuccess}
+        onCancel={handlePaymentCancel}
+      />
     )
   }
 
@@ -427,10 +463,12 @@ const BookingRequest = () => {
                             role="status"
                             aria-hidden="true"
                           ></span>
-                          Submitting Request...
+                          Processing...
                         </>
                       ) : (
-                        "Submit Booking Request"
+                        <>
+                          Proceed to Payment 💳
+                        </>
                       )}
                     </button>
                     <Link to={`/photographer/${photographer.id}`} className="btn btn-outline-secondary btn-lg" onClick={() => window.scrollTo(0, 0)}>
@@ -473,9 +511,10 @@ const BookingRequest = () => {
 
                 <div className="alert alert-info small">
                   <strong>Payment Policy:</strong>
-                  <br />• 50% advance required to confirm
-                  <br />• Remaining 50% on event day
+                  <br />• 50% advance required to confirm: PKR {(calculatedPrice * 0.5).toLocaleString()}
+                  <br />• Remaining 50% on event day: PKR {(calculatedPrice * 0.5).toLocaleString()}
                   <br />• Free cancellation up to 48 hours before
+                  <br />• <strong className="text-success">You will be redirected to secure payment after submitting</strong>
                 </div>
 
                 <div className="alert alert-warning small">

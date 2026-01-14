@@ -27,18 +27,23 @@ import ClientDashboard from "./pages/client/ClientDashboard"
 import ClientProfile from "./pages/client/ClientProfile"
 import PhotographerProfile from "./pages/client/PhotographerProfile"
 import BookingRequest from "./pages/client/BookingRequest"
+import BookingSuccess from "./pages/client/BookingSuccess"
 import ClientBookings from "./pages/client/ClientBookings"
 import ClientChat from "./pages/client/ClientChat"
 import ReviewSubmission from "./pages/client/ReviewSubmission"
 import AlbumBuilder from "./pages/client/AlbumBuilder"
 import ReelGenerator from "./pages/client/ReelGenerator"
 import MusicDiscoveryUI from "./pages/client/MusicDiscoveryUI"
+import PaymentTestPage from "./pages/PaymentTestPage"
+import EscrowDemoPage from "./pages/EscrowDemoPage"
+import BookingSummaryDemo from "./pages/BookingSummaryDemo"
 
 // Photographer Pages
 import PhotographerDashboard from "./pages/photographer/PhotographerDashboard"
 import PhotographerProfilePage from "./pages/photographer/PhotographerProfile"
 import BookingRequests from "./pages/photographer/BookingRequests"
 import EquipmentList from "./pages/photographer/EquipmentList"
+import EquipmentDetail from "./pages/photographer/EquipmentDetail"
 import MyEquipmentListings from "./pages/photographer/MyEquipmentListings"
 import TravelEstimator from "./pages/photographer/TravelEstimator"
 
@@ -77,6 +82,9 @@ function App() {
               <Route path="/privacy" element={<PrivacyPolicy />} />
               <Route path="/support" element={<Support />} />
               <Route path="/contact" element={<Contact />} />
+              <Route path="/payment-test" element={<PaymentTestPage />} />
+              <Route path="/escrow-demo" element={<EscrowDemoPage />} />
+              <Route path="/booking-summary-demo" element={<BookingSummaryDemo />} />
 
               {/* Protected Client Routes */}
               <Route
@@ -100,6 +108,14 @@ function App() {
                 element={
                   <ProtectedRoute allowedRoles={["client"]}>
                     <BookingRequest />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/booking/success"
+                element={
+                  <ProtectedRoute allowedRoles={["client"]}>
+                    <BookingSuccess />
                   </ProtectedRoute>
                 }
               />
@@ -202,6 +218,14 @@ function App() {
                 element={
                   <ProtectedRoute allowedRoles={["photographer", "client"]}>
                     <EquipmentList />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/photographer/equipment/:id"
+                element={
+                  <ProtectedRoute allowedRoles={["photographer", "client"]}>
+                    <EquipmentDetail />
                   </ProtectedRoute>
                 }
               />
