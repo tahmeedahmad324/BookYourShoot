@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import photographersData from '../../data/photographers.json';
+import { photographerAPI } from '../../api/api';
 
 const PhotographerProfile = () => {
   const { id } = useParams();
@@ -8,87 +8,118 @@ const PhotographerProfile = () => {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('about');
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
-    // Simulate API call
-    setTimeout(() => {
-      const foundPhotographer = photographersData.photographers.find(p => p.id === parseInt(id));
-      if (foundPhotographer) {
-        // Enhanced photographer data with portfolio images
-        setPhotographer({
-          ...foundPhotographer,
-          bio: "Professional photographer with over 5 years of experience in wedding and portrait photography. Passionate about capturing life's precious moments with artistic vision and technical excellence.",
-          education: "Diploma in Professional Photography - National College of Arts",
-          languages: ["English", "Urdu", "Punjabi"],
-          equipment: ["Canon EOS R5", "Sony A7R IV", "Professional Lighting Kit", "Various Lenses"],
-          awards: ["Best Wedding Photographer 2023", "Portrait Excellence Award 2022"],
-          portfolio: [
-            "/images/portfolio/wedding-1.jpg",
-            "/images/portfolio/wedding-2.jpg", 
-            "/images/portfolio/portrait-1.jpg",
-            "/images/portfolio/portrait-2.jpg",
-            "/images/portfolio/event-1.jpg",
-            "/images/portfolio/event-2.jpg"
-          ],
-          availability: {
-            monday: "Available",
-            tuesday: "Available", 
-            wednesday: "Busy",
-            thursday: "Available",
-            friday: "Available",
-            saturday: "Available",
-            sunday: "Busy"
-          },
-          services: [
-            {
-              name: "Wedding Photography",
-              description: "Complete wedding coverage from preparation to reception",
-              duration: "6-12 hours",
-              startingPrice: 30000
+    const fetchPhotographer = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        
+        // Fetch photographer from API
+        const response = await photographerAPI.getById(id);
+        
+        if (response.success && response.data) {
+          const photographerData = response.data;
+          
+          // Transform API data to match component expectations
+          setPhotographer({
+            id: photographerData.id,
+            name: photographerData.name,
+            email: photographerData.email,
+            phone: photographerData.phone,
+            location: photographerData.location,
+            specialty: photographerData.specialty || [],
+            experience: photographerData.experience || 0,
+            hourly_rate: photographerData.hourly_rate || 0,
+            rating: photographerData.rating || 0,
+            reviews_count: photographerData.reviews_count || 0,
+            verified: photographerData.verified || false,
+            completed_bookings: photographerData.completed_bookings || 0,
+            response_time: photographerData.response_time || '1 hour',
+            bio: photographerData.bio || "Professional photographer with over 5 years of experience in wedding and portrait photography. Passionate about capturing life's precious moments with artistic vision and technical excellence.",
+            education: photographerData.education || "Diploma in Professional Photography - National College of Arts",
+            languages: photographerData.languages || ["English", "Urdu", "Punjabi"],
+            equipment: photographerData.equipment || ["Canon EOS R5", "Sony A7R IV", "Professional Lighting Kit", "Various Lenses"],
+            awards: photographerData.awards || ["Best Wedding Photographer 2023", "Portrait Excellence Award 2022"],
+            portfolio: photographerData.portfolio || [
+              "/images/portfolio/wedding-1.jpg",
+              "/images/portfolio/wedding-2.jpg", 
+              "/images/portfolio/portrait-1.jpg",
+              "/images/portfolio/portrait-2.jpg",
+              "/images/portfolio/event-1.jpg",
+              "/images/portfolio/event-2.jpg"
+            ],
+            availability: photographerData.availability || {
+              monday: "Available",
+              tuesday: "Available", 
+              wednesday: "Busy",
+              thursday: "Available",
+              friday: "Available",
+              saturday: "Available",
+              sunday: "Busy"
             },
-            {
-              name: "Portrait Photography", 
-              description: "Professional portraits for individuals and families",
-              duration: "1-3 hours",
-              startingPrice: 8000
-            },
-            {
-              name: "Event Photography",
-              description: "Corporate events, birthdays, and special occasions",
-              duration: "3-8 hours", 
-              startingPrice: 15000
-            }
-          ],
-          reviews: [
-            {
-              id: 1,
-              clientName: "Ayesha Khan",
-              rating: 5,
-              date: "2024-10-15",
-              comment: "Absolutely amazing work! Made our wedding day perfect with beautiful photos.",
-              service: "Wedding Photography"
-            },
-            {
-              id: 2,
-              clientName: "Bilal Ahmed", 
-              rating: 5,
-              date: "2024-09-20",
-              comment: "Professional and creative. Captured our family portraits beautifully.",
-              service: "Portrait Photography"
-            },
-            {
-              id: 3,
-              clientName: "Fatima Raza",
-              rating: 4,
-              date: "2024-08-10", 
-              comment: "Great photographer, very cooperative and understanding.",
-              service: "Event Photography"
-            }
-          ]
-        });
+            services: photographerData.services || [
+              {
+                name: "Wedding Photography",
+                description: "Complete wedding coverage from preparation to reception",
+                duration: "6-12 hours",
+                startingPrice: photographerData.hourly_rate * 8 || 30000
+              },
+              {
+                name: "Portrait Photography", 
+                description: "Professional portraits for individuals and families",
+                duration: "1-3 hours",
+                startingPrice: photographerData.hourly_rate * 2 || 8000
+              },
+              {
+                name: "Event Photography",
+                description: "Corporate events, birthdays, and special occasions",
+                duration: "3-8 hours", 
+                startingPrice: photographerData.hourly_rate * 4 || 15000
+              }
+            ],
+            reviews: photographerData.reviews || [
+              {
+                id: 1,
+                clientName: "Ayesha Khan",
+                rating: 5,
+                date: "2024-10-15",
+                comment: "Absolutely amazing work! Made our wedding day perfect with beautiful photos.",
+                service: "Wedding Photography"
+              },
+              {
+                id: 2,
+                clientName: "Bilal Ahmed", 
+                rating: 5,
+                date: "2024-09-20",
+                comment: "Professional and creative. Captured our family portraits beautifully.",
+                service: "Portrait Photography"
+              },
+              {
+                id: 3,
+                clientName: "Fatima Raza",
+                rating: 4,
+                date: "2024-08-10", 
+                comment: "Great photographer, very cooperative and understanding.",
+                service: "Event Photography"
+              }
+            ]
+          });
+        } else {
+          setError('Photographer not found');
+        }
+      } catch (err) {
+        console.error('Error fetching photographer:', err);
+        setError(err.message || 'Failed to load photographer profile');
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
-    }, 500);
+    };
+
+    if (id) {
+      fetchPhotographer();
+    }
   }, [id]);
 
   if (loading) {
@@ -111,8 +142,12 @@ const PhotographerProfile = () => {
       <div className="photographer-profile py-4">
         <div className="container">
           <div className="text-center py-5">
-            <h4 className="fw-bold mb-3">Photographer Not Found</h4>
-            <p className="text-muted mb-4">The photographer you're looking for doesn't exist.</p>
+            <h4 className="fw-bold mb-3">
+              {error ? 'Error Loading Profile' : 'Photographer Not Found'}
+            </h4>
+            <p className="text-muted mb-4">
+              {error || "The photographer you're looking for doesn't exist."}
+            </p>
             <Link to="/search" className="btn btn-primary" onClick={() => window.scrollTo(0, 0)}>
               Find Photographers
             </Link>

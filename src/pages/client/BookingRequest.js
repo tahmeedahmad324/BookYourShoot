@@ -4,7 +4,7 @@ import { useForm } from "react-hook-form"
 import { yupResolver } from "@hookform/resolvers/yup"
 import * as yup from "yup"
 import { useAuth } from "../../context/AuthContext"
-import photographersData from "../../data/photographers.json"
+import { photographerAPI } from "../../api/api"
 import StripeCheckout from "../../components/StripeCheckout"
 
 const API_BASE = 'http://localhost:5000/api';
@@ -25,6 +25,7 @@ const BookingRequest = () => {
   const [selectedDuration, setSelectedDuration] = useState(1)
   const [showPayment, setShowPayment] = useState(false)
   const [bookingData, setBookingData] = useState(null)
+  const [error, setError] = useState(null)
   
   // Split payment state
   const [splitOptions, setSplitOptions] = useState([])
@@ -97,14 +98,30 @@ const BookingRequest = () => {
   const duration = watch("duration")
 
   useEffect(() => {
-    // Simulate API call to get photographer details
-    setTimeout(() => {
-      const foundPhotographer = photographersData.photographers.find((p) => p.id === Number.parseInt(id))
-      if (foundPhotographer) {
-        setPhotographer(foundPhotographer)
+    // Fetch photographer details from API
+    const fetchPhotographer = async () => {
+      try {
+        setLoading(true)
+        setError(null)
+        
+        const response = await photographerAPI.getById(id)
+        
+        if (response.success && response.data) {
+          setPhotographer(response.data)
+        } else {
+          setError('Photographer not found')
+        }
+      } catch (err) {
+        console.error('Error fetching photographer:', err)
+        setError(err.message || 'Failed to load photographer')
+      } finally {
+        setLoading(false)
       }
-      setLoading(false)
-    }, 500)
+    }
+    
+    if (id) {
+      fetchPhotographer()
+    }
   }, [id])
 
   useEffect(() => {
@@ -259,8 +276,12 @@ const BookingRequest = () => {
       <div className="booking-request py-4">
         <div className="container">
           <div className="text-center py-5">
-            <h4 className="fw-bold mb-3">Photographer Not Found</h4>
-            <p className="text-muted mb-4">The photographer you're trying to book doesn't exist.</p>
+            <h4 className="fw-bold mb-3">
+              {error ? 'Error Loading Photographer' : 'Photographer Not Found'}
+            </h4>
+            <p className="text-muted mb-4">
+              {error || "The photographer you're trying to book doesn't exist."}
+            </p>
             <Link to="/search" className="btn btn-primary" onClick={() => window.scrollTo(0, 0)}>
               Find Photographers
             </Link>
