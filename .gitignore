@@ -18,3 +18,4 @@ backend/storage/reels/
 !backend/storage/reels/.gitkeep
 !backend/storage/reels/.gitignore
 backend/storage
+.env.example
