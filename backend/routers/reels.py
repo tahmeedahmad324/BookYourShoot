@@ -865,3 +865,42 @@ async def serve_video(user_id: str, filename: str):
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to serve video: {str(e)}")
+
+@router.post(\"/save-metadata\")
+async def save_reel_metadata(
+    video_url: str,
+    title: str = \"My Reel\",
+    duration: int = 0,
+    thumbnail_url: Optional[str] = None,
+    is_public: bool = True,
+    current_user: dict = Depends(get_current_user)
+):
+    \"\"\"Save reel metadata to database after generation\"\"\"
+    try:
+        user_id = current_user.get(\"id\") or current_user.get(\"sub\")
+        
+        reel_record = {
+            \"user_id\": user_id,
+            \"title\": title,
+            \"video_url\": video_url,
+            \"thumbnail_url\": thumbnail_url,
+            \"duration\": duration,
+            \"is_public\": is_public
+        }
+        
+        resp = supabase.table('reels').insert(reel_record).execute()
+        return {\"success\": True, \"data\": resp.data}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.get(\"/database\")
+async def get_reels_from_database(current_user: dict = Depends(get_current_user)):
+    \"\"\"Get all reels for current user from database\"\"\"
+    try:
+        user_id = current_user.get(\"id\") or current_user.get(\"sub\")
+        
+        resp = supabase.table('reels').select('*').eq('user_id', user_id).order('created_at', desc=True).execute()
+        return {\"success\": True, \"data\": resp.data}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))

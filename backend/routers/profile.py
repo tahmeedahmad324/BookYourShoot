@@ -11,8 +11,8 @@ class UpdateProfileRequest(BaseModel):
     full_name: Optional[str] = None
     phone: Optional[str] = None
     city: Optional[str] = None
-    bio: Optional[str] = None
-    profile_image: Optional[str] = None
+    profile_picture_url: Optional[str] = None
+    is_active: Optional[bool] = None
 
 
 class UpdatePhotographerProfileRequest(BaseModel):
@@ -20,11 +20,15 @@ class UpdatePhotographerProfileRequest(BaseModel):
     specialties: Optional[list] = None
     experience_years: Optional[int] = None
     hourly_rate: Optional[float] = None
-    profile_image: Optional[str] = None
+    profile_image_path: Optional[str] = None
     portfolio_images: Optional[list] = None
     equipment_list: Optional[list] = None
     coverage_areas: Optional[list] = None
-    availability_hours: Optional[dict] = None
+    availability: Optional[dict] = None  # JSONB field for weekly schedule
+    bank_name: Optional[str] = None
+    bank_account_number: Optional[str] = None
+    stripe_account_id: Optional[str] = None
+    stripe_onboarding_complete: Optional[bool] = None
 
 
 @router.get("/me")
@@ -74,10 +78,10 @@ def update_my_profile(payload: UpdateProfileRequest, current_user: dict = Depend
             updates['phone'] = payload.phone
         if payload.city is not None:
             updates['city'] = payload.city
-        if payload.bio is not None:
-            updates['bio'] = payload.bio
-        if payload.profile_image is not None:
-            updates['profile_image'] = payload.profile_image
+        if payload.profile_picture_url is not None:
+            updates['profile_picture_url'] = payload.profile_picture_url
+        if payload.is_active is not None:
+            updates['is_active'] = payload.is_active
 
         resp = supabase.table('users').update(updates).eq('id', user_id).execute()
         return {"success": True, "data": resp.data}

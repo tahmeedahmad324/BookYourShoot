@@ -125,7 +125,7 @@ def get_photographer(photographer_id: str):
         user = item.get('users', {})
         
         # Get equipment
-        equipment_response = supabase.table('equipment').select('*').eq('photographer_id', item['id']).eq('available', True).execute()
+        equipment_response = supabase.table('equipment').select('*').eq('photographer_id', item['id']).eq('is_active', True).execute()
         
         # Get recent reviews
         reviews_response = supabase.table('review').select(

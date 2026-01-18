@@ -38,7 +38,11 @@ from backend.routers import (
     travel,
     reels,
     payments,
-    payouts
+    payouts,
+    albums,
+    notifications,
+    jobs,
+    settings
 )
 from backend.services.payment_service import payment_service, StripeGateway
 
@@ -103,6 +107,10 @@ app.include_router(travel.router, prefix="/api")
 app.include_router(reels.router, prefix="/api")
 app.include_router(payments.router, prefix="/api")
 app.include_router(payouts.router, prefix="/api")
+app.include_router(albums.router, prefix="/api")
+app.include_router(notifications.router, prefix="/api")
+app.include_router(jobs.router, prefix="/api")
+app.include_router(settings.router, prefix="/api")
 
 
 @app.get("/")
@@ -127,7 +135,11 @@ def root():
             "cnic": "/api/cnic",
             "reels": "/api/reels",
             "payments": "/api/payments",
-            "payouts": "/api/payouts"
+            "payouts": "/api/payouts",
+            "albums": "/api/albums",
+            "notifications": "/api/notifications",
+            "jobs": "/api/jobs",
+            "settings": "/api/settings"
         }
     }
 

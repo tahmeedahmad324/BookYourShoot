@@ -21,6 +21,7 @@ class PaymentRequest(BaseModel):
     amount: float
     currency: str = "PKR"
     payment_method: Literal["jazzcash", "easypaisa", "card", "bank"]
+    payment_type: Literal["advance", "final", "full", "refund", "tip"] = "advance"
     customer_phone: str
     customer_email: Optional[str] = None
     # Additional metadata for receipt/notifications
@@ -286,6 +287,8 @@ class EscrowCreateRequest(BaseModel):
     photographer_name: str = "Photographer"
     transaction_type: str = "booking"
     deposit_amount: float = 0
+    escrow_status: str = "held"
+    escrow_release_date: Optional[str] = None
 
 
 class EscrowReleaseRequest(BaseModel):

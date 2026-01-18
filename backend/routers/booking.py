@@ -180,6 +180,12 @@ def create_booking(payload: CreateBookingRequest, current_user: dict = Depends(g
                 detail="Photographer already has a booking on this date (double booking prevented)"
             )
 
+        # Calculate financial splits (50/50 model)
+        advance_amount = payload.price * 0.5 if payload.price else 0
+        remaining_amount = payload.price * 0.5 if payload.price else 0
+        platform_fee = payload.price * 0.10 if payload.price else 0
+        photographer_earning = payload.price * 0.90 if payload.price else 0
+
         booking = {
             "client_id": user_id,
             "photographer_id": payload.photographer_id,  # References photographer_profile.id
@@ -188,6 +194,10 @@ def create_booking(payload: CreateBookingRequest, current_user: dict = Depends(g
             "event_type": payload.event_type,
             "notes": payload.notes,
             "price": payload.price,
+            "advance_payment": advance_amount,
+            "remaining_payment": remaining_amount,
+            "platform_fee": platform_fee,
+            "photographer_earning": photographer_earning,
             "status": "requested"  # Initial status in workflow
         }
         
