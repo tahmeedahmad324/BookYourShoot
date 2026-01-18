@@ -107,6 +107,14 @@ const AdminDashboard = () => {
       badge: null,
     },
     {
+      id: "payouts",
+      title: "Payout Management",
+      description: "Process photographer payout requests",
+      icon: DollarSign,
+      link: "/admin/payouts",
+      badge: null,
+    },
+    {
       id: "webhooks",
       title: "Webhook Simulator",
       description: "Test payment webhooks and simulate payment flows",

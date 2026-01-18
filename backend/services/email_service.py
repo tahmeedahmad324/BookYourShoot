@@ -50,6 +50,13 @@ class EmailTemplate(Enum):
     WELCOME = "welcome"
     PASSWORD_RESET = "password_reset"
     EQUIPMENT_RENTAL_CONFIRMATION = "equipment_rental_confirmation"
+    # New 50/50 payment flow templates
+    ADVANCE_PAYMENT_RECEIVED = "advance_payment_received"
+    REMAINING_PAYMENT_DUE = "remaining_payment_due"
+    REMAINING_PAYMENT_RECEIVED = "remaining_payment_received"
+    WORK_COMPLETED = "work_completed"
+    PAYOUT_PROCESSED = "payout_processed"
+    PHOTOGRAPHER_NEW_BOOKING = "photographer_new_booking"
 
 
 class Email:
@@ -410,6 +417,359 @@ class EmailService:
                 
                 BookYourShoot - Shoot Smart
             """
+        },
+        
+        # ==================== 50/50 Payment Flow Templates ====================
+        
+        EmailTemplate.ADVANCE_PAYMENT_RECEIVED: {
+            "subject": "50% Advance Payment Received - Booking #{booking_id}",
+            "html": """
+                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                    <div style="background: linear-gradient(135deg, #4CAF50 0%, #2E7D32 100%); padding: 30px; text-align: center;">
+                        <h1 style="color: white; margin: 0;">Advance Payment Received! 💵</h1>
+                    </div>
+                    <div style="padding: 30px; background: #fff;">
+                        <p>Hi {client_name},</p>
+                        <p>Your 50% advance payment has been received and your booking is now confirmed!</p>
+                        
+                        <div style="background: #e8f5e9; padding: 20px; border-radius: 8px; margin: 20px 0; text-align: center;">
+                            <p style="margin: 0; font-size: 14px; color: #666;">Advance Paid</p>
+                            <p style="margin: 10px 0; font-size: 32px; font-weight: bold; color: #2e7d32;">PKR {advance_amount}</p>
+                        </div>
+                        
+                        <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0;">
+                            <h3 style="margin-top: 0; color: #1A73E8;">Booking Details</h3>
+                            <p><strong>Booking ID:</strong> #{booking_id}</p>
+                            <p><strong>Service:</strong> {service_type}</p>
+                            <p><strong>Photographer:</strong> {photographer_name}</p>
+                            <p><strong>Date:</strong> {date}</p>
+                        </div>
+                        
+                        <div style="background: #fff3e0; padding: 15px; border-radius: 8px; margin: 20px 0;">
+                            <p style="margin: 0; color: #e65100;">
+                                <strong>💡 Next Step:</strong> After your session is complete, you'll pay the remaining 50% (PKR {remaining_amount}) to release payment to the photographer.
+                            </p>
+                        </div>
+                        
+                        <a href="{dashboard_url}" style="display: inline-block; background: #1A73E8; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; margin-top: 15px;">View Booking</a>
+                    </div>
+                    <div style="padding: 20px; background: #f8f9fa; text-align: center; color: #666;">
+                        <p style="margin: 0;">BookYourShoot - Shoot Smart</p>
+                    </div>
+                </div>
+            """,
+            "text": """
+                Advance Payment Received!
+                
+                Hi {client_name},
+                
+                Your 50% advance payment has been received and your booking is confirmed!
+                
+                Advance Paid: PKR {advance_amount}
+                
+                Booking Details:
+                - Booking ID: #{booking_id}
+                - Service: {service_type}
+                - Photographer: {photographer_name}
+                - Date: {date}
+                
+                Next Step: After your session is complete, pay the remaining 50% (PKR {remaining_amount}) to release payment to the photographer.
+                
+                View your booking at: {dashboard_url}
+                
+                BookYourShoot - Shoot Smart
+            """
+        },
+        
+        EmailTemplate.REMAINING_PAYMENT_DUE: {
+            "subject": "Action Required: Pay Remaining 50% - Booking #{booking_id}",
+            "html": """
+                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                    <div style="background: linear-gradient(135deg, #FF9800 0%, #F57C00 100%); padding: 30px; text-align: center;">
+                        <h1 style="color: white; margin: 0;">Work Complete - Payment Due! ⏰</h1>
+                    </div>
+                    <div style="padding: 30px; background: #fff;">
+                        <p>Hi {client_name},</p>
+                        <p>Great news! {photographer_name} has marked your {service_type} session as complete.</p>
+                        
+                        <div style="background: #fff3e0; padding: 20px; border-radius: 8px; margin: 20px 0; text-align: center;">
+                            <p style="margin: 0; font-size: 14px; color: #666;">Remaining Amount Due</p>
+                            <p style="margin: 10px 0; font-size: 32px; font-weight: bold; color: #e65100;">PKR {remaining_amount}</p>
+                        </div>
+                        
+                        <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0;">
+                            <p><strong>Booking ID:</strong> #{booking_id}</p>
+                            <p><strong>Service:</strong> {service_type}</p>
+                            <p><strong>Session Date:</strong> {date}</p>
+                            <p><strong>Advance Paid:</strong> PKR {advance_paid}</p>
+                        </div>
+                        
+                        <p>Please complete your payment so the photographer can receive their earnings.</p>
+                        
+                        <a href="{payment_url}" style="display: inline-block; background: #FF9800; color: white; padding: 14px 28px; text-decoration: none; border-radius: 6px; margin-top: 15px; font-size: 16px;">
+                            💳 Pay PKR {remaining_amount} Now
+                        </a>
+                    </div>
+                    <div style="padding: 20px; background: #f8f9fa; text-align: center; color: #666;">
+                        <p style="margin: 0;">BookYourShoot - Shoot Smart</p>
+                    </div>
+                </div>
+            """,
+            "text": """
+                Work Complete - Payment Due!
+                
+                Hi {client_name},
+                
+                Great news! {photographer_name} has marked your {service_type} session as complete.
+                
+                Remaining Amount Due: PKR {remaining_amount}
+                
+                Booking Details:
+                - Booking ID: #{booking_id}
+                - Service: {service_type}
+                - Session Date: {date}
+                - Advance Paid: PKR {advance_paid}
+                
+                Please complete your payment at: {payment_url}
+                
+                BookYourShoot - Shoot Smart
+            """
+        },
+        
+        EmailTemplate.REMAINING_PAYMENT_RECEIVED: {
+            "subject": "Final Payment Received - Booking Complete! 🎉",
+            "html": """
+                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                    <div style="background: linear-gradient(135deg, #4CAF50 0%, #2E7D32 100%); padding: 30px; text-align: center;">
+                        <h1 style="color: white; margin: 0;">Booking Complete! 🎉</h1>
+                    </div>
+                    <div style="padding: 30px; background: #fff;">
+                        <p>Hi {client_name},</p>
+                        <p>Thank you! Your final payment has been received and your booking is now complete.</p>
+                        
+                        <div style="background: #e8f5e9; padding: 20px; border-radius: 8px; margin: 20px 0;">
+                            <h3 style="margin-top: 0; color: #2e7d32;">Payment Summary</h3>
+                            <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
+                                <span>Advance Payment:</span>
+                                <span>PKR {advance_paid}</span>
+                            </div>
+                            <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
+                                <span>Final Payment:</span>
+                                <span>PKR {remaining_amount}</span>
+                            </div>
+                            <hr style="margin: 15px 0; border-color: #c8e6c9;">
+                            <div style="display: flex; justify-content: space-between; font-size: 18px;">
+                                <strong>Total Paid:</strong>
+                                <strong style="color: #2e7d32;">PKR {total_amount}</strong>
+                            </div>
+                        </div>
+                        
+                        <div style="background: #e3f2fd; padding: 15px; border-radius: 8px;">
+                            <p style="margin: 0; color: #1565c0;">
+                                <strong>📷 {photographer_name}</strong> will now receive their payment (after platform fee). Thank you for using BookYourShoot!
+                            </p>
+                        </div>
+                        
+                        <p style="margin-top: 20px;">Don't forget to leave a review for your photographer!</p>
+                        
+                        <a href="{review_url}" style="display: inline-block; background: #1A73E8; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; margin-top: 10px;">⭐ Leave a Review</a>
+                    </div>
+                    <div style="padding: 20px; background: #f8f9fa; text-align: center; color: #666;">
+                        <p style="margin: 0;">BookYourShoot - Shoot Smart</p>
+                    </div>
+                </div>
+            """,
+            "text": """
+                Booking Complete! 🎉
+                
+                Hi {client_name},
+                
+                Thank you! Your final payment has been received.
+                
+                Payment Summary:
+                - Advance Payment: PKR {advance_paid}
+                - Final Payment: PKR {remaining_amount}
+                - Total Paid: PKR {total_amount}
+                
+                {photographer_name} will now receive their payment.
+                
+                Leave a review at: {review_url}
+                
+                BookYourShoot - Shoot Smart
+            """
+        },
+        
+        EmailTemplate.WORK_COMPLETED: {
+            "subject": "Session Complete! Photos Ready - Booking #{booking_id}",
+            "html": """
+                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                    <div style="background: linear-gradient(135deg, #9C27B0 0%, #7B1FA2 100%); padding: 30px; text-align: center;">
+                        <h1 style="color: white; margin: 0;">Your Photos Are Ready! 📸</h1>
+                    </div>
+                    <div style="padding: 30px; background: #fff;">
+                        <p>Hi {client_name},</p>
+                        <p>Exciting news! {photographer_name} has completed your {service_type} session and your photos are ready.</p>
+                        
+                        <div style="background: #f3e5f5; padding: 20px; border-radius: 8px; margin: 20px 0;">
+                            <h3 style="margin-top: 0; color: #7B1FA2;">Session Summary</h3>
+                            <p><strong>Service:</strong> {service_type}</p>
+                            <p><strong>Date:</strong> {date}</p>
+                            <p><strong>Photos Delivered:</strong> {photos_count}</p>
+                        </div>
+                        
+                        <div style="background: #fff3e0; padding: 15px; border-radius: 8px; margin: 20px 0;">
+                            <p style="margin: 0; color: #e65100;">
+                                <strong>⚠️ Action Required:</strong> Please pay the remaining 50% (PKR {remaining_amount}) to access your photos and complete the booking.
+                            </p>
+                        </div>
+                        
+                        <a href="{payment_url}" style="display: inline-block; background: #9C27B0; color: white; padding: 14px 28px; text-decoration: none; border-radius: 6px; margin-top: 15px; font-size: 16px;">
+                            💳 Complete Payment & View Photos
+                        </a>
+                    </div>
+                    <div style="padding: 20px; background: #f8f9fa; text-align: center; color: #666;">
+                        <p style="margin: 0;">BookYourShoot - Shoot Smart</p>
+                    </div>
+                </div>
+            """,
+            "text": """
+                Your Photos Are Ready! 📸
+                
+                Hi {client_name},
+                
+                {photographer_name} has completed your {service_type} session!
+                
+                Session Summary:
+                - Service: {service_type}
+                - Date: {date}
+                - Photos Delivered: {photos_count}
+                
+                Please pay the remaining 50% (PKR {remaining_amount}) to access your photos.
+                
+                Complete payment at: {payment_url}
+                
+                BookYourShoot - Shoot Smart
+            """
+        },
+        
+        EmailTemplate.PHOTOGRAPHER_NEW_BOOKING: {
+            "subject": "New Booking Alert! 🎉 - {service_type} on {date}",
+            "html": """
+                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                    <div style="background: linear-gradient(135deg, #1A73E8 0%, #1557B0 100%); padding: 30px; text-align: center;">
+                        <h1 style="color: white; margin: 0;">New Booking! 🎉</h1>
+                    </div>
+                    <div style="padding: 30px; background: #fff;">
+                        <p>Hi {photographer_name},</p>
+                        <p>Great news! You have a new booking.</p>
+                        
+                        <div style="background: #e8f5e9; padding: 20px; border-radius: 8px; margin: 20px 0; text-align: center;">
+                            <p style="margin: 0; font-size: 14px; color: #666;">Client Paid 50% Advance</p>
+                            <p style="margin: 10px 0; font-size: 32px; font-weight: bold; color: #2e7d32;">PKR {advance_amount}</p>
+                            <p style="margin: 0; font-size: 14px; color: #666;">Secured in Escrow</p>
+                        </div>
+                        
+                        <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0;">
+                            <h3 style="margin-top: 0; color: #1A73E8;">Booking Details</h3>
+                            <p><strong>Client:</strong> {client_name}</p>
+                            <p><strong>Service:</strong> {service_type}</p>
+                            <p><strong>Date:</strong> {date}</p>
+                            <p><strong>Time:</strong> {time}</p>
+                            <p><strong>Location:</strong> {location}</p>
+                            <p><strong>Total Amount:</strong> PKR {total_amount}</p>
+                        </div>
+                        
+                        <div style="background: #e3f2fd; padding: 15px; border-radius: 8px;">
+                            <p style="margin: 0; color: #1565c0;">
+                                <strong>💡 Payment Flow:</strong> Client pays 50% now, 50% after work. You'll receive PKR {your_earnings} (after 10% platform fee) once fully paid.
+                            </p>
+                        </div>
+                        
+                        <a href="{dashboard_url}" style="display: inline-block; background: #1A73E8; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; margin-top: 15px;">View Booking Details</a>
+                    </div>
+                    <div style="padding: 20px; background: #f8f9fa; text-align: center; color: #666;">
+                        <p style="margin: 0;">BookYourShoot - Shoot Smart</p>
+                    </div>
+                </div>
+            """,
+            "text": """
+                New Booking! 🎉
+                
+                Hi {photographer_name},
+                
+                Great news! You have a new booking.
+                
+                Client Paid 50% Advance: PKR {advance_amount} (Secured in Escrow)
+                
+                Booking Details:
+                - Client: {client_name}
+                - Service: {service_type}
+                - Date: {date}
+                - Time: {time}
+                - Location: {location}
+                - Total Amount: PKR {total_amount}
+                
+                You'll receive PKR {your_earnings} (after 10% platform fee) once fully paid.
+                
+                View booking at: {dashboard_url}
+                
+                BookYourShoot - Shoot Smart
+            """
+        },
+        
+        EmailTemplate.PAYOUT_PROCESSED: {
+            "subject": "Payout Processed! 💸 PKR {amount} sent to your account",
+            "html": """
+                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                    <div style="background: linear-gradient(135deg, #4CAF50 0%, #2E7D32 100%); padding: 30px; text-align: center;">
+                        <h1 style="color: white; margin: 0;">Payout Processed! 💸</h1>
+                    </div>
+                    <div style="padding: 30px; background: #fff;">
+                        <p>Hi {photographer_name},</p>
+                        <p>Your payout request has been processed successfully!</p>
+                        
+                        <div style="background: #e8f5e9; padding: 20px; border-radius: 8px; margin: 20px 0; text-align: center;">
+                            <p style="margin: 0; font-size: 14px; color: #666;">Amount Sent</p>
+                            <p style="margin: 10px 0; font-size: 32px; font-weight: bold; color: #2e7d32;">PKR {amount}</p>
+                        </div>
+                        
+                        <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0;">
+                            <p><strong>Payout ID:</strong> {payout_id}</p>
+                            <p><strong>Bank:</strong> {bank_name}</p>
+                            <p><strong>Account:</strong> ****{account_last4}</p>
+                            <p><strong>Processed On:</strong> {processed_date}</p>
+                        </div>
+                        
+                        <p style="color: #666;">The funds should arrive in your account within 2-3 business days.</p>
+                        
+                        <a href="{earnings_url}" style="display: inline-block; background: #1A73E8; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; margin-top: 15px;">View Earnings Dashboard</a>
+                    </div>
+                    <div style="padding: 20px; background: #f8f9fa; text-align: center; color: #666;">
+                        <p style="margin: 0;">BookYourShoot - Shoot Smart</p>
+                    </div>
+                </div>
+            """,
+            "text": """
+                Payout Processed! 💸
+                
+                Hi {photographer_name},
+                
+                Your payout request has been processed!
+                
+                Amount Sent: PKR {amount}
+                
+                Details:
+                - Payout ID: {payout_id}
+                - Bank: {bank_name}
+                - Account: ****{account_last4}
+                - Processed On: {processed_date}
+                
+                Funds should arrive within 2-3 business days.
+                
+                View earnings at: {earnings_url}
+                
+                BookYourShoot - Shoot Smart
+            """
         }
     }
 
@@ -685,6 +1045,191 @@ class EmailService:
                 "deposit": f"{deposit:,.0f}",
                 "total_amount": f"{total_amount:,.0f}",
                 "dashboard_url": dashboard_url
+            }
+        )
+
+    # ============================================
+    # 50/50 Payment Flow Email Methods
+    # ============================================
+
+    def send_advance_payment_received(
+        self,
+        client_email: str,
+        client_name: str,
+        booking_id: str,
+        service_type: str,
+        photographer_name: str,
+        date: str,
+        advance_amount: float,
+        remaining_amount: float,
+        dashboard_url: str = "http://localhost:3000/client/bookings"
+    ) -> Email:
+        """Send email when 50% advance payment is received"""
+        return self.send_email(
+            to_email=client_email,
+            to_name=client_name,
+            template=EmailTemplate.ADVANCE_PAYMENT_RECEIVED,
+            data={
+                "client_name": client_name,
+                "booking_id": booking_id,
+                "service_type": service_type,
+                "photographer_name": photographer_name,
+                "date": date,
+                "advance_amount": f"{advance_amount:,.0f}",
+                "remaining_amount": f"{remaining_amount:,.0f}",
+                "dashboard_url": dashboard_url
+            }
+        )
+
+    def send_photographer_new_booking(
+        self,
+        photographer_email: str,
+        photographer_name: str,
+        client_name: str,
+        service_type: str,
+        date: str,
+        time: str,
+        location: str,
+        total_amount: float,
+        advance_amount: float,
+        your_earnings: float,
+        dashboard_url: str = "http://localhost:3000/photographer/bookings"
+    ) -> Email:
+        """Send email to photographer when new booking is made"""
+        return self.send_email(
+            to_email=photographer_email,
+            to_name=photographer_name,
+            template=EmailTemplate.PHOTOGRAPHER_NEW_BOOKING,
+            data={
+                "photographer_name": photographer_name,
+                "client_name": client_name,
+                "service_type": service_type,
+                "date": date,
+                "time": time,
+                "location": location,
+                "total_amount": f"{total_amount:,.0f}",
+                "advance_amount": f"{advance_amount:,.0f}",
+                "your_earnings": f"{your_earnings:,.0f}",
+                "dashboard_url": dashboard_url
+            }
+        )
+
+    def send_remaining_payment_due(
+        self,
+        client_email: str,
+        client_name: str,
+        booking_id: str,
+        photographer_name: str,
+        service_type: str,
+        date: str,
+        advance_paid: float,
+        remaining_amount: float,
+        payment_url: str = None
+    ) -> Email:
+        """Send email when work is complete and remaining payment is due"""
+        if payment_url is None:
+            payment_url = f"http://localhost:3000/payment/{booking_id}"
+        
+        return self.send_email(
+            to_email=client_email,
+            to_name=client_name,
+            template=EmailTemplate.REMAINING_PAYMENT_DUE,
+            data={
+                "client_name": client_name,
+                "booking_id": booking_id,
+                "photographer_name": photographer_name,
+                "service_type": service_type,
+                "date": date,
+                "advance_paid": f"{advance_paid:,.0f}",
+                "remaining_amount": f"{remaining_amount:,.0f}",
+                "payment_url": payment_url
+            }
+        )
+
+    def send_work_completed(
+        self,
+        client_email: str,
+        client_name: str,
+        booking_id: str,
+        photographer_name: str,
+        service_type: str,
+        date: str,
+        photos_count: int,
+        remaining_amount: float,
+        payment_url: str = None
+    ) -> Email:
+        """Send email when photographer marks work as complete"""
+        if payment_url is None:
+            payment_url = f"http://localhost:3000/payment/{booking_id}"
+        
+        return self.send_email(
+            to_email=client_email,
+            to_name=client_name,
+            template=EmailTemplate.WORK_COMPLETED,
+            data={
+                "client_name": client_name,
+                "booking_id": booking_id,
+                "photographer_name": photographer_name,
+                "service_type": service_type,
+                "date": date,
+                "photos_count": photos_count,
+                "remaining_amount": f"{remaining_amount:,.0f}",
+                "payment_url": payment_url
+            }
+        )
+
+    def send_remaining_payment_received(
+        self,
+        client_email: str,
+        client_name: str,
+        photographer_name: str,
+        advance_paid: float,
+        remaining_amount: float,
+        total_amount: float,
+        review_url: str = "http://localhost:3000/client/bookings"
+    ) -> Email:
+        """Send email when final 50% payment is received"""
+        return self.send_email(
+            to_email=client_email,
+            to_name=client_name,
+            template=EmailTemplate.REMAINING_PAYMENT_RECEIVED,
+            data={
+                "client_name": client_name,
+                "photographer_name": photographer_name,
+                "advance_paid": f"{advance_paid:,.0f}",
+                "remaining_amount": f"{remaining_amount:,.0f}",
+                "total_amount": f"{total_amount:,.0f}",
+                "review_url": review_url
+            }
+        )
+
+    def send_payout_processed(
+        self,
+        photographer_email: str,
+        photographer_name: str,
+        payout_id: str,
+        amount: float,
+        bank_name: str,
+        account_last4: str,
+        processed_date: str = None,
+        earnings_url: str = "http://localhost:3000/photographer/earnings"
+    ) -> Email:
+        """Send email when payout is processed"""
+        if processed_date is None:
+            processed_date = datetime.now().strftime("%B %d, %Y")
+        
+        return self.send_email(
+            to_email=photographer_email,
+            to_name=photographer_name,
+            template=EmailTemplate.PAYOUT_PROCESSED,
+            data={
+                "photographer_name": photographer_name,
+                "payout_id": payout_id,
+                "amount": f"{amount:,.0f}",
+                "bank_name": bank_name,
+                "account_last4": account_last4,
+                "processed_date": processed_date,
+                "earnings_url": earnings_url
             }
         )
 

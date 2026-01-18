@@ -27,6 +27,7 @@ import ClientDashboard from "./pages/client/ClientDashboard"
 import ClientProfile from "./pages/client/ClientProfile"
 import ClientPayments from "./pages/client/ClientPayments"
 import PaymentSuccess from "./pages/client/PaymentSuccess"
+import RemainingPayment from "./pages/client/RemainingPayment"
 import PhotographerProfile from "./pages/client/PhotographerProfile"
 import BookingRequest from "./pages/client/BookingRequest"
 import BookingSuccess from "./pages/client/BookingSuccess"
@@ -45,6 +46,7 @@ import NotificationSettings from "./pages/NotificationSettings"
 import PhotographerDashboard from "./pages/photographer/PhotographerDashboard"
 import PhotographerProfilePage from "./pages/photographer/PhotographerProfile"
 import PhotographerPayments from "./pages/photographer/PhotographerPayments"
+import PhotographerEarnings from "./pages/photographer/PhotographerEarnings"
 import BookingRequests from "./pages/photographer/BookingRequests"
 import EquipmentList from "./pages/photographer/EquipmentList"
 import EquipmentDetail from "./pages/photographer/EquipmentDetail"
@@ -59,6 +61,7 @@ import AdminSettings from "./pages/admin/AdminSettings"
 import AdminReportedReviews from "./pages/admin/AdminReportedReviews"
 import AdminPlatformSettings from "./pages/admin/AdminPlatformSettings"
 import AdminPaymentManagement from "./pages/admin/AdminPaymentManagement"
+import AdminPayouts from "./pages/admin/AdminPayouts"
 import WebhookSimulator from "./pages/admin/WebhookSimulator"
 
 // Context Providers
@@ -154,6 +157,14 @@ function App() {
                 element={
                   <ProtectedRoute allowedRoles={["client"]}>
                     <PaymentSuccess />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/payment/:bookingId"
+                element={
+                  <ProtectedRoute allowedRoles={["client"]}>
+                    <RemainingPayment />
                   </ProtectedRoute>
                 }
               />
@@ -283,6 +294,14 @@ function App() {
                   </ProtectedRoute>
                 }
               />
+              <Route
+                path="/photographer/earnings"
+                element={
+                  <ProtectedRoute allowedRoles={["photographer"]}>
+                    <PhotographerEarnings />
+                  </ProtectedRoute>
+                }
+              />
 
               {/* Protected Admin Routes */}
               <Route
@@ -346,6 +365,14 @@ function App() {
                 element={
                   <ProtectedRoute allowedRoles={["admin"]}>
                     <AdminPlatformSettings />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/admin/payouts"
+                element={
+                  <ProtectedRoute allowedRoles={["admin"]}>
+                    <AdminPayouts />
                   </ProtectedRoute>
                 }
               />

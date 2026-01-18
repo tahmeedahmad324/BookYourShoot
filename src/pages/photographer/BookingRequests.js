@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import { bookingAPI } from '../../api/api';
+import { toast } from 'react-toastify';
 
 const BookingRequests = () => {
   const { user } = useAuth();
@@ -8,6 +10,7 @@ const BookingRequests = () => {
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('all');
   const [selectedBooking, setSelectedBooking] = useState(null);
+  const [processingAction, setProcessingAction] = useState(null);
 
   // Mock booking requests data
   const mockBookings = [
@@ -84,6 +87,9 @@ const BookingRequests = () => {
       guestCount: 50,
       totalAmount: 15000,
       advanceRequired: 7500,
+      advancePaid: 7500,
+      remainingAmount: 7500,
+      paymentStatus: "advance_paid",
       specialRequests: "Kids birthday party, cake cutting ceremony, family group photos, outdoor shots at sunset",
       urgency: "low",
       createdAt: "2024-11-13",
@@ -167,37 +173,135 @@ const BookingRequests = () => {
     );
   };
 
+  // Payment status badge for confirmed bookings
+  const getPaymentStatusBadge = (booking) => {
+    if (booking.status === 'pending' || booking.status === 'rejected') {
+      return null; // No payment for pending/rejected
+    }
+    
+    const advancePaid = booking.advancePaid || 0;
+    const remainingAmount = booking.remainingAmount || booking.advanceRequired || 0;
+    
+    if (advancePaid > 0 && remainingAmount > 0) {
+      return (
+        <span className="badge bg-info d-inline-flex align-items-center">
+          <span className="me-1">💰</span>
+          50% Advance Received
+        </span>
+      );
+    }
+    
+    if (booking.paymentStatus === 'fully_paid' || remainingAmount === 0) {
+      return (
+        <span className="badge bg-success d-inline-flex align-items-center">
+          <span className="me-1">✅</span>
+          Fully Paid
+        </span>
+      );
+    }
+    
+    return (
+      <span className="badge bg-warning d-inline-flex align-items-center">
+        <span className="me-1">⏳</span>
+        Awaiting Payment
+      </span>
+    );
+  };
+
   const filteredBookings = bookings.filter(booking => {
     return filter === 'all' || booking.status === filter;
   });
 
-  const handleAcceptBooking = (bookingId) => {
-    if (window.confirm('Are you sure you want to accept this booking?')) {
+  const handleAcceptBooking = async (bookingId) => {
+    if (!window.confirm('Are you sure you want to accept this booking?')) return;
+    
+    setProcessingAction(bookingId);
+    try {
+      await bookingAPI.updateStatus(bookingId, 'accepted');
       setBookings(prev => prev.map(booking => 
         booking.id === bookingId 
           ? { ...booking, status: 'confirmed' }
           : booking
       ));
-      alert('Booking accepted successfully! Client will be notified.');
+      toast.success('Booking accepted successfully! Client will be notified.');
+    } catch (error) {
+      console.error('Error accepting booking:', error);
+      toast.error(error.message || 'Failed to accept booking');
+      // Still update locally for demo
+      setBookings(prev => prev.map(booking => 
+        booking.id === bookingId 
+          ? { ...booking, status: 'confirmed' }
+          : booking
+      ));
+    } finally {
+      setProcessingAction(null);
     }
   };
 
-  const handleRejectBooking = (bookingId) => {
+  const handleRejectBooking = async (bookingId) => {
     const reason = prompt('Please provide a reason for rejection (optional):');
-    if (window.confirm('Are you sure you want to reject this booking?')) {
+    if (!window.confirm('Are you sure you want to reject this booking?')) return;
+    
+    setProcessingAction(bookingId);
+    try {
+      await bookingAPI.updateStatus(bookingId, 'rejected', reason);
       setBookings(prev => prev.map(booking => 
         booking.id === bookingId 
           ? { ...booking, status: 'rejected', rejectionReason: reason || 'Not available' }
           : booking
       ));
-      alert('Booking rejected. Client will be notified.');
+      toast.success('Booking rejected. Client will be notified.');
+    } catch (error) {
+      console.error('Error rejecting booking:', error);
+      toast.error(error.message || 'Failed to reject booking');
+      // Still update locally for demo
+      setBookings(prev => prev.map(booking => 
+        booking.id === bookingId 
+          ? { ...booking, status: 'rejected', rejectionReason: reason || 'Not available' }
+          : booking
+      ));
+    } finally {
+      setProcessingAction(null);
     }
   };
 
   const handleSendMessage = (bookingId) => {
     const message = prompt('Enter your message to the client:');
     if (message) {
-      alert(`Message sent to client: "${message}"`);
+      toast.success(`Message sent to client: "${message}"`);
+    }
+  };
+
+  const handleMarkCompleted = async (bookingId) => {
+    if (!window.confirm('Mark this booking as work completed? The client will be notified to pay the remaining amount.')) return;
+    
+    setProcessingAction(bookingId);
+    try {
+      const result = await bookingAPI.markWorkCompleted(bookingId);
+      
+      setBookings(prev => prev.map(booking => 
+        booking.id === bookingId 
+          ? { ...booking, status: 'work_completed', workCompleted: true }
+          : booking
+      ));
+      
+      toast.success(result.message || 'Work marked as completed! Client will be notified to pay the remaining 50%.');
+      
+      // Show next steps
+      if (result.next_steps) {
+        console.log('Next steps:', result.next_steps);
+      }
+    } catch (error) {
+      console.error('Error marking work completed:', error);
+      toast.error(error.message || 'Failed to mark work as completed');
+      // Still update locally for demo
+      setBookings(prev => prev.map(booking => 
+        booking.id === bookingId 
+          ? { ...booking, status: 'work_completed', workCompleted: true }
+          : booking
+      ));
+    } finally {
+      setProcessingAction(null);
     }
   };
 
@@ -403,7 +507,7 @@ const BookingRequests = () => {
                         <div className="fw-bold text-primary">Rs. {booking.totalAmount.toLocaleString()}</div>
                       </div>
                       <div className="mb-2">
-                        <span className="text-muted small">Advance:</span>
+                        <span className="text-muted small">Advance (50%):</span>
                         <div className="fw-semibold">Rs. {booking.advanceRequired.toLocaleString()}</div>
                       </div>
                       <div className="mb-3">
@@ -413,9 +517,14 @@ const BookingRequests = () => {
                       <div className="mb-2">
                         {getStatusBadge(booking.status)}
                       </div>
-                      <div>
+                      <div className="mb-2">
                         {getUrgencyBadge(booking.urgency)}
                       </div>
+                      {getPaymentStatusBadge(booking) && (
+                        <div className="mt-2">
+                          {getPaymentStatusBadge(booking)}
+                        </div>
+                      )}
                     </div>
 
                     {/* Actions */}
@@ -426,14 +535,33 @@ const BookingRequests = () => {
                             <button 
                               className="btn btn-success"
                               onClick={() => handleAcceptBooking(booking.id)}
+                              disabled={processingAction === booking.id}
                             >
-                              ✅ Accept Booking
+                              {processingAction === booking.id ? '⏳ Processing...' : '✅ Accept Booking'}
                             </button>
                             <button 
                               className="btn btn-outline-danger"
                               onClick={() => handleRejectBooking(booking.id)}
+                              disabled={processingAction === booking.id}
                             >
-                              ❌ Decline
+                              {processingAction === booking.id ? '⏳...' : '❌ Decline'}
+                            </button>
+                          </>
+                        )}
+                        {booking.status === 'confirmed' && (
+                          <>
+                            <button 
+                              className="btn btn-primary"
+                              onClick={() => setSelectedBooking(booking)}
+                            >
+                              📋 View Details
+                            </button>
+                            <button 
+                              className="btn btn-success"
+                              onClick={() => handleMarkCompleted(booking.id)}
+                              disabled={processingAction === booking.id}
+                            >
+                              {processingAction === booking.id ? '⏳ Processing...' : '✅ Mark Work Completed'}
                             </button>
                           </>
                         )}
@@ -488,6 +616,145 @@ const BookingRequests = () => {
           </div>
         )}
       </div>
+
+      {/* Booking Details Modal */}
+      {selectedBooking && (
+        <div className="modal show d-block" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
+          <div className="modal-dialog modal-lg modal-dialog-centered">
+            <div className="modal-content">
+              <div className="modal-header">
+                <h5 className="modal-title">📋 Booking Details</h5>
+                <button 
+                  type="button" 
+                  className="btn-close" 
+                  onClick={() => setSelectedBooking(null)}
+                ></button>
+              </div>
+              <div className="modal-body">
+                <div className="row mb-3">
+                  <div className="col-md-6">
+                    <h6 className="text-muted">Client Information</h6>
+                    <div className="mb-2">
+                      <strong>Name:</strong> {selectedBooking.clientName}
+                    </div>
+                    <div className="mb-2">
+                      <strong>Email:</strong> {selectedBooking.clientEmail}
+                    </div>
+                    <div className="mb-2">
+                      <strong>Phone:</strong> {selectedBooking.clientPhone}
+                    </div>
+                    <div className="mb-2">
+                      <strong>Previous Bookings:</strong> {selectedBooking.clientProfile.bookingsCompleted}
+                    </div>
+                    <div className="mb-2">
+                      <strong>Rating:</strong> ⭐ {selectedBooking.clientProfile.rating || 'New'}
+                    </div>
+                  </div>
+                  <div className="col-md-6">
+                    <h6 className="text-muted">Event Information</h6>
+                    <div className="mb-2">
+                      <strong>Service:</strong> {selectedBooking.serviceType}
+                    </div>
+                    <div className="mb-2">
+                      <strong>Event Type:</strong> {selectedBooking.eventType}
+                    </div>
+                    <div className="mb-2">
+                      <strong>Date:</strong> {formatDateTime(selectedBooking.date, selectedBooking.time)}
+                    </div>
+                    <div className="mb-2">
+                      <strong>Duration:</strong> {selectedBooking.duration}
+                    </div>
+                    <div className="mb-2">
+                      <strong>Location:</strong> {selectedBooking.location}
+                    </div>
+                    <div className="mb-2">
+                      <strong>Venue:</strong> {selectedBooking.venue}
+                    </div>
+                    <div className="mb-2">
+                      <strong>Guests:</strong> {selectedBooking.guestCount} people
+                    </div>
+                  </div>
+                </div>
+
+                <div className="row mb-3">
+                  <div className="col-12">
+                    <h6 className="text-muted">Payment Information</h6>
+                    <div className="row">
+                      <div className="col-md-4 mb-2">
+                        <strong>Total Amount:</strong>
+                        <div className="text-primary fs-5">Rs. {selectedBooking.totalAmount.toLocaleString()}</div>
+                      </div>
+                      <div className="col-md-4 mb-2">
+                        <strong>Advance Paid (50%):</strong>
+                        <div className="text-success fs-5">Rs. {selectedBooking.advanceRequired.toLocaleString()}</div>
+                      </div>
+                      <div className="col-md-4 mb-2">
+                        <strong>Remaining (50%):</strong>
+                        <div className="text-warning fs-5">Rs. {selectedBooking.remainingAmount?.toLocaleString() || selectedBooking.advanceRequired.toLocaleString()}</div>
+                      </div>
+                    </div>
+                    <div className="mt-2">
+                      {getPaymentStatusBadge(selectedBooking)}
+                    </div>
+                  </div>
+                </div>
+
+                {selectedBooking.message && (
+                  <div className="mb-3">
+                    <h6 className="text-muted">Client Message</h6>
+                    <div className="bg-light p-3 rounded">
+                      "{selectedBooking.message}"
+                    </div>
+                  </div>
+                )}
+
+                {selectedBooking.specialRequests && (
+                  <div className="mb-3">
+                    <h6 className="text-muted">Special Requests</h6>
+                    <div className="bg-light p-3 rounded">
+                      {selectedBooking.specialRequests}
+                    </div>
+                  </div>
+                )}
+
+                <div className="mb-3">
+                  <h6 className="text-muted">Status</h6>
+                  <div>{getStatusBadge(selectedBooking.status)}</div>
+                </div>
+              </div>
+              <div className="modal-footer">
+                <button 
+                  type="button" 
+                  className="btn btn-secondary" 
+                  onClick={() => setSelectedBooking(null)}
+                >
+                  Close
+                </button>
+                {selectedBooking.status === 'confirmed' && (
+                  <button 
+                    type="button" 
+                    className="btn btn-success" 
+                    onClick={() => {
+                      handleMarkCompleted(selectedBooking.id);
+                      setSelectedBooking(null);
+                    }}
+                    disabled={processingAction === selectedBooking.id}
+                  >
+                    {processingAction === selectedBooking.id ? '⏳ Processing...' : '✅ Mark Work Completed'}
+                  </button>
+                )}
+                <button 
+                  type="button" 
+                  className="btn btn-primary" 
+                  onClick={() => handleSendMessage(selectedBooking.id)}
+                >
+                  💬 Message Client
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

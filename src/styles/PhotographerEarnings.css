@@ -1,0 +1,234 @@
+/* Photographer Earnings Dashboard Styles */
+
+.earnings-card {
+    border-radius: 12px;
+    border: none;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    overflow: hidden;
+}
+
+.earnings-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+}
+
+.earnings-card .card-body {
+    display: flex;
+    align-items: center;
+    padding: 1.5rem;
+}
+
+.earnings-card .earnings-icon {
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+    margin-right: 1rem;
+    flex-shrink: 0;
+}
+
+.earnings-card .earnings-content h6 {
+    margin-bottom: 0.25rem;
+    color: #6c757d;
+    font-weight: 500;
+}
+
+.earnings-card .earnings-content h2 {
+    margin-bottom: 0.25rem;
+    font-weight: 700;
+}
+
+.earnings-card .earnings-content small {
+    font-size: 0.75rem;
+}
+
+/* Available Balance Card */
+.earnings-card.available {
+    background: linear-gradient(135deg, #f0fff4 0%, #c6f6d5 100%);
+}
+
+.earnings-card.available .earnings-icon {
+    background-color: #48bb78;
+    color: white;
+}
+
+.earnings-card.available .earnings-content h2 {
+    color: #276749;
+}
+
+/* Pending Balance Card */
+.earnings-card.pending {
+    background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%);
+}
+
+.earnings-card.pending .earnings-icon {
+    background-color: #ed8936;
+    color: white;
+}
+
+.earnings-card.pending .earnings-content h2 {
+    color: #c05621;
+}
+
+/* Total Earnings Card */
+.earnings-card.total {
+    background: linear-gradient(135deg, #ebf8ff 0%, #bee3f8 100%);
+}
+
+.earnings-card.total .earnings-icon {
+    background-color: #4299e1;
+    color: white;
+}
+
+.earnings-card.total .earnings-content h2 {
+    color: #2b6cb0;
+}
+
+/* Info Items */
+.info-item {
+    display: flex;
+    justify-content: space-between;
+    padding: 0.75rem 0;
+    border-bottom: 1px solid #f0f0f0;
+}
+
+.info-item:last-child {
+    border-bottom: none;
+}
+
+.info-item .label {
+    color: #6c757d;
+    font-weight: 500;
+}
+
+.info-item .value {
+    color: #333;
+    font-weight: 600;
+}
+
+/* Tab Styles */
+.nav-tabs .nav-link {
+    border: none;
+    color: #6c757d;
+    padding: 1rem 1.5rem;
+    font-weight: 500;
+}
+
+.nav-tabs .nav-link:hover {
+    border: none;
+    color: #333;
+}
+
+.nav-tabs .nav-link.active {
+    border: none;
+    border-bottom: 3px solid #0d6efd;
+    color: #0d6efd;
+    background: transparent;
+}
+
+/* Table Styles */
+.table th {
+    background-color: #f8f9fa;
+    font-weight: 600;
+    color: #495057;
+    border-bottom: 2px solid #dee2e6;
+}
+
+.table td {
+    vertical-align: middle;
+}
+
+/* Badge Styles */
+.badge {
+    padding: 0.5rem 0.75rem;
+    font-weight: 500;
+}
+
+.badge svg {
+    margin-right: 0.25rem;
+}
+
+/* Modal Styles */
+.modal-header {
+    background-color: #f8f9fa;
+    border-bottom: 1px solid #dee2e6;
+}
+
+.modal-title {
+    font-weight: 600;
+}
+
+/* Form Styles */
+.form-label {
+    font-weight: 500;
+    color: #495057;
+}
+
+.form-check-inline {
+    margin-right: 1.5rem;
+}
+
+.form-check-input:checked {
+    background-color: #0d6efd;
+    border-color: #0d6efd;
+}
+
+/* Button Styles */
+.btn-success {
+    background-color: #48bb78;
+    border-color: #48bb78;
+}
+
+.btn-success:hover {
+    background-color: #38a169;
+    border-color: #38a169;
+}
+
+/* Responsive Adjustments */
+@media (max-width: 768px) {
+    .earnings-card .card-body {
+        flex-direction: column;
+        text-align: center;
+    }
+
+    .earnings-card .earnings-icon {
+        margin-right: 0;
+        margin-bottom: 1rem;
+    }
+
+    .d-flex.gap-3 {
+        flex-direction: column;
+    }
+
+    .d-flex.gap-3 .btn {
+        width: 100%;
+    }
+
+    .nav-tabs .nav-link {
+        padding: 0.75rem 1rem;
+        font-size: 0.875rem;
+    }
+}
+
+/* Empty State Styles */
+.text-center.py-5 {
+    color: #adb5bd;
+}
+
+.text-center.py-5 svg {
+    opacity: 0.5;
+}
+
+/* Alert Styles */
+.alert-warning {
+    background-color: #fff3cd;
+    border-color: #ffc107;
+}
+
+.alert-warning svg {
+    color: #856404;
+}

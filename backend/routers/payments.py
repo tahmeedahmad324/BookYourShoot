@@ -11,9 +11,6 @@ from backend.services.email_service import email_service
 from backend.services.escalation_service import escalation_service
 from backend.services.webhook_service import webhook_simulator
 from backend.services.tip_service import tip_service
-# Promo service removed - can be re-added later
-# from backend.services.promo_service import promo_service
-from backend.services.split_payment_service import split_payment_service
 
 router = APIRouter(prefix="/payments", tags=["payments"])
 
@@ -197,6 +194,84 @@ async def refund_payment(payment_id: str, amount: Optional[float] = None):
             "status": "processing",
             "message": "Refund initiated successfully"
         }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ==================== Remaining Payment (50% after work) ====================
+
+class RemainingPaymentRequest(BaseModel):
+    booking_id: str
+    amount: float  # Should be 50% of total
+    currency: str = "PKR"
+    payment_method: Literal["jazzcash", "easypaisa", "card", "bank"] = "card"
+    customer_phone: str
+    customer_email: Optional[str] = None
+    client_name: Optional[str] = None
+    photographer_name: Optional[str] = None
+    photographer_id: Optional[str] = None
+    service_type: Optional[str] = None
+
+
+@router.post("/remaining-payment")
+async def create_remaining_payment(payment: RemainingPaymentRequest):
+    """
+    Create checkout session for remaining 50% payment after work completion.
+    This is paid by the client after the photographer completes the work.
+    
+    Flow:
+    1. Client pays 50% advance (handled by /create-checkout)
+    2. Photographer completes work
+    3. Client confirms work done and pays remaining 50% (this endpoint)
+    4. After payment, funds are added to escrow and then released based on policy
+    """
+    try:
+        gateway = payment_service.get_gateway("stripe")
+        
+        customer_info = {
+            "phone": payment.customer_phone,
+            "email": payment.customer_email
+        }
+        
+        metadata = {
+            "payment_type": "remaining_payment",
+            "client_name": payment.client_name or "Client",
+            "client_email": payment.customer_email or "",
+            "photographer_name": payment.photographer_name or "Photographer",
+            "photographer_id": payment.photographer_id or "",
+            "service_type": payment.service_type or "Photography Service",
+            "is_final_payment": "true"
+        }
+        
+        result = gateway.create_checkout(
+            amount=payment.amount,
+            booking_id=f"{payment.booking_id}_remaining",
+            customer_info=customer_info,
+            currency=payment.currency,
+            metadata=metadata
+        )
+        
+        if "error" in result:
+            raise HTTPException(status_code=400, detail=result["error"])
+        
+        # Notify client about remaining payment due (reminder)
+        if payment.customer_email:
+            notification_service.notify_remaining_payment_due(
+                client_id=payment.customer_email,
+                booking_id=payment.booking_id,
+                remaining_amount=payment.amount,
+                photographer_name=payment.photographer_name or "Photographer",
+                service_type=payment.service_type or "Photography Service"
+            )
+        
+        return {
+            "status": "success",
+            "payment_id": result.get("transaction_id", ""),
+            "checkout_url": result.get("checkout_url"),
+            "message": "Remaining payment checkout created. Client will pay final 50%."
+        }
+    except ValueError as e:
+        raise HTTPException(status_code=503, detail=f"Payment service unavailable: {str(e)}")
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -631,10 +706,16 @@ class SendBookingEmailRequest(BaseModel):
 
 @router.post("/send-booking-email")
 async def send_booking_confirmation_email(request: SendBookingEmailRequest):
-    """Send booking confirmation email to client AND create notifications"""
+    """Send booking confirmation email to client AND photographer, create notifications"""
     print(f"📧 Received send-booking-email request: {request.dict()}")
     try:
-        # Send booking confirmation email with both total and deposit amounts
+        # Calculate amounts for 50/50 payment model
+        total_amount = request.amount
+        advance_amount = request.advance_paid or (total_amount * 0.5)
+        remaining_amount = total_amount - advance_amount
+        photographer_earnings = total_amount * 0.9  # After 10% platform fee
+        
+        # Send booking confirmation email to client
         result = email_service.send_booking_confirmation(
             client_email=request.client_email,
             client_name=request.client_name,
@@ -643,51 +724,50 @@ async def send_booking_confirmation_email(request: SendBookingEmailRequest):
             date=request.event_date,
             time=request.event_time or "TBD",
             location=request.location or "TBD",
-            amount=request.amount,
-            advance_paid=request.advance_paid  # Pass the deposit amount
+            amount=total_amount,
+            advance_paid=advance_amount
         )
-        print(f"📧 Email service result: {result}")
+        print(f"📧 Client email sent: {result}")
+        
+        # Also send advance payment received email for clarity
+        email_service.send_advance_payment_received(
+            client_email=request.client_email,
+            client_name=request.client_name,
+            booking_id=request.booking_id,
+            service_type=request.service_type,
+            photographer_name=request.photographer_name,
+            date=request.event_date,
+            advance_amount=advance_amount,
+            remaining_amount=remaining_amount
+        )
         
         # Create notifications for both client and photographer
         photographer_id = request.photographer_id or request.photographer_name
-        # Use notification_user_id if provided, otherwise fall back to client_email
         notification_client_id = request.notification_user_id or request.client_email
         print(f"🔔 Creating notifications for client: {notification_client_id}")
         
-        # Notify client - booking confirmed
-        notification_service.notify_booking_confirmed(
+        # Notify both parties about advance payment received (50/50 flow)
+        notification_service.notify_advance_payment_received(
             client_id=notification_client_id,
             photographer_id=photographer_id,
             booking_id=request.booking_id,
+            advance_amount=advance_amount,
+            remaining_amount=remaining_amount,
             photographer_name=request.photographer_name,
             service_type=request.service_type,
             date=request.event_date
         )
         
-        # Also create payment notifications - use advance_paid (deposit) not total amount
-        deposit_amount = request.advance_paid or request.amount
-        notification_service.notify_payment_received(
-            client_id=notification_client_id,
-            photographer_id=photographer_id,
-            booking_id=request.booking_id,
-            amount=deposit_amount,
-            photographer_name=request.photographer_name
-        )
-        
-        notification_service.notify_payment_held(
-            client_id=notification_client_id,
-            photographer_id=photographer_id,
-            booking_id=request.booking_id,
-            amount=deposit_amount
-        )
-        
-        print(f"✅ Notifications created for booking {request.booking_id}")
+        print(f"✅ 50/50 payment notifications created for booking {request.booking_id}")
         
         return {
             "status": "success",
-            "message": "Booking confirmation email sent and notifications created",
+            "message": "Booking confirmation email sent with 50/50 payment details",
             "email_sent": True,
-            "notifications_created": True
+            "notifications_created": True,
+            "payment_model": "50/50",
+            "advance_amount": advance_amount,
+            "remaining_amount": remaining_amount
         }
     except Exception as e:
         print(f"❌ Failed to send booking email: {e}")
@@ -1372,129 +1452,4 @@ async def get_tip_leaderboard(limit: int = 10):
     return {
         "status": "success",
         "leaderboard": leaderboard
-    }
-
-
-# =============================================================================
-# PROMO CODE ENDPOINTS - DISABLED (can be re-enabled later)
-# =============================================================================
-# Promo code functionality has been temporarily disabled.
-# To re-enable, uncomment the import and endpoints below.
-
-
-# =============================================================================
-# SPLIT PAYMENT ENDPOINTS - Pay in installments
-# =============================================================================
-
-class SplitPaymentRequest(BaseModel):
-    booking_id: str
-    client_id: str
-    photographer_id: str
-    total_amount: float
-    shoot_date: str
-    split_option: str  # "2_parts", "3_parts", "4_parts"
-
-
-class InstallmentPaymentRequest(BaseModel):
-    booking_id: str
-    installment_number: int
-    transaction_id: str
-
-
-@router.get("/split/options/{amount}")
-async def get_split_options(amount: float):
-    """
-    Get available split payment options for an amount
-    """
-    options = split_payment_service.get_available_options(amount)
-    return {
-        "status": "success",
-        "eligible": len(options) > 0,
-        "min_amount": split_payment_service.MIN_SPLIT_AMOUNT,
-        "options": options
-    }
-
-
-@router.post("/split/create")
-async def create_split_plan(request: SplitPaymentRequest):
-    """
-    Create a split payment plan for a booking
-    """
-    result = split_payment_service.create_payment_plan(
-        booking_id=request.booking_id,
-        client_id=request.client_id,
-        photographer_id=request.photographer_id,
-        total_amount=request.total_amount,
-        shoot_date=request.shoot_date,
-        split_option=request.split_option
-    )
-    return result
-
-
-@router.post("/split/pay-installment")
-async def pay_installment(request: InstallmentPaymentRequest):
-    """
-    Record payment for an installment
-    """
-    result = split_payment_service.record_installment_payment(
-        booking_id=request.booking_id,
-        installment_number=request.installment_number,
-        transaction_id=request.transaction_id
-    )
-    return result
-
-
-@router.get("/split/plan/{booking_id}")
-async def get_split_plan(booking_id: str):
-    """
-    Get payment plan for a booking
-    """
-    plan = split_payment_service.get_payment_plan(booking_id)
-    if plan:
-        return {
-            "status": "success",
-            "has_plan": True,
-            "plan": plan
-        }
-    return {
-        "status": "success",
-        "has_plan": False,
-        "plan": None
-    }
-
-
-@router.get("/split/client/{client_id}")
-async def get_client_split_plans(client_id: str):
-    """
-    Get all payment plans for a client
-    """
-    plans = split_payment_service.get_client_plans(client_id)
-    return {
-        "status": "success",
-        "plans": plans
-    }
-
-
-@router.get("/split/due")
-async def get_due_installments(client_id: Optional[str] = None):
-    """
-    Get all due installments
-    """
-    due = split_payment_service.get_due_installments(client_id)
-    return {
-        "status": "success",
-        "due_installments": due
-    }
-
-
-@router.get("/split/upcoming")
-async def get_upcoming_installments(days: int = 7):
-    """
-    Get installments due in the next X days (for reminders)
-    """
-    upcoming = split_payment_service.get_upcoming_installments(days)
-    return {
-        "status": "success",
-        "upcoming_installments": upcoming,
-        "days_ahead": days
     }

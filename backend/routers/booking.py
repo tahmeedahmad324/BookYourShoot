@@ -6,6 +6,8 @@ from backend.auth import get_current_user
 from backend.services.reminder_service import reminder_service
 from backend.services.optimization_service import booking_optimizer
 from backend.services.photographer_data_service import photographer_data_engine
+from backend.services.notification_service import notification_service
+from backend.services.email_service import email_service
 
 router = APIRouter(prefix="/bookings", tags=["Booking"])
 
@@ -460,4 +462,262 @@ def send_demo_reminder(payload: DemoReminderRequest):
         reminder_type=payload.reminder_type
     )
     return result
+
+
+# ============ WORK COMPLETION ENDPOINT ============
+
+class WorkCompletedRequest(BaseModel):
+    """Request model for marking work as completed"""
+    notes: Optional[str] = None  # Optional notes from photographer
+
+
+@router.post("/{booking_id}/work-completed")
+async def mark_work_completed(
+    booking_id: str, 
+    payload: WorkCompletedRequest = None,
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Mark booking work as completed by photographer.
+    
+    This endpoint:
+    1. Updates booking status to 'work_completed'
+    2. Notifies client that work is done
+    3. Triggers client to pay remaining 50%
+    4. Sends email to client with payment link
+    
+    Flow:
+    - Photographer finishes work → calls this endpoint
+    - Client receives notification to pay remaining 50%
+    - After remaining payment → funds go to escrow
+    - After 7 days → escrow released to photographer
+    """
+    try:
+        # Get user ID from token
+        user_id = None
+        if isinstance(current_user, dict):
+            user_id = current_user.get("id") or current_user.get("sub")
+        else:
+            user_id = getattr(current_user, 'id', None)
+
+        if not user_id:
+            raise HTTPException(status_code=401, detail="Unauthorized")
+        
+        # Get booking with all related data
+        booking = supabase.table('booking').select(
+            '*, photographer_profile!booking_photographer_id_fkey(user_id, business_name)'
+        ).eq('id', booking_id).limit(1).execute()
+        
+        if not booking.data:
+            raise HTTPException(status_code=404, detail="Booking not found")
+        
+        booking_data = booking.data[0]
+        
+        # Verify user is the photographer
+        photographer_profile = booking_data.get('photographer_profile', {})
+        photographer_user_id = photographer_profile.get('user_id')
+        
+        if photographer_user_id != user_id:
+            raise HTTPException(status_code=403, detail="Only the assigned photographer can mark work as completed")
+        
+        # Check booking is in valid state (must be confirmed with advance paid)
+        current_status = booking_data.get('status', '')
+        advance_paid = booking_data.get('advance_paid', False)
+        
+        if current_status == 'completed' or current_status == 'work_completed':
+            raise HTTPException(status_code=400, detail="Work already marked as completed")
+        
+        if current_status not in ['confirmed', 'paid', 'in_progress']:
+            raise HTTPException(status_code=400, detail=f"Cannot complete work. Booking status is: {current_status}")
+        
+        if not advance_paid:
+            raise HTTPException(status_code=400, detail="Cannot complete work. Advance payment not received yet.")
+        
+        # Get booking details for notifications
+        client_id = booking_data.get('client_id')
+        total_price = booking_data.get('price', 0) or 0
+        advance_amount = booking_data.get('advance_paid', 0) or total_price * 0.5
+        remaining_amount = total_price - float(advance_amount)
+        photographer_name = photographer_profile.get('business_name', 'Photographer')
+        service_type = booking_data.get('service_type') or booking_data.get('event_type', 'Photography Service')
+        event_date = booking_data.get('event_date', '')
+        
+        # Get client email for notifications
+        client = supabase.table('users').select('email, full_name').eq('id', client_id).limit(1).execute()
+        client_email = client.data[0].get('email') if client.data else None
+        client_name = client.data[0].get('full_name', 'Client') if client.data else 'Client'
+        
+        # Update booking status
+        from datetime import datetime
+        update_data = {
+            'status': 'work_completed',
+            'completed_at': datetime.now().isoformat(),
+        }
+        
+        resp = supabase.table('booking').update(update_data).eq('id', booking_id).execute()
+        
+        # Send notification to client about work completion
+        notification_service.notify_work_completed(
+            client_id=client_id,
+            photographer_id=user_id,
+            booking_id=booking_id,
+            remaining_amount=remaining_amount,
+            photographer_name=photographer_name,
+            service_type=service_type
+        )
+        
+        # Send email to client with remaining payment details
+        if client_email:
+            try:
+                email_service.send_remaining_payment_due(
+                    client_email=client_email,
+                    client_name=client_name,
+                    photographer_name=photographer_name,
+                    remaining_amount=remaining_amount,
+                    service_type=service_type,
+                    booking_id=booking_id,
+                    event_date=event_date
+                )
+            except Exception as e:
+                print(f"Warning: Failed to send work completion email: {e}")
+        
+        return {
+            "success": True,
+            "message": "Work marked as completed! Client has been notified to pay the remaining amount.",
+            "data": {
+                "booking_id": booking_id,
+                "status": "work_completed",
+                "remaining_amount": remaining_amount,
+                "client_notified": True,
+                "email_sent": client_email is not None
+            },
+            "next_steps": [
+                "Client will receive notification to pay remaining Rs. {:,.0f}".format(remaining_amount),
+                "After client pays, funds will be held in escrow for 7 days",
+                "After 7 days, funds will be released to your available balance"
+            ]
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+# ============ PAYMENT COMPLETION ENDPOINTS ============
+
+class PaymentCompleteRequest(BaseModel):
+    paymentType: str  # "advance" or "remaining"
+    amount: float
+
+
+@router.post("/{booking_id}/payment-complete")
+def mark_payment_complete(
+    booking_id: str, 
+    payload: PaymentCompleteRequest, 
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Mark a payment as complete for a booking.
+    
+    Payment Types:
+    - "advance": 50% advance payment (confirms booking)
+    - "remaining": Final 50% payment (after work completion)
+    
+    Updates:
+    - advance_paid / remaining_paid amounts
+    - payment_status field
+    - Booking status if fully paid
+    - Sends notifications to both parties
+    """
+    try:
+        user_id = None
+        if isinstance(current_user, dict):
+            user_id = current_user.get("id") or current_user.get("sub")
+        else:
+            user_id = getattr(current_user, 'id', None)
+
+        if not user_id:
+            raise HTTPException(status_code=401, detail="Unauthorized")
+        
+        # Get booking with photographer details
+        booking = supabase.table('booking').select(
+            '*, photographer_profile!booking_photographer_id_fkey(user_id)'
+        ).eq('id', booking_id).limit(1).execute()
+        
+        if not booking.data:
+            raise HTTPException(status_code=404, detail="Booking not found")
+        
+        booking_data = booking.data[0]
+        
+        # Verify user is the client
+        if booking_data['client_id'] != user_id:
+            raise HTTPException(status_code=403, detail="Only booking client can mark payment complete")
+        
+        # Get current payment amounts
+        current_advance = booking_data.get('advance_paid', 0) or 0
+        current_remaining = booking_data.get('remaining_paid', 0) or 0
+        total_price = booking_data.get('price', 0) or 0
+        photographer_user_id = booking_data.get('photographer_profile', {}).get('user_id')
+        
+        # Update based on payment type
+        update_data = {}
+        
+        if payload.paymentType == "advance":
+            update_data['advance_paid'] = payload.amount
+            update_data['payment_status'] = 'advance_paid'
+            update_data['status'] = 'confirmed'  # Confirm booking when advance paid
+            
+            # Notify about advance payment
+            notification_service.notify_advance_payment_received(
+                client_id=user_id,
+                photographer_id=photographer_user_id or booking_data.get('photographer_id'),
+                booking_id=booking_id,
+                advance_amount=payload.amount,
+                remaining_amount=total_price - payload.amount,
+                photographer_name=booking_data.get('photographer_name', 'Photographer'),
+                service_type=booking_data.get('event_type', 'Photography Service'),
+                date=booking_data.get('event_date', '')
+            )
+        
+        elif payload.paymentType == "remaining":
+            update_data['remaining_paid'] = payload.amount
+            new_total_paid = current_advance + payload.amount
+            
+            # Check if fully paid
+            if new_total_paid >= total_price:
+                update_data['payment_status'] = 'fully_paid'
+            else:
+                update_data['payment_status'] = 'partially_paid'
+            
+            # Calculate platform fee (10%) and photographer earnings
+            platform_fee = total_price * 0.10
+            photographer_earnings = total_price - platform_fee
+            
+            # Notify about remaining payment received
+            notification_service.notify_remaining_payment_received(
+                client_id=user_id,
+                photographer_id=photographer_user_id or booking_data.get('photographer_id'),
+                booking_id=booking_id,
+                remaining_amount=payload.amount,
+                total_amount=total_price,
+                photographer_earnings=photographer_earnings,
+                platform_fee=platform_fee
+            )
+        
+        # Update booking
+        resp = supabase.table('booking').update(update_data).eq('id', booking_id).execute()
+        
+        return {
+            "success": True,
+            "data": resp.data,
+            "message": f"Payment recorded: {payload.paymentType} - Rs. {payload.amount}",
+            "payment_status": update_data.get('payment_status', 'unknown'),
+            "notifications_sent": True
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
 

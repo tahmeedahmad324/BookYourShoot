@@ -14,10 +14,6 @@ const EquipmentDetail = () => {
   const [startDate, setStartDate] = useState('');
   const [showPayment, setShowPayment] = useState(false);
   const [rentalBooking, setRentalBooking] = useState(null);
-  
-  // Split payment state
-  const [splitOptions, setSplitOptions] = useState([]);
-  const [selectedSplit, setSelectedSplit] = useState(null);
 
   const API_BASE = 'http://localhost:5000/api';
 
@@ -80,30 +76,6 @@ const EquipmentDetail = () => {
     }, 500);
   }, [id]);
 
-  // Fetch split options when total amount changes
-  useEffect(() => {
-    if (equipment) {
-      const totalAmount = calculateRentalCost() + equipment.deposit;
-      fetchSplitOptions(totalAmount);
-    }
-  }, [equipment, selectedPeriod, rentalDays]);
-
-  const fetchSplitOptions = async (amount) => {
-    try {
-      const res = await fetch(`${API_BASE}/payments/split/options/${amount}`);
-      const data = await res.json();
-      if (data.status === 'success') {
-        setSplitOptions(data.options || []);
-        // Reset selected split if no longer available
-        if (selectedSplit && !data.options?.find(o => o.key === selectedSplit.key)) {
-          setSelectedSplit(null);
-        }
-      }
-    } catch (err) {
-      console.error('Failed to fetch split options:', err);
-    }
-  };
-
   const calculateRentalCost = () => {
     if (!equipment) return 0;
     
@@ -126,7 +98,8 @@ const EquipmentDetail = () => {
 
     const rentalCost = calculateRentalCost();
     const totalAmount = rentalCost + equipment.deposit;
-    const advancePayment = selectedSplit ? selectedSplit.first_payment : totalAmount;
+    // Standard 50/50 payment: 50% advance now, 50% on pickup
+    const advancePayment = totalAmount * 0.5;
 
     const bookingData = {
       id: `RENT-${Date.now()}`,
@@ -141,7 +114,7 @@ const EquipmentDetail = () => {
       deposit: equipment.deposit,
       totalAmount: totalAmount,
       advancePayment: advancePayment,
-      splitPlan: selectedSplit ? selectedSplit.key : null,
+      remainingPayment: totalAmount - advancePayment,
       status: 'pending_payment',
       ownerName: equipment.owner.name,
       ownerPhone: equipment.owner.phone,
@@ -451,92 +424,42 @@ const EquipmentDetail = () => {
                   </div>
                 </div>
 
-                {/* Payment Plan Selection */}
+                {/* Standard 50/50 Payment Plan */}
                 <div className="mb-4">
                   <label className="form-label fw-semibold">Payment Plan</label>
                   
-                  {/* Standard Full Payment Option */}
-                  <div 
-                    className={`border rounded-3 p-3 mb-2 ${!selectedSplit ? 'border-primary bg-primary bg-opacity-10' : 'bg-light'}`}
-                    onClick={() => setSelectedSplit(null)}
-                    style={{ cursor: 'pointer' }}
-                  >
+                  {/* 50% Advance Payment Info */}
+                  <div className="border rounded-3 p-3 mb-2 border-primary bg-primary bg-opacity-10">
                     <div className="d-flex align-items-start">
-                      <input 
-                        type="radio" 
-                        className="form-check-input mt-1 me-2" 
-                        checked={!selectedSplit}
-                        onChange={() => setSelectedSplit(null)}
-                      />
+                      <div className="me-3">
+                        <span className="badge bg-primary rounded-pill px-3 py-2">50%</span>
+                      </div>
                       <div className="flex-grow-1">
-                        <div className="fw-semibold">Full Payment</div>
-                        <div className="small text-muted">Pay full amount now</div>
+                        <div className="fw-semibold">Pay Now (Advance)</div>
+                        <div className="small text-muted">Secure your rental booking</div>
                         <div className="mt-1">
-                          <span className="badge bg-primary">Pay Rs. {(calculateRentalCost() + equipment.deposit).toLocaleString()} now</span>
+                          <span className="fw-bold text-primary fs-5">Rs. {((calculateRentalCost() + equipment.deposit) * 0.5).toLocaleString()}</span>
                         </div>
                       </div>
                     </div>
                   </div>
 
-                  {/* Split Payment Options */}
-                  {splitOptions.filter(opt => opt.key === '3_parts').length > 0 ? (
-                    splitOptions.filter(opt => opt.key === '3_parts').map(option => (
-                      <div 
-                        key={option.key}
-                        className={`border rounded-3 p-3 mb-2 ${selectedSplit?.key === option.key ? 'border-primary bg-primary bg-opacity-10' : 'bg-light'}`}
-                        onClick={() => setSelectedSplit(option)}
-                        style={{ cursor: 'pointer' }}
-                      >
-                        <div className="d-flex align-items-start">
-                          <input 
-                            type="radio" 
-                            className="form-check-input mt-1 me-2" 
-                            checked={selectedSplit?.key === option.key}
-                            onChange={() => setSelectedSplit(option)}
-                          />
-                          <div className="flex-grow-1">
-                            <div className="fw-semibold">{option.name}</div>
-                            <div className="small text-muted">{option.description}</div>
-                            <div className="mt-1">
-                              <span className="badge bg-success">Pay Rs. {option.first_payment.toLocaleString()} now</span>
-                            </div>
-                          </div>
-                        </div>
+                  {/* Remaining 50% Info */}
+                  <div className="border rounded-3 p-3 bg-light">
+                    <div className="d-flex align-items-start">
+                      <div className="me-3">
+                        <span className="badge bg-secondary rounded-pill px-3 py-2">50%</span>
                       </div>
-                    ))
-                  ) : (calculateRentalCost() + equipment.deposit) < 25000 ? (
-                    <div 
-                      className="border rounded-3 p-3 bg-light opacity-50"
-                      style={{ cursor: 'not-allowed' }}
-                    >
-                      <div className="d-flex align-items-start">
-                        <input 
-                          type="radio" 
-                          className="form-check-input mt-1 me-2" 
-                          disabled
-                        />
-                        <div className="flex-grow-1">
-                          <div className="fw-semibold text-muted">3 Installments</div>
-                          <div className="small text-muted">34% now, 33% midway, 33% before pickup</div>
-                          <div className="mt-1">
-                            <span className="badge bg-secondary">Available for rentals ≥ Rs. 25,000</span>
-                          </div>
+                      <div className="flex-grow-1">
+                        <div className="fw-semibold text-muted">Pay on Pickup</div>
+                        <div className="small text-muted">Remaining balance when collecting equipment</div>
+                        <div className="mt-1">
+                          <span className="fw-bold text-secondary fs-5">Rs. {((calculateRentalCost() + equipment.deposit) * 0.5).toLocaleString()}</span>
                         </div>
                       </div>
                     </div>
-                  ) : null}
+                  </div>
                 </div>
-
-                {/* Pay Now Summary */}
-                {selectedSplit && (
-                  <div className="alert alert-success py-2 mb-3">
-                    <div className="d-flex justify-content-between align-items-center">
-                      <span className="fw-semibold">Pay Now:</span>
-                      <span className="fw-bold fs-5">Rs. {selectedSplit.first_payment.toLocaleString()}</span>
-                    </div>
-                    <small className="text-muted">Remaining: Rs. {(calculateRentalCost() + equipment.deposit - selectedSplit.first_payment).toLocaleString()}</small>
-                  </div>
-                )}
 
                 {/* Rent Button */}
                 {equipment.available ? (

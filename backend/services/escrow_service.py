@@ -12,6 +12,12 @@ from datetime import datetime, timedelta
 from typing import Dict, Optional, List
 from enum import Enum
 
+# Import payout service for integration
+try:
+    from backend.services.payout_service import payout_service
+except ImportError:
+    payout_service = None
+
 
 class EscrowStatus(Enum):
     HELD = "held"  # Payment received, held by platform
@@ -140,6 +146,16 @@ class EscrowService:
         escrow.notes.append(f"{datetime.now().isoformat()}: Escrow created - Rs. {amount} held")
         
         self.transactions[transaction_id] = escrow
+        
+        # Add to photographer's pending balance (in escrow)
+        if payout_service:
+            payout_service.add_earnings(
+                photographer_id=photographer_id,
+                amount=escrow.photographer_amount,  # 90% after platform fee
+                booking_id=booking_id,
+                is_released=False  # In escrow, not yet available
+            )
+        
         return escrow
     
     def release_to_photographer(self, transaction_id: str, reason: str = "Work completed") -> Dict:
@@ -160,6 +176,14 @@ class EscrowService:
         escrow.released_at = datetime.now().isoformat()
         escrow.notes.append(f"{datetime.now().isoformat()}: Released Rs. {escrow.photographer_amount} to photographer - {reason}")
         escrow.notes.append(f"{datetime.now().isoformat()}: Platform fee Rs. {escrow.platform_fee} retained")
+        
+        # Release earnings to photographer's available balance
+        if payout_service:
+            payout_service.release_earnings(
+                photographer_id=escrow.photographer_id,
+                amount=escrow.photographer_amount,
+                booking_id=escrow.booking_id
+            )
         
         # In production: Call Stripe Transfer API to send money to photographer's connected account
         # stripe.Transfer.create(

@@ -101,6 +101,25 @@ const ClientBookings = () => {
       createdAt: "2024-10-28",
       imagesDelivered: 0,
       totalImages: 80
+    },
+    {
+      id: 5,
+      photographerId: 5,
+      photographerName: "Golden Frame Studio",
+      photographerImage: "🌟",
+      serviceType: "Bridal Photography",
+      date: "2024-12-10",
+      time: "09:00",
+      duration: "5 hours",
+      location: "Faisalabad",
+      totalAmount: 30000,
+      status: "work_completed",
+      paidAmount: 15000,
+      remainingAmount: 15000,
+      specialRequests: "Full bridal coverage with candid moments",
+      createdAt: "2024-11-20",
+      imagesDelivered: 250,
+      totalImages: 250
     }
   ];
 
@@ -123,7 +142,8 @@ const ClientBookings = () => {
       pending: { color: 'warning', icon: '⏳', text: 'Pending' },
       confirmed: { color: 'success', icon: '✅', text: 'Confirmed' },
       completed: { color: 'info', icon: '🎉', text: 'Completed' },
-      cancelled: { color: 'danger', icon: '❌', text: 'Cancelled' }
+      cancelled: { color: 'danger', icon: '❌', text: 'Cancelled' },
+      work_completed: { color: 'primary', icon: '📸', text: 'Work Done' }
     };
     
     const config = statusConfig[status] || statusConfig.pending;
@@ -133,6 +153,31 @@ const ClientBookings = () => {
         {config.text}
       </span>
     );
+  };
+
+  const getPaymentStatusBadge = (booking) => {
+    const { paidAmount, totalAmount, remainingAmount, status } = booking;
+    
+    if (status === 'cancelled') {
+      return <span className="badge bg-secondary">Payment Cancelled</span>;
+    }
+    
+    if (paidAmount === 0) {
+      return <span className="badge bg-danger">💰 Payment Due</span>;
+    }
+    
+    if (remainingAmount > 0 && paidAmount > 0) {
+      if (status === 'completed' || status === 'work_completed') {
+        return <span className="badge bg-warning text-dark">⏳ Final Payment Due</span>;
+      }
+      return <span className="badge bg-info">✓ 50% Advance Paid</span>;
+    }
+    
+    if (remainingAmount === 0) {
+      return <span className="badge bg-success">✓ Fully Paid</span>;
+    }
+    
+    return null;
   };
 
   const filteredBookings = bookings.filter(booking => {
@@ -458,6 +503,9 @@ const ClientBookings = () => {
                         <div className="fw-semibold text-warning">Rs. {booking.remainingAmount.toLocaleString()}</div>
                       </div>
                       {getPaymentProgress(booking.paidAmount, booking.totalAmount)}
+                      <div className="mt-2">
+                        {getPaymentStatusBadge(booking)}
+                      </div>
                     </div>
 
                     {/* Actions */}
@@ -466,12 +514,13 @@ const ClientBookings = () => {
                         {getStatusBadge(booking.status)}
                       </div>
                       <div className="d-flex flex-column gap-1">
-                        {booking.status === 'confirmed' && booking.remainingAmount > 0 && (
+                        {/* Pay Remaining button - show for confirmed/work_completed with remaining balance */}
+                        {(booking.status === 'confirmed' || booking.status === 'work_completed' || booking.status === 'completed') && booking.remainingAmount > 0 && (
                           <button 
                             className="btn btn-primary btn-sm"
                             onClick={() => handlePayRemaining(booking.id)}
                           >
-                            💰 Pay Remaining
+                            💰 Pay Remaining (Rs. {booking.remainingAmount.toLocaleString()})
                           </button>
                         )}
                         {(booking.status === 'confirmed' || booking.status === 'pending') && (
@@ -482,7 +531,7 @@ const ClientBookings = () => {
                             📅 Reschedule
                           </button>
                         )}
-                        {booking.status === 'completed' && (
+                        {(booking.status === 'completed' || booking.status === 'work_completed') && (
                           <>
                             <button 
                               className="btn btn-primary btn-sm"

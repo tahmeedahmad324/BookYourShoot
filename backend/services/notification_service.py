@@ -19,6 +19,14 @@ class NotificationType(Enum):
     BOOKING_COMPLETED = "booking_completed"
     DISPUTE_OPENED = "dispute_opened"
     DISPUTE_RESOLVED = "dispute_resolved"
+    # New 50/50 payment flow notifications
+    ADVANCE_PAYMENT_RECEIVED = "advance_payment_received"
+    REMAINING_PAYMENT_DUE = "remaining_payment_due"
+    REMAINING_PAYMENT_RECEIVED = "remaining_payment_received"
+    WORK_COMPLETED = "work_completed"
+    PAYOUT_REQUESTED = "payout_requested"
+    PAYOUT_PROCESSED = "payout_processed"
+    PAYOUT_REJECTED = "payout_rejected"
 
 
 class Notification:
@@ -82,7 +90,14 @@ class NotificationService:
             NotificationType.BOOKING_CANCELLED: "❌",
             NotificationType.BOOKING_COMPLETED: "🎉",
             NotificationType.DISPUTE_OPENED: "⚠️",
-            NotificationType.DISPUTE_RESOLVED: "✔️"
+            NotificationType.DISPUTE_RESOLVED: "✔️",
+            NotificationType.ADVANCE_PAYMENT_RECEIVED: "💵",
+            NotificationType.REMAINING_PAYMENT_DUE: "⏰",
+            NotificationType.REMAINING_PAYMENT_RECEIVED: "✅",
+            NotificationType.WORK_COMPLETED: "📸",
+            NotificationType.PAYOUT_REQUESTED: "📤",
+            NotificationType.PAYOUT_PROCESSED: "💸",
+            NotificationType.PAYOUT_REJECTED: "❌"
         }.get(notification.type, "📧")
         
         print(f"\n{emoji} NOTIFICATION [{notification.recipient_role.upper()}]")
@@ -157,16 +172,19 @@ class NotificationService:
         photographer_id: str,
         booking_id: str,
         amount: float,
-        photographer_name: str
+        photographer_name: str,
+        is_advance: bool = True
     ):
         """Notify both parties when payment is received"""
+        payment_type = "50% advance" if is_advance else "remaining 50%"
+        
         # Notify client
         self.send(Notification(
             notification_type=NotificationType.PAYMENT_RECEIVED,
             recipient_id=client_id,
             recipient_role="client",
-            title="Payment Successful",
-            message=f"Your payment of Rs. {amount:,.0f} for booking with {photographer_name} has been received. The payment is now secured until work is completed.",
+            title="Payment Successful ✅",
+            message=f"Your {payment_type} payment of Rs. {amount:,.0f} for booking with {photographer_name} has been received and secured.",
             booking_id=booking_id,
             amount=amount
         ))
@@ -176,8 +194,8 @@ class NotificationService:
             notification_type=NotificationType.PAYMENT_RECEIVED,
             recipient_id=photographer_id,
             recipient_role="photographer",
-            title="New Booking Payment Received",
-            message=f"A client has paid Rs. {amount:,.0f} for your services. The payment is held securely until you complete the work.",
+            title=f"{'New Booking' if is_advance else 'Final'} Payment Received! 💵",
+            message=f"Client paid {payment_type} (Rs. {amount:,.0f}) for your services. {'Complete the work to unlock full payment.' if is_advance else 'Full payment received!'}",
             booking_id=booking_id,
             amount=amount
         ))
@@ -332,7 +350,7 @@ class NotificationService:
             recipient_id=client_id,
             recipient_role="client",
             title="Booking Confirmed! ✅",
-            message=f"Your {service_type} session with {photographer_name} on {date} is confirmed. Payment has been secured.",
+            message=f"Your {service_type} session with {photographer_name} on {date} is confirmed. 50% advance payment has been secured.",
             booking_id=booking_id,
             metadata={"photographer_name": photographer_name, "service_type": service_type, "date": date}
         ))
@@ -343,9 +361,203 @@ class NotificationService:
             recipient_id=photographer_id,
             recipient_role="photographer",
             title="New Booking Confirmed! 🎉",
-            message=f"You have a new {service_type} booking on {date}. Payment is secured and awaiting your work completion.",
+            message=f"You have a new {service_type} booking on {date}. Client paid 50% advance - payment is secured in escrow.",
             booking_id=booking_id,
             metadata={"service_type": service_type, "date": date}
+        ))
+
+    # ============================================
+    # 50/50 Payment Flow Notifications
+    # ============================================
+
+    def notify_advance_payment_received(
+        self,
+        client_id: str,
+        photographer_id: str,
+        booking_id: str,
+        advance_amount: float,
+        remaining_amount: float,
+        photographer_name: str,
+        service_type: str,
+        date: str
+    ):
+        """Notify when 50% advance payment is received"""
+        # Notify client
+        self.send(Notification(
+            notification_type=NotificationType.ADVANCE_PAYMENT_RECEIVED,
+            recipient_id=client_id,
+            recipient_role="client",
+            title="50% Advance Payment Received ✅",
+            message=f"Your advance payment of Rs. {advance_amount:,.0f} for {service_type} with {photographer_name} is confirmed. Remaining Rs. {remaining_amount:,.0f} due after session.",
+            booking_id=booking_id,
+            amount=advance_amount,
+            metadata={"remaining_amount": remaining_amount, "photographer_name": photographer_name}
+        ))
+        
+        # Notify photographer
+        self.send(Notification(
+            notification_type=NotificationType.ADVANCE_PAYMENT_RECEIVED,
+            recipient_id=photographer_id,
+            recipient_role="photographer",
+            title="New Booking - 50% Advance Received! 💵",
+            message=f"Client paid Rs. {advance_amount:,.0f} advance for {service_type} on {date}. Complete the work to receive full payment.",
+            booking_id=booking_id,
+            amount=advance_amount,
+            metadata={"remaining_amount": remaining_amount, "date": date}
+        ))
+
+    def notify_work_completed(
+        self,
+        client_id: str,
+        photographer_id: str,
+        booking_id: str,
+        remaining_amount: float,
+        photographer_name: str,
+        service_type: str,
+        photos_count: int = 0
+    ):
+        """Notify when photographer marks work as complete"""
+        # Notify client - action required
+        self.send(Notification(
+            notification_type=NotificationType.WORK_COMPLETED,
+            recipient_id=client_id,
+            recipient_role="client",
+            title="📸 Your Photos Are Ready!",
+            message=f"{photographer_name} has completed your {service_type} session! Please pay remaining Rs. {remaining_amount:,.0f} to access your photos.",
+            booking_id=booking_id,
+            amount=remaining_amount,
+            metadata={"photographer_name": photographer_name, "photos_count": photos_count, "action_required": True}
+        ))
+        
+        # Notify photographer
+        self.send(Notification(
+            notification_type=NotificationType.WORK_COMPLETED,
+            recipient_id=photographer_id,
+            recipient_role="photographer",
+            title="Work Marked Complete ✅",
+            message=f"You've marked the {service_type} booking as complete. Client has been notified to pay remaining Rs. {remaining_amount:,.0f}.",
+            booking_id=booking_id,
+            amount=remaining_amount
+        ))
+
+    def notify_remaining_payment_due(
+        self,
+        client_id: str,
+        booking_id: str,
+        remaining_amount: float,
+        photographer_name: str,
+        service_type: str
+    ):
+        """Remind client about remaining payment"""
+        self.send(Notification(
+            notification_type=NotificationType.REMAINING_PAYMENT_DUE,
+            recipient_id=client_id,
+            recipient_role="client",
+            title="⏰ Remaining Payment Due",
+            message=f"Please pay remaining Rs. {remaining_amount:,.0f} for your {service_type} with {photographer_name} to complete the booking.",
+            booking_id=booking_id,
+            amount=remaining_amount,
+            metadata={"action_required": True}
+        ))
+
+    def notify_remaining_payment_received(
+        self,
+        client_id: str,
+        photographer_id: str,
+        booking_id: str,
+        remaining_amount: float,
+        total_amount: float,
+        photographer_earnings: float,
+        platform_fee: float
+    ):
+        """Notify when final 50% payment is received"""
+        # Notify client
+        self.send(Notification(
+            notification_type=NotificationType.REMAINING_PAYMENT_RECEIVED,
+            recipient_id=client_id,
+            recipient_role="client",
+            title="Final Payment Complete! 🎉",
+            message=f"Thank you! Your final payment of Rs. {remaining_amount:,.0f} has been received. Total paid: Rs. {total_amount:,.0f}. Don't forget to leave a review!",
+            booking_id=booking_id,
+            amount=total_amount
+        ))
+        
+        # Notify photographer
+        self.send(Notification(
+            notification_type=NotificationType.PAYMENT_RELEASED,
+            recipient_id=photographer_id,
+            recipient_role="photographer",
+            title="Full Payment Received! 💰",
+            message=f"Client completed final payment! You'll receive Rs. {photographer_earnings:,.0f} (after Rs. {platform_fee:,.0f} platform fee). Funds available for payout after 7-day escrow.",
+            booking_id=booking_id,
+            amount=photographer_earnings,
+            metadata={"platform_fee": platform_fee, "gross_amount": total_amount}
+        ))
+
+    def notify_payout_requested(
+        self,
+        photographer_id: str,
+        payout_id: str,
+        amount: float,
+        bank_name: str
+    ):
+        """Notify when photographer requests a payout"""
+        # Notify photographer
+        self.send(Notification(
+            notification_type=NotificationType.PAYOUT_REQUESTED,
+            recipient_id=photographer_id,
+            recipient_role="photographer",
+            title="Payout Requested 📤",
+            message=f"Your payout request for Rs. {amount:,.0f} to {bank_name} has been submitted. Processing takes 2-3 business days.",
+            amount=amount,
+            metadata={"payout_id": payout_id, "bank_name": bank_name}
+        ))
+        
+        # Notify admin
+        self.send(Notification(
+            notification_type=NotificationType.PAYOUT_REQUESTED,
+            recipient_id="admin",
+            recipient_role="admin",
+            title="New Payout Request",
+            message=f"Photographer requested payout of Rs. {amount:,.0f} to {bank_name}. Payout ID: {payout_id}",
+            amount=amount,
+            metadata={"payout_id": payout_id, "photographer_id": photographer_id}
+        ))
+
+    def notify_payout_processed(
+        self,
+        photographer_id: str,
+        payout_id: str,
+        amount: float,
+        bank_name: str
+    ):
+        """Notify when payout is processed"""
+        self.send(Notification(
+            notification_type=NotificationType.PAYOUT_PROCESSED,
+            recipient_id=photographer_id,
+            recipient_role="photographer",
+            title="Payout Processed! 💸",
+            message=f"Your payout of Rs. {amount:,.0f} has been sent to {bank_name}. Funds should arrive within 2-3 business days.",
+            amount=amount,
+            metadata={"payout_id": payout_id, "bank_name": bank_name}
+        ))
+
+    def notify_payout_rejected(
+        self,
+        photographer_id: str,
+        payout_id: str,
+        amount: float,
+        reason: str
+    ):
+        """Notify when payout is rejected"""
+        self.send(Notification(
+            notification_type=NotificationType.PAYOUT_REJECTED,
+            recipient_id=photographer_id,
+            recipient_role="photographer",
+            title="Payout Rejected ❌",
+            message=f"Your payout request for Rs. {amount:,.0f} was rejected. Reason: {reason}. Please contact support.",
+            amount=amount,
+            metadata={"payout_id": payout_id, "reason": reason}
         ))
 
     def notify_dispute_resolved(

@@ -26,10 +26,6 @@ const BookingRequest = () => {
   const [showPayment, setShowPayment] = useState(false)
   const [bookingData, setBookingData] = useState(null)
   const [error, setError] = useState(null)
-  
-  // Split payment state
-  const [splitOptions, setSplitOptions] = useState([])
-  const [selectedSplit, setSelectedSplit] = useState(null)
 
   // Photographer services data
   const photographerServices = {
@@ -131,23 +127,9 @@ const BookingRequest = () => {
       if (service) {
         const price = service.basePrice + service.hourlyRate * (duration - 1)
         setCalculatedPrice(price)
-        // Fetch split options only if price changed
-        fetchSplitOptions(price)
       }
     }
   }, [serviceType, duration])
-
-  const fetchSplitOptions = async (amount) => {
-    try {
-      const res = await fetch(`${API_BASE}/payments/split/options/${amount}`)
-      const data = await res.json()
-      if (data.status === 'success') {
-        setSplitOptions(data.options || [])
-      }
-    } catch (err) {
-      console.error('Failed to fetch split options:', err)
-    }
-  }
 
   const onSubmit = async (data) => {
     setSubmitting(true)
@@ -168,8 +150,8 @@ const BookingRequest = () => {
         duration: data.duration,
         location: data.location,
         price: calculatedPrice,
-        advancePayment: selectedSplit ? selectedSplit.first_payment : calculatedPrice * 0.5,
-        splitPlan: selectedSplit ? selectedSplit.key : null,
+        advancePayment: calculatedPrice * 0.5, // Standard 50% advance
+        remainingPayment: calculatedPrice * 0.5, // 50% after work
         status: "pending_payment",
         specialRequests: data.specialRequests,
         createdAt: new Date().toISOString(),
@@ -571,80 +553,30 @@ const BookingRequest = () => {
                   <span className="fw-bold fs-5 text-primary">PKR {calculatedPrice.toLocaleString()}</span>
                 </div>
 
-                {/* Payment Plan Selection */}
+                {/* Payment Summary */}
                 <div className="mb-3">
-                  <p className="small text-muted mb-2">Select Payment Plan:</p>
+                  <p className="small text-muted mb-2">Payment Plan:</p>
                   
-                  {/* Standard 50/50 Option */}
-                  <div 
-                    className={`border rounded-3 p-3 mb-2 ${!selectedSplit ? 'border-primary bg-primary bg-opacity-10' : 'bg-light'}`}
-                    onClick={() => setSelectedSplit(null)}
-                    style={{ cursor: 'pointer' }}
-                  >
+                  {/* Standard 50/50 Payment */}
+                  <div className="border rounded-3 p-3 mb-2 border-primary bg-primary bg-opacity-10">
                     <div className="d-flex align-items-start">
-                      <input 
-                        type="radio" 
-                        className="form-check-input mt-1 me-2" 
-                        checked={!selectedSplit}
-                        onChange={() => setSelectedSplit(null)}
-                      />
+                      <div className="text-primary me-2">✓</div>
                       <div className="flex-grow-1">
-                        <div className="fw-semibold">Standard (2 Payments)</div>
-                        <div className="small text-muted">50% now, 50% on event day</div>
-                        <div className="mt-1">
-                          <span className="badge bg-primary">Pay PKR {(calculatedPrice * 0.5).toLocaleString()} now</span>
+                        <div className="fw-semibold">Standard Payment (50/50)</div>
+                        <div className="small text-muted">Pay 50% now to confirm, 50% after completion</div>
+                        <div className="mt-2">
+                          <div className="d-flex justify-content-between mb-1">
+                            <span className="small">Advance Payment (Now):</span>
+                            <span className="badge bg-primary">PKR {(calculatedPrice * 0.5).toLocaleString()}</span>
+                          </div>
+                          <div className="d-flex justify-content-between">
+                            <span className="small text-muted">Remaining (After Work):</span>
+                            <span className="badge bg-secondary">PKR {(calculatedPrice * 0.5).toLocaleString()}</span>
+                          </div>
                         </div>
                       </div>
                     </div>
                   </div>
-
-                  {/* 3 Installments Option */}
-                  {splitOptions.filter(opt => opt.key === '3_parts').length > 0 ? (
-                    splitOptions.filter(opt => opt.key === '3_parts').map(option => (
-                      <div 
-                        key={option.key}
-                        className={`border rounded-3 p-3 ${selectedSplit?.key === option.key ? 'border-primary bg-primary bg-opacity-10' : 'bg-light'}`}
-                        onClick={() => setSelectedSplit(option)}
-                        style={{ cursor: 'pointer' }}
-                      >
-                        <div className="d-flex align-items-start">
-                          <input 
-                            type="radio" 
-                            className="form-check-input mt-1 me-2" 
-                            checked={selectedSplit?.key === option.key}
-                            onChange={() => setSelectedSplit(option)}
-                          />
-                          <div className="flex-grow-1">
-                            <div className="fw-semibold">{option.name}</div>
-                            <div className="small text-muted">{option.description}</div>
-                            <div className="mt-1">
-                              <span className="badge bg-success">Pay PKR {option.first_payment.toLocaleString()} now</span>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    ))
-                  ) : (
-                    <div 
-                      className="border rounded-3 p-3 bg-light opacity-50"
-                      style={{ cursor: 'not-allowed' }}
-                    >
-                      <div className="d-flex align-items-start">
-                        <input 
-                          type="radio" 
-                          className="form-check-input mt-1 me-2" 
-                          disabled
-                        />
-                        <div className="flex-grow-1">
-                          <div className="fw-semibold text-muted">3 Installments</div>
-                          <div className="small text-muted">34% now, 33% midway, 33% before event</div>
-                          <div className="mt-1">
-                            <span className="badge bg-secondary">Available for orders ≥ PKR 25,000</span>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  )}
                 </div>
 
                 <div className="small text-muted mb-3">
@@ -660,7 +592,7 @@ const BookingRequest = () => {
                 </div>
 
                 <div className="alert alert-light border small mb-0 py-2">
-                  <strong>Note:</strong> Booking confirmed after {selectedSplit ? 'first installment' : 'advance'} payment. Travel charges may apply outside {photographer.location}.
+                  <strong>Note:</strong> Booking confirmed after advance payment. Travel charges may apply outside {photographer.location}.
                 </div>
               </div>
             </div>

@@ -33,14 +33,50 @@ const profileSchema = yup.object().shape({
     .min(1, 'Please select at least one service'),
   workLocation: yup.string()
     .required('Please specify your work location preference'),
+  // Bank Details for Payouts
+  bankName: yup.string()
+    .required('Bank name is required for receiving payments'),
+  accountTitle: yup.string()
+    .required('Account holder name is required')
+    .min(3, 'Account title must be at least 3 characters'),
+  accountNumber: yup.string()
+    .required('Account number is required')
+    .min(10, 'Account number must be at least 10 characters'),
+  preferredPayoutMethod: yup.string()
+    .required('Please select your preferred payout method'),
+  mobileWalletNumber: yup.string()
+    .nullable()
+    .matches(/^03\d{9}$/, 'Please enter a valid Pakistani mobile number (03XXXXXXXXX)'),
 });
+
+// Pakistani Banks List
+const PAKISTANI_BANKS = [
+  "Allied Bank Limited (ABL)",
+  "Askari Bank",
+  "Bank Alfalah",
+  "Bank Al-Habib",
+  "Faysal Bank",
+  "Habib Bank Limited (HBL)",
+  "Habib Metropolitan Bank",
+  "JS Bank",
+  "MCB Bank",
+  "Meezan Bank",
+  "National Bank of Pakistan (NBP)",
+  "Silk Bank",
+  "Soneri Bank",
+  "Standard Chartered Pakistan",
+  "Summit Bank",
+  "The Bank of Punjab",
+  "United Bank Limited (UBL)",
+  "Other"
+];
 
 const PhotographerProfileSetup = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const [loading, setLoading] = useState(false);
   const [currentStep, setCurrentStep] = useState(1);
-  const totalSteps = 4;
+  const totalSteps = 5;
 
   const { 
     register, 
@@ -56,13 +92,19 @@ const PhotographerProfileSetup = () => {
       languages: [],
       servicesOffered: [],
       availability: '',
-      workLocation: ''
+      workLocation: '',
+      bankName: '',
+      accountTitle: '',
+      accountNumber: '',
+      preferredPayoutMethod: 'bank',
+      mobileWalletNumber: ''
     }
   });
 
   const watchSpecialties = watch('specialties');
   const watchServices = watch('servicesOffered');
   const watchLanguages = watch('languages');
+  const watchPayoutMethod = watch('preferredPayoutMethod');
 
   const specialtiesOptions = [
     'Wedding Photography', 'Portrait Photography', 'Event Photography',
@@ -115,7 +157,8 @@ const PhotographerProfileSetup = () => {
       1: ['bio', 'experienceYears'],
       2: ['specialties', 'servicesOffered'],
       3: ['hourlyRate', 'availability', 'workLocation'],
-      4: ['languages']
+      4: ['languages'],
+      5: ['bankName', 'accountTitle', 'accountNumber', 'preferredPayoutMethod']
     };
 
     const isValid = await trigger(fieldsToValidate[currentStep]);
@@ -377,7 +420,7 @@ const PhotographerProfileSetup = () => {
                   {/* Step 4: Languages */}
                   {currentStep === 4 && (
                     <div className="fade-in">
-                      <h4 className="fw-bold mb-4">🗣️ Languages & Final Details</h4>
+                      <h4 className="fw-bold mb-4">🗣️ Languages</h4>
                       
                       {/* Languages */}
                       <div className="mb-4">
@@ -406,18 +449,151 @@ const PhotographerProfileSetup = () => {
                           <div className="text-danger small mt-1">{errors.languages.message}</div>
                         )}
                       </div>
+                    </div>
+                  )}
+
+                  {/* Step 5: Bank Account Details for Payouts */}
+                  {currentStep === 5 && (
+                    <div className="fade-in">
+                      <h4 className="fw-bold mb-4">🏦 Payout Details</h4>
+                      <div className="alert alert-info mb-4">
+                        <strong>💰 How you'll get paid:</strong> After completing bookings, your earnings (minus 10% platform fee) will be transferred to your account within 7 days of job completion.
+                      </div>
+                      
+                      {/* Preferred Payout Method */}
+                      <div className="mb-4">
+                        <label className="form-label fw-semibold">
+                          Preferred Payout Method *
+                        </label>
+                        <div className="row g-3">
+                          {[
+                            { value: 'bank', label: 'Bank Transfer', icon: '🏦', desc: '1-2 business days' },
+                            { value: 'jazzcash', label: 'JazzCash', icon: '📱', desc: 'Instant transfer' },
+                            { value: 'easypaisa', label: 'EasyPaisa', icon: '📲', desc: 'Instant transfer' }
+                          ].map((method) => (
+                            <div className="col-md-4" key={method.value}>
+                              <div
+                                className={`card h-100 ${watchPayoutMethod === method.value ? 'border-primary bg-primary bg-opacity-10' : 'border'}`}
+                                style={{ cursor: 'pointer' }}
+                                onClick={() => {
+                                  setValue('preferredPayoutMethod', method.value);
+                                  trigger('preferredPayoutMethod');
+                                }}
+                              >
+                                <div className="card-body p-3 text-center">
+                                  <div className="fs-3 mb-1">{method.icon}</div>
+                                  <div className="fw-semibold">{method.label}</div>
+                                  <small className="text-muted">{method.desc}</small>
+                                  {watchPayoutMethod === method.value && (
+                                    <div className="text-primary mt-1">✓</div>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                        {errors.preferredPayoutMethod && (
+                          <div className="text-danger small mt-1">{errors.preferredPayoutMethod.message}</div>
+                        )}
+                      </div>
+
+                      {/* Bank Details (shown when bank is selected) */}
+                      {watchPayoutMethod === 'bank' && (
+                        <>
+                          {/* Bank Name */}
+                          <div className="mb-4">
+                            <label htmlFor="bankName" className="form-label fw-semibold">
+                              Bank Name *
+                            </label>
+                            <select
+                              className={`form-select ${errors.bankName ? 'is-invalid' : ''}`}
+                              id="bankName"
+                              {...register('bankName')}
+                            >
+                              <option value="">Select your bank</option>
+                              {PAKISTANI_BANKS.map((bank) => (
+                                <option key={bank} value={bank}>{bank}</option>
+                              ))}
+                            </select>
+                            {errors.bankName && (
+                              <div className="text-danger small mt-1">{errors.bankName.message}</div>
+                            )}
+                          </div>
+
+                          {/* Account Title */}
+                          <div className="mb-4">
+                            <label htmlFor="accountTitle" className="form-label fw-semibold">
+                              Account Holder Name *
+                            </label>
+                            <input
+                              type="text"
+                              className={`form-control ${errors.accountTitle ? 'is-invalid' : ''}`}
+                              id="accountTitle"
+                              placeholder="Name as shown on bank account (must match CNIC)"
+                              {...register('accountTitle')}
+                            />
+                            <small className="text-muted">Must match the name on your CNIC</small>
+                            {errors.accountTitle && (
+                              <div className="text-danger small mt-1">{errors.accountTitle.message}</div>
+                            )}
+                          </div>
+
+                          {/* Account Number */}
+                          <div className="mb-4">
+                            <label htmlFor="accountNumber" className="form-label fw-semibold">
+                              Account Number / IBAN *
+                            </label>
+                            <input
+                              type="text"
+                              className={`form-control ${errors.accountNumber ? 'is-invalid' : ''}`}
+                              id="accountNumber"
+                              placeholder="e.g., PK36HABB0000111122223333 or 1234567890123"
+                              {...register('accountNumber')}
+                            />
+                            <small className="text-muted">IBAN (starting with PK) is preferred for faster transfers</small>
+                            {errors.accountNumber && (
+                              <div className="text-danger small mt-1">{errors.accountNumber.message}</div>
+                            )}
+                          </div>
+                        </>
+                      )}
+
+                      {/* Mobile Wallet Number (shown when JazzCash or EasyPaisa is selected) */}
+                      {(watchPayoutMethod === 'jazzcash' || watchPayoutMethod === 'easypaisa') && (
+                        <div className="mb-4">
+                          <label htmlFor="mobileWalletNumber" className="form-label fw-semibold">
+                            {watchPayoutMethod === 'jazzcash' ? 'JazzCash' : 'EasyPaisa'} Mobile Number *
+                          </label>
+                          <input
+                            type="tel"
+                            className={`form-control ${errors.mobileWalletNumber ? 'is-invalid' : ''}`}
+                            id="mobileWalletNumber"
+                            placeholder="03XX-XXXXXXX"
+                            {...register('mobileWalletNumber')}
+                          />
+                          <small className="text-muted">Enter your registered {watchPayoutMethod === 'jazzcash' ? 'JazzCash' : 'EasyPaisa'} number</small>
+                          {errors.mobileWalletNumber && (
+                            <div className="text-danger small mt-1">{errors.mobileWalletNumber.message}</div>
+                          )}
+                        </div>
+                      )}
 
                       {/* Summary */}
-                      <div className="alert alert-info">
+                      <div className="alert alert-success">
                         <h6 className="fw-bold mb-2">📋 Profile Summary</h6>
                         <ul className="mb-0 small">
                           <li>Bio: {watch('bio')?.length || 0} characters</li>
                           <li>Experience: {watch('experienceYears') || 0} years</li>
                           <li>Specialties: {watchSpecialties?.length || 0} selected</li>
                           <li>Services: {watchServices?.length || 0} selected</li>
-                          <li>Hourly Rate: PKR {watch('hourlyRate') || 0}</li>
+                          <li>Hourly Rate: PKR {watch('hourlyRate')?.toLocaleString() || 0}</li>
                           <li>Languages: {watchLanguages?.length || 0} selected</li>
+                          <li>Payout Method: {watchPayoutMethod === 'bank' ? 'Bank Transfer' : watchPayoutMethod === 'jazzcash' ? 'JazzCash' : 'EasyPaisa'}</li>
                         </ul>
+                      </div>
+
+                      <div className="alert alert-warning small">
+                        <strong>⚠️ Important:</strong> Your bank/wallet details are encrypted and secure. We will verify your account before processing the first payout.
                       </div>
                     </div>
                   )}

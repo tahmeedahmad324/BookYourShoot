@@ -125,9 +125,9 @@ const PhotographerDashboard = () => {
     {
       id: "payments",
       title: "Earnings & Payouts",
-      description: "View payments, pending payouts, and transaction history",
+      description: "View earnings, request payouts, and manage bank details",
       icon: Receipt,
-      link: "/photographer/payments",
+      link: "/photographer/earnings",
       badge: stats.pendingPayouts > 0 ? stats.pendingPayouts : null,
       badgeColor: "success",
     },

@@ -270,7 +270,13 @@ export default function BookingSuccess() {
                   }
                 </p>
 
-                {/* Removed transaction ID - kept in backend for support */}
+                {/* 50% Advance Payment Notice */}
+                {!isEquipmentRental && (
+                  <div className="alert alert-info mb-4">
+                    <strong>✅ 50% Advance Paid</strong>
+                    <p className="mb-0 small">The remaining 50% will be due after your photography session is complete.</p>
+                  </div>
+                )}
 
                 <div className="bg-light rounded-3 p-4 mb-4">
                   <h6 className="fw-bold mb-3">What's Next?</h6>
@@ -315,11 +321,18 @@ export default function BookingSuccess() {
                             <p className="mb-0 small text-muted">The photographer will reach out within 24 hours</p>
                           </div>
                         </div>
-                        <div className="d-flex align-items-start">
+                        <div className="d-flex align-items-start mb-3">
                           <span className="badge bg-primary me-3 mt-1">3</span>
                           <div>
-                            <strong>Final Preparation</strong>
-                            <p className="mb-0 small text-muted">Discuss final details before your event date</p>
+                            <strong>Photography Session</strong>
+                            <p className="mb-0 small text-muted">Enjoy your photography session on the scheduled date</p>
+                          </div>
+                        </div>
+                        <div className="d-flex align-items-start">
+                          <span className="badge bg-success me-3 mt-1">4</span>
+                          <div>
+                            <strong>Pay Remaining 50%</strong>
+                            <p className="mb-0 small text-muted">Complete payment after work is done, then receive your photos</p>
                           </div>
                         </div>
                       </>

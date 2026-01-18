@@ -199,6 +199,22 @@ export const bookingAPI = {
       body: JSON.stringify({ status: 'cancelled', notes: reason }),
     });
   },
+
+  // Mark work as completed (photographer only)
+  markWorkCompleted: async (bookingId, notes = '') => {
+    return apiRequest(`/api/bookings/${bookingId}/work-completed`, {
+      method: 'POST',
+      body: JSON.stringify({ notes }),
+    });
+  },
+
+  // Mark payment as complete (client only)
+  markPaymentComplete: async (bookingId, paymentType, amount) => {
+    return apiRequest(`/api/bookings/${bookingId}/payment-complete`, {
+      method: 'POST',
+      body: JSON.stringify({ paymentType, amount }),
+    });
+  },
 };
 
 // ==================== Review APIs ====================
