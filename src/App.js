@@ -2,7 +2,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-d
 import Navbar from "./components/common/Navbar"
 import Footer from "./components/common/Footer"
 import ProtectedRoute from "./components/common/ProtectedRoute"
-import AIChatbot from "./components/common/AIChatbot"
+import AIChatbotV2 from "./components/common/AIChatbotV2"
 import ScrollToTop from "./components/common/ScrollToTop"
 
 // Public Pages
@@ -387,7 +387,7 @@ function App() {
             </Routes>
           </main>
           <Footer />
-          <AIChatbot />
+          <AIChatbotV2 />
         </div>
       </Router>
     </AuthProvider>

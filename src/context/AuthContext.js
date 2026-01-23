@@ -46,6 +46,9 @@ export const AuthProvider = ({ children }) => {
       sessionStorage.setItem('user', JSON.stringify(userData));
       sessionStorage.setItem('token', token);
     }
+    
+    // Notify other components (like chatbot) about auth change
+    window.dispatchEvent(new Event('authChanged'));
   };
 
   const logout = () => {
@@ -54,6 +57,9 @@ export const AuthProvider = ({ children }) => {
     localStorage.removeItem('token');
     sessionStorage.removeItem('user');
     sessionStorage.removeItem('token');
+    
+    // Notify other components (like chatbot) about auth change
+    window.dispatchEvent(new Event('authChanged'));
   };
 
   const value = {

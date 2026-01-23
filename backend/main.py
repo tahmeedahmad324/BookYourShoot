@@ -42,7 +42,8 @@ from backend.routers import (
     albums,
     notifications,
     jobs,
-    settings
+    settings,
+    chatbot
 )
 from backend.services.payment_service import payment_service, StripeGateway
 
@@ -111,6 +112,7 @@ app.include_router(albums.router, prefix="/api")
 app.include_router(notifications.router, prefix="/api")
 app.include_router(jobs.router, prefix="/api")
 app.include_router(settings.router, prefix="/api")
+app.include_router(chatbot.router, prefix="/api")
 
 
 @app.get("/")
