@@ -12,10 +12,100 @@ const BookingRequests = () => {
   const [selectedBooking, setSelectedBooking] = useState(null);
   const [processingAction, setProcessingAction] = useState(null);
 
-  // Mock booking requests data
+  // Mock booking requests data (including equipment rentals)
   const mockBookings = [
     {
+      id: 201,
+      type: "equipment_rental",
+      clientId: "client_eq1",
+      clientName: "Ali Raza",
+      clientEmail: "ali.raza@email.com",
+      clientPhone: "+92-300-9876543",
+      clientImage: "👤",
+      equipmentName: "Canon EOS R5 Camera",
+      equipmentCategory: "Camera Bodies",
+      rentalStartDate: "2024-12-20",
+      rentalEndDate: "2024-12-25",
+      rentalDays: 5,
+      dailyRate: 3500,
+      totalAmount: 17500,
+      securityDeposit: 25000,
+      deliveryMethod: "pickup",
+      specialRequests: "Need camera with extra battery pack and charger. Will pick up from your location.",
+      urgency: "high",
+      createdAt: "2024-11-16",
+      status: "pending",
+      message: "Hi! I need this camera for a wedding shoot in Murree. I have experience with Canon cameras.",
+      clientProfile: {
+        rentalsCompleted: 2,
+        rating: 4.8,
+        joinedDate: "2024-05-20"
+      }
+    },
+    {
+      id: 202,
+      type: "equipment_rental",
+      clientId: "client_eq2",
+      clientName: "Zainab Ahmed",
+      clientEmail: "zainab.a@email.com",
+      clientPhone: "+92-333-5544332",
+      clientImage: "👩",
+      equipmentName: "Sony A7 III with 24-70mm Lens",
+      equipmentCategory: "Complete Kit",
+      rentalStartDate: "2024-12-22",
+      rentalEndDate: "2024-12-27",
+      rentalDays: 5,
+      dailyRate: 4000,
+      totalAmount: 20000,
+      securityDeposit: 30000,
+      depositPaid: 30000,
+      deliveryMethod: "delivery",
+      deliveryAddress: "DHA Phase 5, Lahore",
+      specialRequests: "Please deliver to my address. I'll need a quick tutorial on using the camera settings.",
+      urgency: "medium",
+      createdAt: "2024-11-15",
+      status: "approved",
+      message: "This will be my first time using a professional camera. Can you help me with basic settings?",
+      clientProfile: {
+        rentalsCompleted: 0,
+        rating: 0,
+        joinedDate: "2024-11-01"
+      }
+    },
+    {
+      id: 203,
+      type: "equipment_rental",
+      clientId: "client_eq3",
+      clientName: "Hassan Sheikh",
+      clientEmail: "hassan.s@email.com",
+      clientPhone: "+92-321-7788990",
+      clientImage: "👨",
+      equipmentName: "DJI Ronin-S Gimbal",
+      equipmentCategory: "Stabilizers",
+      rentalStartDate: "2024-12-18",
+      rentalEndDate: "2024-12-20",
+      rentalDays: 2,
+      dailyRate: 2500,
+      totalAmount: 5000,
+      securityDeposit: 15000,
+      depositPaid: 15000,
+      rentalPaid: 5000,
+      deliveryMethod: "pickup",
+      specialRequests: "I've used this model before. Just need it for a corporate video shoot.",
+      urgency: "low",
+      createdAt: "2024-11-14",
+      status: "active",
+      activatedAt: "2024-12-18T10:30:00",
+      message: "Quick rental for a 2-day corporate shoot. Very familiar with the equipment.",
+      clientProfile: {
+        rentalsCompleted: 5,
+        rating: 4.9,
+        joinedDate: "2024-02-10"
+      }
+    },
+    {
       id: 101,
+      type: "photography_booking",
       clientId: "client123",
       clientName: "Sarah Khan",
       clientEmail: "sarah.khan@email.com",
@@ -44,6 +134,7 @@ const BookingRequests = () => {
     },
     {
       id: 102,
+      type: "photography_booking",
       clientId: "client456",
       clientName: "Ahmed Hassan",
       clientEmail: "ahmed.h@email.com",
@@ -72,6 +163,7 @@ const BookingRequests = () => {
     },
     {
       id: 103,
+      type: "photography_booking",
       clientId: "client789",
       clientName: "Fatima Zahra",
       clientEmail: "fatima.z@email.com",
@@ -103,6 +195,7 @@ const BookingRequests = () => {
     },
     {
       id: 104,
+      type: "photography_booking",
       clientId: "client012",
       clientName: "Mohammad Ali",
       clientEmail: "m.ali@email.com",
@@ -143,9 +236,12 @@ const BookingRequests = () => {
   const getStatusBadge = (status) => {
     const statusConfig = {
       pending: { color: 'warning', icon: '⏳', text: 'Pending Response' },
+      approved: { color: 'success', icon: '✅', text: 'Approved' },
       confirmed: { color: 'success', icon: '✅', text: 'Confirmed' },
+      active: { color: 'primary', icon: '🔄', text: 'Active Rental' },
       rejected: { color: 'danger', icon: '❌', text: 'Rejected' },
-      completed: { color: 'info', icon: '🎉', text: 'Completed' }
+      completed: { color: 'info', icon: '🎉', text: 'Completed' },
+      returned: { color: 'secondary', icon: '✓', text: 'Returned' }
     };
     
     const config = statusConfig[status] || statusConfig.pending;
@@ -440,6 +536,13 @@ const BookingRequests = () => {
             {filteredBookings.map((booking) => (
               <div key={booking.id} className="card border-0 shadow-sm">
                 <div className="card-body">
+                  {/* Equipment Rental Badge */}
+                  {booking.type === 'equipment_rental' && (
+                    <div className="mb-3">
+                      <span className="badge bg-info">🎥 Equipment Rental</span>
+                    </div>
+                  )}
+                  
                   <div className="row align-items-start">
                     {/* Client Info */}
                     <div className="col-md-3">
@@ -458,8 +561,8 @@ const BookingRequests = () => {
                       {/* Client Profile Info */}
                       <div className="small text-muted">
                         <div className="d-flex justify-content-between mb-1">
-                          <span>Previous Bookings:</span>
-                          <span className="fw-semibold">{booking.clientProfile.bookingsCompleted}</span>
+                          <span>Previous {booking.type === 'equipment_rental' ? 'Rentals' : 'Bookings'}:</span>
+                          <span className="fw-semibold">{booking.clientProfile.rentalsCompleted || booking.clientProfile.bookingsCompleted || 0}</span>
                         </div>
                         <div className="d-flex justify-content-between mb-1">
                           <span>Client Rating:</span>
@@ -472,48 +575,94 @@ const BookingRequests = () => {
                       </div>
                     </div>
 
-                    {/* Booking Details */}
+                    {/* Booking/Rental Details */}
                     <div className="col-md-4">
-                      <div className="mb-2">
-                        <span className="text-muted small">Service Type:</span>
-                        <div className="fw-semibold">📸 {booking.serviceType}</div>
-                      </div>
-                      <div className="mb-2">
-                        <span className="text-muted small">Event Type:</span>
-                        <div className="fw-semibold">🎉 {booking.eventType}</div>
-                      </div>
-                      <div className="mb-2">
-                        <span className="text-muted small">Date & Time:</span>
-                        <div className="fw-semibold">📅 {formatDateTime(booking.date, booking.time)}</div>
-                      </div>
-                      <div className="mb-2">
-                        <span className="text-muted small">Duration:</span>
-                        <div className="fw-semibold">⏱️ {booking.duration}</div>
-                      </div>
-                      <div className="mb-2">
-                        <span className="text-muted small">Location:</span>
-                        <div className="fw-semibold">📍 {booking.location}</div>
-                      </div>
-                      <div>
-                        <span className="text-muted small">Venue:</span>
-                        <div className="fw-semibold">🏢 {booking.venue}</div>
-                      </div>
+                      {booking.type === 'equipment_rental' ? (
+                        <>
+                          <div className="mb-2">
+                            <span className="text-muted small">Equipment:</span>
+                            <div className="fw-semibold">📷 {booking.equipmentName}</div>
+                          </div>
+                          <div className="mb-2">
+                            <span className="text-muted small">Category:</span>
+                            <div className="fw-semibold">🏷️ {booking.equipmentCategory}</div>
+                          </div>
+                          <div className="mb-2">
+                            <span className="text-muted small">Rental Period:</span>
+                            <div className="fw-semibold">📅 {booking.rentalStartDate} to {booking.rentalEndDate}</div>
+                          </div>
+                          <div className="mb-2">
+                            <span className="text-muted small">Duration:</span>
+                            <div className="fw-semibold">⏱️ {booking.rentalDays} days</div>
+                          </div>
+                          <div className="mb-2">
+                            <span className="text-muted small">Daily Rate:</span>
+                            <div className="fw-semibold">💰 Rs. {booking.dailyRate.toLocaleString()}/day</div>
+                          </div>
+                          <div>
+                            <span className="text-muted small">Delivery Method:</span>
+                            <div className="fw-semibold">🚚 {booking.deliveryMethod === 'pickup' ? 'Self Pickup' : 'Delivery'}</div>
+                            {booking.deliveryAddress && (
+                              <div className="text-muted small">📍 {booking.deliveryAddress}</div>
+                            )}
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          <div className="mb-2">
+                            <span className="text-muted small">Service Type:</span>
+                            <div className="fw-semibold">📸 {booking.serviceType}</div>
+                          </div>
+                          <div className="mb-2">
+                            <span className="text-muted small">Event Type:</span>
+                            <div className="fw-semibold">🎉 {booking.eventType}</div>
+                          </div>
+                          <div className="mb-2">
+                            <span className="text-muted small">Date & Time:</span>
+                            <div className="fw-semibold">📅 {formatDateTime(booking.date, booking.time)}</div>
+                          </div>
+                          <div className="mb-2">
+                            <span className="text-muted small">Duration:</span>
+                            <div className="fw-semibold">⏱️ {booking.duration}</div>
+                          </div>
+                          <div className="mb-2">
+                            <span className="text-muted small">Location:</span>
+                            <div className="fw-semibold">📍 {booking.location}</div>
+                          </div>
+                          <div>
+                            <span className="text-muted small">Venue:</span>
+                            <div className="fw-semibold">🏢 {booking.venue}</div>
+                          </div>
+                        </>
+                      )}
                     </div>
 
                     {/* Pricing & Status */}
                     <div className="col-md-2">
                       <div className="mb-2">
-                        <span className="text-muted small">Total Amount:</span>
+                        <span className="text-muted small">{booking.type === 'equipment_rental' ? 'Rental Amount' : 'Total Amount'}:</span>
                         <div className="fw-bold text-primary">Rs. {booking.totalAmount.toLocaleString()}</div>
                       </div>
-                      <div className="mb-2">
-                        <span className="text-muted small">Advance (50%):</span>
-                        <div className="fw-semibold">Rs. {booking.advanceRequired.toLocaleString()}</div>
-                      </div>
-                      <div className="mb-3">
-                        <span className="text-muted small">Guests:</span>
-                        <div className="fw-semibold">{booking.guestCount} people</div>
-                      </div>
+                      {booking.type === 'equipment_rental' ? (
+                        <div className="mb-2">
+                          <span className="text-muted small">Security Deposit:</span>
+                          <div className="fw-semibold">Rs. {booking.securityDeposit.toLocaleString()}</div>
+                          {booking.depositPaid && (
+                            <div className="badge bg-success text-white mt-1">✓ Deposit Paid</div>
+                          )}
+                        </div>
+                      ) : (
+                        <div className="mb-2">
+                          <span className="text-muted small">Advance (50%):</span>
+                          <div className="fw-semibold">Rs. {booking.advanceRequired.toLocaleString()}</div>
+                        </div>
+                      )}
+                      {booking.guestCount && (
+                        <div className="mb-3">
+                          <span className="text-muted small">Guests:</span>
+                          <div className="fw-semibold">{booking.guestCount} people</div>
+                        </div>
+                      )}
                       <div className="mb-2">
                         {getStatusBadge(booking.status)}
                       </div>

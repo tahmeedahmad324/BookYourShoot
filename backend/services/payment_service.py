@@ -73,6 +73,9 @@ class StripeGateway(PaymentGateway):
                 **(metadata or {})
             }
             
+            # Determine if this is equipment rental or photography booking
+            is_equipment_rental = metadata and metadata.get('is_equipment_rental') == 'true'
+            
             session = self.stripe.checkout.Session.create(
                 payment_method_types=['card'],
                 line_items=[{
@@ -80,8 +83,8 @@ class StripeGateway(PaymentGateway):
                         'currency': currency.lower(),
                         'unit_amount': amount_cents,
                         'product_data': {
-                            'name': f'Photography Booking - {booking_id}',
-                            'description': 'BookYourShoot Photography Service',
+                            'name': f'{"Equipment Rental" if is_equipment_rental else "Photography Booking"} - {booking_id}',
+                            'description': f'BookYourShoot {"Equipment Rental Service" if is_equipment_rental else "Photography Service"}',
                         },
                     },
                     'quantity': 1,

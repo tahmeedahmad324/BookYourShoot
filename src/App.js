@@ -51,12 +51,17 @@ import BookingRequests from "./pages/photographer/BookingRequests"
 import EquipmentList from "./pages/photographer/EquipmentList"
 import EquipmentDetail from "./pages/photographer/EquipmentDetail"
 import MyEquipmentListings from "./pages/photographer/MyEquipmentListings"
+import OwnerRentalRequests from "./pages/photographer/OwnerRentalRequests"
 import TravelEstimator from "./pages/photographer/TravelEstimator"
+
+// Client Pages - Equipment Rentals
+import ClientRentals from "./pages/client/ClientRentals"
 
 // Admin Pages
 import AdminDashboard from "./pages/admin/AdminDashboard"
 import AdminVerifications from "./pages/admin/AdminVerifications"
 import AdminComplaints from "./pages/admin/AdminComplaints"
+import AdminEquipmentDisputes from "./pages/admin/AdminEquipmentDisputes"
 import AdminSettings from "./pages/admin/AdminSettings"
 import AdminReportedReviews from "./pages/admin/AdminReportedReviews"
 import AdminPlatformSettings from "./pages/admin/AdminPlatformSettings"
@@ -141,6 +146,14 @@ function App() {
                 element={
                   <ProtectedRoute allowedRoles={["client"]}>
                     <ClientBookings />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/client/my-rentals"
+                element={
+                  <ProtectedRoute allowedRoles={["client", "photographer"]}>
+                    <ClientRentals />
                   </ProtectedRoute>
                 }
               />
@@ -287,6 +300,14 @@ function App() {
                 }
               />
               <Route
+                path="/photographer/rental-requests"
+                element={
+                  <ProtectedRoute allowedRoles={["photographer"]}>
+                    <OwnerRentalRequests />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
                 path="/photographer/travel"
                 element={
                   <ProtectedRoute allowedRoles={["photographer"]}>
@@ -325,6 +346,14 @@ function App() {
                 element={
                   <ProtectedRoute allowedRoles={["admin"]}>
                     <AdminComplaints />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/admin/equipment-disputes"
+                element={
+                  <ProtectedRoute allowedRoles={["admin"]}>
+                    <AdminEquipmentDisputes />
                   </ProtectedRoute>
                 }
               />

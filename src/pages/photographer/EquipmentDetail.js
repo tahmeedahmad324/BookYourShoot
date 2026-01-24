@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import StripeCheckout from '../../components/StripeCheckout';
+import api from '../../api/api';
 
 const EquipmentDetail = () => {
   const { id } = useParams();
@@ -12,10 +12,10 @@ const EquipmentDetail = () => {
   const [selectedPeriod, setSelectedPeriod] = useState('weekly');
   const [rentalDays, setRentalDays] = useState(7);
   const [startDate, setStartDate] = useState('');
-  const [showPayment, setShowPayment] = useState(false);
-  const [rentalBooking, setRentalBooking] = useState(null);
-
-  const API_BASE = 'http://localhost:5000/api';
+  const [endDate, setEndDate] = useState('');
+  const [blockedDates, setBlockedDates] = useState([]);
+  const [availabilityLoading, setAvailabilityLoading] = useState(false);
+  const [submittingRental, setSubmittingRental] = useState(false);
 
   // Mock equipment data (in real app, fetch from API)
   const mockEquipment = [
@@ -68,13 +68,121 @@ const EquipmentDetail = () => {
   ];
 
   useEffect(() => {
-    // Simulate API call
-    setTimeout(() => {
-      const found = mockEquipment.find(e => e.id === parseInt(id));
-      setEquipment(found);
-      setLoading(false);
-    }, 500);
+    fetchEquipmentDetails();
+    fetchAvailability();
   }, [id]);
+
+  // Update end date when start date or rental days change
+  useEffect(() => {
+    if (startDate && rentalDays) {
+      const start = new Date(startDate);
+      const end = new Date(start);
+      end.setDate(end.getDate() + rentalDays - 1);
+      setEndDate(end.toISOString().split('T')[0]);
+    }
+  }, [startDate, rentalDays]);
+
+  const fetchEquipmentDetails = async () => {
+    setLoading(true);
+    try {
+      // Try to fetch from rentable equipment list first
+      const response = await api.get('/equipment/rentable');
+      if (response.data.success && response.data.data) {
+        const found = response.data.data.find(e => e.id === id);
+        if (found) {
+          // Transform API data to match our UI format
+          const transformed = {
+            id: found.id,
+            name: found.name,
+            category: found.category?.charAt(0).toUpperCase() + found.category?.slice(1) || 'Other',
+            type: found.model || found.category || 'Equipment',
+            brand: found.brand || 'Unknown',
+            dailyRate: found.rental_price_per_day || 0,
+            weeklyRate: (found.rental_price_per_day || 0) * 6,
+            monthlyRate: (found.rental_price_per_day || 0) * 25,
+            deposit: (found.rental_price_per_day || 0) * 5,
+            description: found.description || `${found.brand} ${found.model} - ${found.condition} condition`,
+            specifications: {
+              brand: found.brand || 'N/A',
+              model: found.model || 'N/A',
+              condition: found.condition || 'N/A',
+              category: found.category || 'N/A'
+            },
+            images: [getCategoryEmoji(found.category)],
+            available: found.available !== false,
+            rating: 4.5 + Math.random() * 0.5,
+            reviews: Math.floor(Math.random() * 100) + 10,
+            rentalCount: Math.floor(Math.random() * 50) + 5,
+            condition: found.condition?.charAt(0).toUpperCase() + found.condition?.slice(1) || 'Good',
+            includes: ['Item', 'Accessories', 'Carry Case', 'Manual'],
+            features: [
+              `${found.brand} ${found.model}`,
+              `${found.condition} condition`,
+              'Professional grade equipment',
+              'Fully inspected before rental'
+            ],
+            owner: {
+              name: found.photographer_profile?.business_name || 'Equipment Owner',
+              location: found.photographer_profile?.city || 'Pakistan',
+              phone: 'Contact via platform',
+              rating: 4.8,
+              totalRentals: Math.floor(Math.random() * 100) + 20
+            },
+            original: found
+          };
+          setEquipment(transformed);
+          setLoading(false);
+          return;
+        }
+      }
+      // Fallback to mock data
+      const mockFound = mockEquipment.find(e => e.id === parseInt(id));
+      setEquipment(mockFound);
+    } catch (error) {
+      console.error('Error fetching equipment:', error);
+      // Fallback to mock data
+      const mockFound = mockEquipment.find(e => e.id === parseInt(id));
+      setEquipment(mockFound);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchAvailability = async () => {
+    setAvailabilityLoading(true);
+    try {
+      const now = new Date();
+      const response = await api.get(`/equipment/${id}/availability`, {
+        params: { month: now.getMonth() + 1, year: now.getFullYear() }
+      });
+      if (response.data.success) {
+        setBlockedDates(response.data.blocked_dates || []);
+      }
+    } catch (error) {
+      console.error('Error fetching availability:', error);
+    } finally {
+      setAvailabilityLoading(false);
+    }
+  };
+
+  const getCategoryEmoji = (category) => {
+    const emojis = {
+      'camera': '📷',
+      'lens': '🔭',
+      'lighting': '💡',
+      'audio': '🎤',
+      'accessory': '🎒',
+      'video': '🎥',
+      'drone': '🚁',
+      'support': '🗼',
+      'other': '📦'
+    };
+    return emojis[category?.toLowerCase()] || '📦';
+  };
+
+  const isDateBlocked = (dateStr) => {
+    return blockedDates.some(bd => bd.date === dateStr);
+  };
 
   const calculateRentalCost = () => {
     if (!equipment) return 0;
@@ -90,57 +198,111 @@ const EquipmentDetail = () => {
     }
   };
 
-  const handleRentNow = () => {
+  const handleRentNow = async () => {
     if (!startDate) {
       alert('Please select a start date');
       return;
     }
 
-    const rentalCost = calculateRentalCost();
-    const totalAmount = rentalCost + equipment.deposit;
-    // Standard 50/50 payment: 50% advance now, 50% on pickup
-    const advancePayment = totalAmount * 0.5;
+    // Check if any selected dates are blocked
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+      if (isDateBlocked(d.toISOString().split('T')[0])) {
+        alert('Some of your selected dates are not available. Please choose different dates.');
+        return;
+      }
+    }
 
-    const bookingData = {
-      id: `RENT-${Date.now()}`,
-      equipmentId: equipment.id,
-      equipmentName: equipment.name,
-      equipmentCategory: equipment.category,
-      equipmentImage: equipment.images[0],
-      startDate,
-      rentalDays,
-      period: selectedPeriod,
-      rentalCost: rentalCost,
-      deposit: equipment.deposit,
-      totalAmount: totalAmount,
-      advancePayment: advancePayment,
-      remainingPayment: totalAmount - advancePayment,
-      status: 'pending_payment',
-      ownerName: equipment.owner.name,
-      ownerPhone: equipment.owner.phone,
-      createdAt: new Date().toISOString()
-    };
+    setSubmittingRental(true);
 
-    // Store rental data before payment
-    localStorage.setItem('pending_rental', JSON.stringify(bookingData));
-    
-    setRentalBooking(bookingData);
-    setShowPayment(true);
-    
-    // Scroll to top when showing payment
-    window.scrollTo(0, 0);
-  };
+    try {
+      // Create rental request via API
+      const response = await api.post('/equipment/rentals', {
+        equipment_id: equipment.original?.id || equipment.id,
+        start_date: startDate,
+        end_date: endDate,
+        notes: `Rental period: ${selectedPeriod}, ${rentalDays} days`
+      });
 
-  const handlePaymentSuccess = () => {
-    // Navigate to success page which will handle the rental confirmation
-    // The success page will read from localStorage and save the rental
-    navigate('/booking/success?session_id=rental_success');
-  };
+      if (response.data.success) {
+        const rentalData = response.data.data;
+        const totalAmount = response.data.total_amount;
+        const advancePayment = totalAmount * 0.5;
 
-  const handlePaymentCancel = () => {
-    setShowPayment(false);
-    setRentalBooking(null);
-    localStorage.removeItem('pending_rental');
+        const bookingData = {
+          id: rentalData.id,
+          equipmentId: equipment.id,
+          equipmentName: equipment.name,
+          equipmentCategory: equipment.category,
+          equipmentImage: equipment.images[0],
+          startDate,
+          endDate,
+          rentalDays,
+          period: selectedPeriod,
+          rentalCost: rentalData.rental_price,
+          deposit: rentalData.security_deposit,
+          totalAmount: totalAmount,
+          advancePayment: advancePayment,
+          remainingPayment: totalAmount - advancePayment,
+          status: 'pending_approval',
+          ownerName: equipment.owner?.name || 'Equipment Owner',
+          ownerPhone: equipment.owner?.phone || 'Contact via platform',
+          createdAt: new Date().toISOString(),
+          message: response.data.message
+        };
+
+        // Show success message - rental is pending approval
+        alert(response.data.message || 'Rental request submitted successfully! The equipment owner will review your request. You will be able to pay once approved.');
+        
+        // Navigate to client bookings to see the pending rental
+        navigate('/client/bookings');
+      } else {
+        alert(response.data.error || 'Failed to create rental request');
+      }
+    } catch (error) {
+      console.error('Error creating rental:', error);
+      
+      // Fallback to old flow for demo/mock data
+      const rentalCost = calculateRentalCost();
+      const totalAmount = rentalCost + equipment.deposit;
+      const advancePayment = totalAmount * 0.5;
+
+      const bookingData = {
+        id: `RENT-${Date.now()}`,
+        equipmentId: equipment.id,
+        equipmentName: equipment.name,
+        equipmentCategory: equipment.category,
+        equipmentImage: equipment.images[0],
+        startDate,
+        endDate,
+        rentalDays,
+        period: selectedPeriod,
+        rentalCost: rentalCost,
+        deposit: equipment.deposit,
+        totalAmount: totalAmount,
+        advancePayment: advancePayment,
+        remainingPayment: totalAmount - advancePayment,
+        status: 'requested', // Waiting for owner approval
+        paymentStatus: 'pending',
+        ownerName: equipment.owner?.name || 'Equipment Owner',
+        ownerPhone: equipment.owner?.phone || 'Contact via platform',
+        createdAt: new Date().toISOString()
+      };
+
+      // Save to localStorage as 'requested' status for bookings page to pick up
+      const savedRentals = JSON.parse(localStorage.getItem('equipmentRentals') || '[]');
+      
+      // Add the new rental with 'requested' status
+      savedRentals.push(bookingData);
+      
+      localStorage.setItem('equipmentRentals', JSON.stringify(savedRentals));
+      
+      alert('Rental request submitted successfully! The equipment owner will review your request. You will be able to pay once approved.');
+      navigate('/client/bookings');
+    } finally {
+      setSubmittingRental(false);
+    }
   };
 
   const generateMinDate = () => {
@@ -176,31 +338,6 @@ const EquipmentDetail = () => {
           </div>
         </div>
       </div>
-    );
-  }
-
-  // Show payment screen
-  if (showPayment && rentalBooking) {
-    // Prepare bookingData for StripeCheckout
-    const rentalBookingData = {
-      ...rentalBooking,
-      clientName: user?.name || 'Client',
-      clientEmail: user?.email || 'client@example.com',
-      phone: user?.phone || '',
-      isEquipmentRental: true,
-      price: rentalBooking.totalAmount  // Full price for display
-    };
-    
-    return (
-      <StripeCheckout
-        bookingId={rentalBooking.id}
-        amount={rentalBooking.advancePayment}
-        photographerName={`${equipment.name} - ${rentalDays} days`}
-        onSuccess={handlePaymentSuccess}
-        onCancel={handlePaymentCancel}
-        isEquipmentRental={true}
-        bookingData={rentalBookingData}
-      />
     );
   }
 

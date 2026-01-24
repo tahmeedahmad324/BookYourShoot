@@ -30,7 +30,7 @@ def get_dashboard_stats(current_user: dict = Depends(verify_admin)):
         photographers_count = supabase.table('photographer_profile').select('id', count='exact').execute()  # type: ignore[arg-type]
         bookings_count = supabase.table('booking').select('id', count='exact').execute()  # type: ignore[arg-type]
         pending_verifications = supabase.table('photographer_profile').select('id', count='exact').eq('admin_approved', False).execute()  # type: ignore[arg-type]
-        active_complaints = supabase.table('complaint').select('id', count='exact').eq('status', 'open').execute()  # type: ignore[arg-type]
+        active_complaints = supabase.table('complaints').select('id', count='exact').eq('status', 'open').execute()  # type: ignore[arg-type]
         
         # Get recent bookings
         recent_bookings = supabase.table('booking').select('*, users!booking_client_id_fkey(full_name), photographer_profile!booking_photographer_id_fkey(*)').order('created_at', desc=True).limit(10).execute()

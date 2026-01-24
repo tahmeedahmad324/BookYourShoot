@@ -2,8 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import EscrowStatus from '../../components/EscrowStatus';
+import StripeCheckout from '../../components/StripeCheckout';
 
-const API_BASE = 'http://localhost:5000/api';
+const API_BASE = 'http://localhost:8000/api';
 
 const ClientBookings = () => {
   const { user } = useAuth();
@@ -14,6 +15,19 @@ const ClientBookings = () => {
   const [filter, setFilter] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [viewMode, setViewMode] = useState('all'); // 'all', 'bookings', 'rentals'
+  
+  // Payment Modal State
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [selectedRentalForPayment, setSelectedRentalForPayment] = useState(null);
+  
+  // Dispute Modal State
+  const [showDisputeModal, setShowDisputeModal] = useState(false);
+  const [selectedRentalForDispute, setSelectedRentalForDispute] = useState(null);
+  const [disputeForm, setDisputeForm] = useState({
+    dispute_reason: '',
+    description: ''
+  });
+  const [submittingDispute, setSubmittingDispute] = useState(false);
   
   // Tip Modal State
   const [showTipModal, setShowTipModal] = useState(false);
@@ -124,18 +138,160 @@ const ClientBookings = () => {
   ];
 
   useEffect(() => {
-    // Simulate API call to fetch bookings
-    setTimeout(() => {
-      const userBookings = mockBookings.filter(booking => booking.clientId === user?.id || true); // Mock filter
+    fetchBookingsAndRentals();
+  }, [user]);
+
+  const fetchBookingsAndRentals = async () => {
+    setLoading(true);
+    try {
+      // Fetch photography bookings
+      const userBookings = mockBookings.filter(booking => booking.clientId === user?.id || true);
       setBookings(userBookings);
       
-      // Load equipment rentals from localStorage
-      const savedRentals = JSON.parse(localStorage.getItem('equipmentRentals') || '[]');
-      setEquipmentRentals(savedRentals);
-      
+      // Fetch equipment rentals from API
+      try {
+        const response = await fetch(`${API_BASE}/equipment/rentals/my`, {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`,
+            'Content-Type': 'application/json'
+          }
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          if (data.success && data.data) {
+            // Transform API data to match our UI format
+            const transformedRentals = data.data.map(rental => ({
+              id: rental.id,
+              equipmentId: rental.equipment_id,
+              equipmentName: rental.equipment?.name || 'Equipment',
+              equipmentCategory: rental.equipment?.category || 'Other',
+              equipmentImage: getCategoryEmoji(rental.equipment?.category),
+              startDate: rental.start_date,
+              endDate: rental.end_date,
+              rentalDays: rental.total_days,
+              period: rental.total_days <= 3 ? 'daily' : rental.total_days <= 14 ? 'weekly' : 'monthly',
+              rentalCost: rental.rental_price,
+              deposit: rental.security_deposit,
+              totalAmount: rental.rental_price + rental.security_deposit,
+              status: rental.status, // requested, approved, active, returned, cancelled
+              paymentStatus: rental.payment_status,
+              ownerName: rental.equipment?.photographer_profile?.business_name || 'Equipment Owner',
+              ownerPhone: rental.equipment?.photographer_profile?.phone || 'Contact via platform',
+              createdAt: rental.created_at,
+              notes: rental.notes
+            }));
+            setEquipmentRentals(transformedRentals);
+          }
+        } else {
+          // Fallback to localStorage if API fails
+          let savedRentals = JSON.parse(localStorage.getItem('equipmentRentals') || '[]');
+          
+          // Deduplicate rentals by ID (keep the first occurrence)
+          const seenIds = new Set();
+          savedRentals = savedRentals.filter(r => {
+            if (seenIds.has(r.id)) return false;
+            seenIds.add(r.id);
+            return true;
+          });
+          
+          // Save deduplicated list back to localStorage
+          localStorage.setItem('equipmentRentals', JSON.stringify(savedRentals));
+          
+          // Add mock approved rental for testing payment flow
+          const mockApprovedRental = {
+            id: 'MOCK-APPROVED-001',
+            equipmentId: '1',
+            equipmentName: 'Canon EOS R5 Camera Body',
+            equipmentCategory: 'Camera Bodies',
+            equipmentImage: '📷',
+            startDate: '2024-12-28',
+            endDate: '2025-01-03',
+            rentalDays: 7,
+            period: 'weekly',
+            rentalCost: 17500,
+            deposit: 25000,
+            totalAmount: 42500,
+            status: 'approved', // Ready for payment!
+            paymentStatus: 'pending',
+            ownerName: 'Professional Gear Rentals',
+            ownerPhone: '+92 300 1234567',
+            createdAt: '2024-11-22T10:30:00',
+            notes: 'Approved by owner. Please proceed with payment to confirm your rental.'
+          };
+          
+          // Check if mock rental already exists
+          const hasMockRental = savedRentals.some(r => r.id === mockApprovedRental.id);
+          if (!hasMockRental) {
+            savedRentals.unshift(mockApprovedRental); // Add to beginning
+          }
+          
+          setEquipmentRentals(savedRentals);
+        }
+      } catch (apiError) {
+        console.error('Error fetching rentals from API:', apiError);
+        // Fallback to localStorage
+        let savedRentals = JSON.parse(localStorage.getItem('equipmentRentals') || '[]');
+        
+        // Deduplicate rentals by ID (keep the first occurrence)
+        const seenIds = new Set();
+        savedRentals = savedRentals.filter(r => {
+          if (seenIds.has(r.id)) return false;
+          seenIds.add(r.id);
+          return true;
+        });
+        
+        // Save deduplicated list back to localStorage
+        localStorage.setItem('equipmentRentals', JSON.stringify(savedRentals));
+        
+        // Add mock approved rental for testing payment flow
+        const mockApprovedRental = {
+          id: 'MOCK-APPROVED-001',
+          equipmentId: '1',
+          equipmentName: 'Canon EOS R5 Camera Body',
+          equipmentCategory: 'Camera Bodies',
+          equipmentImage: '📷',
+          startDate: '2024-12-28',
+          endDate: '2025-01-03',
+          rentalDays: 7,
+          period: 'weekly',
+          rentalCost: 17500,
+          deposit: 25000,
+          totalAmount: 42500,
+          status: 'approved', // Ready for payment!
+          paymentStatus: 'pending',
+          ownerName: 'Professional Gear Rentals',
+          ownerPhone: '+92 300 1234567',
+          createdAt: '2024-11-22T10:30:00',
+          notes: 'Approved by owner. Please proceed with payment to confirm your rental.'
+        };
+        
+        // Check if mock rental already exists
+        const hasMockRental = savedRentals.some(r => r.id === mockApprovedRental.id);
+        if (!hasMockRental) {
+          savedRentals.unshift(mockApprovedRental); // Add to beginning
+        }
+        
+        setEquipmentRentals(savedRentals);
+      }
+    } finally {
       setLoading(false);
-    }, 1000);
-  }, [user]);
+    }
+  };
+
+  const getCategoryEmoji = (category) => {
+    const emojis = {
+      'camera': '📷',
+      'lens': '🔭',
+      'lighting': '💡',
+      'audio': '🎤',
+      'accessory': '🎒',
+      'video': '🎥',
+      'drone': '🚁',
+      'support': '🗼'
+    };
+    return emojis[category?.toLowerCase()] || '🎥';
+  };
 
   const getStatusBadge = (status) => {
     const statusConfig = {
@@ -143,7 +299,11 @@ const ClientBookings = () => {
       confirmed: { color: 'success', icon: '✅', text: 'Confirmed' },
       completed: { color: 'info', icon: '🎉', text: 'Completed' },
       cancelled: { color: 'danger', icon: '❌', text: 'Cancelled' },
-      work_completed: { color: 'primary', icon: '📸', text: 'Work Done' }
+      work_completed: { color: 'primary', icon: '📸', text: 'Work Done' },
+      requested: { color: 'warning', icon: '⏳', text: 'Pending Approval' },
+      approved: { color: 'info', icon: '✓', text: 'Approved - Pay Now' },
+      active: { color: 'primary', icon: '📦', text: 'Active Rental' },
+      returned: { color: 'success', icon: '✅', text: 'Returned' }
     };
     
     const config = statusConfig[status] || statusConfig.pending;
@@ -178,6 +338,80 @@ const ClientBookings = () => {
     }
     
     return null;
+  };
+
+  const handlePayForRental = (rental) => {
+    setSelectedRentalForPayment(rental);
+    setShowPaymentModal(true);
+  };
+
+  const handlePaymentSuccess = () => {
+    // Update rental status to active after successful payment
+    setEquipmentRentals(prev => prev.map(r =>
+      r.id === selectedRentalForPayment.id
+        ? { ...r, status: 'active', paymentStatus: 'paid' }
+        : r
+    ));
+    
+    // Also update localStorage
+    const savedRentals = JSON.parse(localStorage.getItem('equipmentRentals') || '[]');
+    const updatedRentals = savedRentals.map(r =>
+      r.id === selectedRentalForPayment.id
+        ? { ...r, status: 'active', paymentStatus: 'paid' }
+        : r
+    );
+    localStorage.setItem('equipmentRentals', JSON.stringify(updatedRentals));
+    
+    setShowPaymentModal(false);
+    setSelectedRentalForPayment(null);
+    alert('Payment successful! The equipment owner will contact you for pickup/delivery.');
+  };
+
+  const handlePaymentCancel = () => {
+    setShowPaymentModal(false);
+    setSelectedRentalForPayment(null);
+  };
+
+  const handleOpenDisputeModal = (rental) => {
+    setSelectedRentalForDispute(rental);
+    setShowDisputeModal(true);
+  };
+
+  const handleDispute = async () => {
+    if (!selectedRentalForDispute || !disputeForm.dispute_reason || !disputeForm.description) {
+      alert('Please fill in all fields');
+      return;
+    }
+
+    setSubmittingDispute(true);
+    try {
+      const response = await fetch(`${API_BASE}/equipment/rentals/${selectedRentalForDispute.id}/dispute`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(disputeForm)
+      });
+      
+      if (response.ok) {
+        alert('Dispute submitted successfully. Our team will review and respond within 24-48 hours.');
+        setShowDisputeModal(false);
+        setSelectedRentalForDispute(null);
+        setDisputeForm({ dispute_reason: '', description: '' });
+      } else {
+        const error = await response.json();
+        alert(error.detail || 'Failed to submit dispute. Please try again.');
+      }
+    } catch (error) {
+      console.error('Error submitting dispute:', error);
+      alert('Dispute submitted (mock). Our team will review and respond within 24-48 hours.');
+      setShowDisputeModal(false);
+      setSelectedRentalForDispute(null);
+      setDisputeForm({ dispute_reason: '', description: '' });
+    } finally {
+      setSubmittingDispute(false);
+    }
   };
 
   const filteredBookings = bookings.filter(booking => {
@@ -673,7 +907,32 @@ const ClientBookings = () => {
                             {getStatusBadge(rental.status)}
                           </div>
                           <div className="d-flex flex-column gap-1">
-                            {rental.status === 'confirmed' && (
+                            {rental.status === 'requested' && (
+                              <>
+                                <span className="badge bg-warning text-dark">⏳ Waiting for Owner Approval</span>
+                                <Link
+                                  to={`/photographer/equipment/${rental.equipmentId}`}
+                                  className="btn btn-outline-primary btn-sm mt-2"
+                                >
+                                  📋 View Equipment
+                                </Link>
+                              </>
+                            )}
+                            {rental.status === 'approved' && rental.paymentStatus !== 'paid' && (
+                              <>
+                                <button 
+                                  className="btn btn-success btn-sm fw-bold"
+                                  onClick={() => handlePayForRental(rental)}
+                                >
+                                  💳 Pay Now (Rs. {rental.totalAmount.toLocaleString()})
+                                </button>
+                                <small className="text-muted mt-1">
+                                  Rental: Rs. {rental.rentalCost.toLocaleString()}<br/>
+                                  Deposit: Rs. {rental.deposit.toLocaleString()}
+                                </small>
+                              </>
+                            )}
+                            {(rental.status === 'active' || rental.status === 'returned') && (
                               <>
                                 <Link
                                   to={`/photographer/equipment/${rental.equipmentId}`}
@@ -687,6 +946,14 @@ const ClientBookings = () => {
                                 >
                                   📞 Contact Owner
                                 </button>
+                                {rental.status === 'active' && (
+                                  <button 
+                                    className="btn btn-outline-danger btn-sm"
+                                    onClick={() => handleOpenDisputeModal(rental)}
+                                  >
+                                    ⚠️ Report Issue
+                                  </button>
+                                )}
                               </>
                             )}
                           </div>
@@ -821,6 +1088,114 @@ const ClientBookings = () => {
                       <>
                         💝 Send Rs. {tipAmount.toLocaleString()} Tip
                       </>
+                    )}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Payment Modal for Equipment Rental */}
+        {showPaymentModal && selectedRentalForPayment && (
+          <div className="modal fade show d-block" style={{ backgroundColor: 'rgba(0,0,0,0.7)', zIndex: 9999 }}>
+            <div className="modal-dialog modal-dialog-centered modal-lg">
+              <div className="modal-content">
+                <div className="modal-body p-0">
+                  <StripeCheckout
+                    bookingId={selectedRentalForPayment.id}
+                    amount={selectedRentalForPayment.totalAmount}
+                    photographerName={`${selectedRentalForPayment.equipmentName} - ${selectedRentalForPayment.rentalDays} days`}
+                    onSuccess={handlePaymentSuccess}
+                    onCancel={handlePaymentCancel}
+                    isEquipmentRental={true}
+                    bookingData={{
+                      clientName: user?.name || 'Client',
+                      clientEmail: user?.email || 'client@example.com',
+                      phone: user?.phone || '',
+                      price: selectedRentalForPayment.totalAmount,
+                      rentalCost: selectedRentalForPayment.rentalCost,
+                      deposit: selectedRentalForPayment.deposit,
+                      equipmentName: selectedRentalForPayment.equipmentName,
+                      rentalDays: selectedRentalForPayment.rentalDays
+                    }}
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Dispute Modal */}
+        {showDisputeModal && selectedRentalForDispute && (
+          <div className="modal fade show d-block" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
+            <div className="modal-dialog">
+              <div className="modal-content">
+                <div className="modal-header">
+                  <h5 className="modal-title">Report an Issue</h5>
+                  <button type="button" className="btn-close" onClick={() => setShowDisputeModal(false)}></button>
+                </div>
+                <div className="modal-body">
+                  <div className="alert alert-info">
+                    <strong>Equipment:</strong> {selectedRentalForDispute.equipmentName}
+                  </div>
+
+                  <div className="mb-3">
+                    <label className="form-label">Issue Type <span className="text-danger">*</span></label>
+                    <select
+                      className="form-select"
+                      value={disputeForm.dispute_reason}
+                      onChange={(e) => setDisputeForm({ ...disputeForm, dispute_reason: e.target.value })}
+                    >
+                      <option value="">Select issue type...</option>
+                      <option value="Equipment Damage">Equipment was damaged when received</option>
+                      <option value="Wrong Equipment">Received different equipment than listed</option>
+                      <option value="Missing Accessories">Missing accessories or parts</option>
+                      <option value="Equipment Malfunction">Equipment not working properly</option>
+                      <option value="Owner Dispute">Dispute with equipment owner</option>
+                      <option value="Deposit Issue">Issue with security deposit</option>
+                      <option value="Other">Other issue</option>
+                    </select>
+                  </div>
+
+                  <div className="mb-3">
+                    <label className="form-label">Description <span className="text-danger">*</span></label>
+                    <textarea
+                      className="form-control"
+                      rows={4}
+                      placeholder="Please describe the issue in detail..."
+                      value={disputeForm.description}
+                      onChange={(e) => setDisputeForm({ ...disputeForm, description: e.target.value })}
+                    />
+                  </div>
+
+                  <div className="alert alert-warning">
+                    <small>
+                      <strong>Note:</strong> Our support team will review your dispute and respond within 24-48 hours.
+                      Please provide as much detail as possible.
+                    </small>
+                  </div>
+                </div>
+                <div className="modal-footer">
+                  <button
+                    className="btn btn-secondary"
+                    onClick={() => setShowDisputeModal(false)}
+                    disabled={submittingDispute}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    className="btn btn-danger"
+                    onClick={handleDispute}
+                    disabled={submittingDispute || !disputeForm.dispute_reason || !disputeForm.description}
+                  >
+                    {submittingDispute ? (
+                      <>
+                        <span className="spinner-border spinner-border-sm me-2"></span>
+                        Submitting...
+                      </>
+                    ) : (
+                      <>Submit Dispute</>
                     )}
                   </button>
                 </div>

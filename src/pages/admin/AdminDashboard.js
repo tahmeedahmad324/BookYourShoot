@@ -63,6 +63,14 @@ const AdminDashboard = () => {
       badgeColor: "danger",
     },
     {
+      id: "equipment-disputes",
+      title: "Equipment Rental Disputes",
+      description: "Manage equipment rental conflicts and deposit issues",
+      icon: Shield,
+      link: "/admin/equipment-disputes",
+      badge: null,
+    },
+    {
       id: "reviews",
       title: "Reported Reviews",
       description: "Moderate reviews flagged by photographers",
