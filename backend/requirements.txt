@@ -23,3 +23,9 @@ qrcode>=7.4.0
 
 # ILP Optimization for Photographer Selection
 pulp>=2.7.0
+
+# AI/ML for Event & Mood Detection (CLIP zero-shot classification)
+transformers>=4.36.0
+torch>=2.1.0
+ultralytics>=8.0.0  # YOLOv8 for person detection
+# Pillow already included above for CNIC OCR
