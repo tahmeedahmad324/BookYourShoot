@@ -19,7 +19,7 @@ export default function StripeCheckout({ bookingId, amount, photographerName, on
 
     try {
       // Call your backend to create checkout session
-      const response = await fetch('http://localhost:5000/api/payments/create-checkout', {
+      const response = await fetch('http://localhost:8000/api/payments/create-checkout', {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
@@ -35,7 +35,7 @@ export default function StripeCheckout({ bookingId, amount, photographerName, on
           client_name: bookingData?.clientName || 'Client',
           photographer_name: bookingData?.photographerName || photographerName || 'Photographer',
           photographer_id: bookingData?.photographerEmail || bookingData?.photographerId || '',
-          service_type: bookingData?.service || 'Photography Service',
+          service_type: isEquipmentRental ? `Equipment Rental - ${bookingData?.equipmentName || 'Equipment'}` : (bookingData?.service || 'Photography Service'),
           event_date: bookingData?.date || '',
           // Pass full price info for email
           total_price: bookingData?.price || amount,
@@ -83,7 +83,7 @@ export default function StripeCheckout({ bookingId, amount, photographerName, on
             <span>Booking Reference:</span>
             <span className="detail-value">{bookingId}</span>
           </div>
-          {bookingData?.price && bookingData.price !== amount && (
+          {bookingData?.price && bookingData.price !== amount && !isEquipmentRental && (
             <>
               <div className="detail-row">
                 <span>Total Booking Price:</span>
@@ -95,12 +95,27 @@ export default function StripeCheckout({ bookingId, amount, photographerName, on
               </div>
             </>
           )}
+          {isEquipmentRental && bookingData?.rentalCost && bookingData?.deposit && (
+            <>
+              <div className="detail-row">
+                <span>Rental Cost ({bookingData.rentalDays} days):</span>
+                <span className="detail-value">Rs. {bookingData.rentalCost.toLocaleString()}</span>
+              </div>
+              <div className="detail-row">
+                <span>Security Deposit:</span>
+                <span className="detail-value">Rs. {bookingData.deposit.toLocaleString()}</span>
+              </div>
+            </>
+          )}
           <div className="detail-row total">
-            <span>{bookingData?.price && bookingData.price !== amount ? 'Deposit to Pay Now:' : 'Total Amount:'}</span>
+            <span>{isEquipmentRental ? 'Total Amount:' : (bookingData?.price && bookingData.price !== amount ? 'Deposit to Pay Now:' : 'Total Amount:')}</span>
             <span className="detail-value">Rs. {amount.toLocaleString()}</span>
           </div>
           <div className="text-muted small text-center mt-2">
-            Your payment is secured until work is completed
+            {isEquipmentRental 
+              ? 'Deposit refundable after equipment return' 
+              : 'Your payment is secured until work is completed'
+            }
           </div>
         </div>
 

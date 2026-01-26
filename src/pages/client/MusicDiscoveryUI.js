@@ -1,10 +1,39 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Link } from 'react-router-dom';
-import { Music, Play, Pause, Heart, Search, Sparkles, ExternalLink } from 'lucide-react';
+import { 
+  Music, Play, Pause, Heart, Search, Sparkles, ExternalLink, 
+  Upload, Image, Wand2, X, Camera, CheckCircle2,
+  Loader2, AlertCircle, RefreshCw, Video, FileVideo
+} from 'lucide-react';
+
+/**
+ * =============================================================================
+ * SMART MUSIC DISCOVERY WITH CLIP-BASED AI DETECTION
+ * =============================================================================
+ * 
+ * This component provides AI-powered music suggestions using CLIP zero-shot
+ * classification for event and mood detection. Unlike simple Spotify search,
+ * this approach:
+ * 
+ * 1. ANALYZES VISUAL CONTENT: Uses CLIP to understand images/videos
+ * 2. DETECTS EVENT TYPE: Mehndi, Barat, Walima, Birthday, Corporate, etc.
+ * 3. DETECTS MOOD: Romantic, Energetic, Dance, Calm
+ * 4. SUGGESTS MUSIC: Based on detected event + mood combination
+ * 
+ * SUPPORTS:
+ * - Image upload (JPG, PNG, WebP, etc.)
+ * - Video upload (MP4, MOV, AVI) with frame extraction
+ * - Drag and drop
+ * - Click to browse
+ * 
+ * Author: BookYourShoot Team
+ * Course: Final Year Project (FYP)
+ * =============================================================================
+ */
 
 const MusicDiscoveryUI = () => {
-  const [selectedEvent, setSelectedEvent] = useState(null);
-  const [searchQuery, setSearchQuery] = useState('');
+  // Core state
+  const [mode, setMode] = useState('smart'); // 'smart' (AI) or 'browse'
   const [tracks, setTracks] = useState([]);
   const [savedTracks, setSavedTracks] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -13,93 +42,228 @@ const MusicDiscoveryUI = () => {
   const [selectedTrackForPlayer, setSelectedTrackForPlayer] = useState(null);
   const audioRef = useRef(null);
 
-  // Event categories configuration with search queries
+  // AI/Smart mode state - now supports both image and video
+  const [uploadedFile, setUploadedFile] = useState(null);  // Renamed from uploadedImage
+  const [filePreview, setFilePreview] = useState(null);    // Renamed from imagePreview
+  const [fileType, setFileType] = useState(null);          // 'image' or 'video'
+  const [analyzing, setAnalyzing] = useState(false);
+  const [analysis, setAnalysis] = useState(null);
+  const [dragActive, setDragActive] = useState(false);
+  const fileInputRef = useRef(null);
+  const videoRef = useRef(null);
+
+  // Browse mode state
+  const [selectedEvent, setSelectedEvent] = useState(null);
+  const [searchQuery, setSearchQuery] = useState('');
+
+  const API_BASE = process.env.REACT_APP_API_URL || "http://localhost:5000";
+
+  // Event categories for browse mode
   const events = [
-    {
-      id: 'mehndi',
-      name: 'Mehndi',
-      image: '/illustrations/mehndi.jpg',
-      searchQuery: 'mehndi dholki pakistani wedding dance'
-    },
-    {
-      id: 'barat',
-      name: 'Barat',
-      image: '/illustrations/baraat.jpg',
-      searchQuery: 'barat shaadi pakistani wedding baraat'
-    },
-    {
-      id: 'walima',
-      name: 'Walima',
-      image: '/illustrations/valima.jpg',
-      searchQuery: 'walima romantic pakistani love songs'
-    },
-    {
-      id: 'birthday',
-      name: 'Birthday',
-      image: '/illustrations/birthday.jpg',
-      searchQuery: 'happy birthday celebration party songs'
-    },
-    {
-      id: 'corporate',
-      name: 'Corporate',
-      image: '/illustrations/corporate.jpg',
-      searchQuery: 'corporate instrumental background music'
-    }
+    { id: 'mehndi', name: 'Mehndi', image: '/illustrations/mehndi.jpg', emoji: '💛' },
+    { id: 'barat', name: 'Barat', image: '/illustrations/baraat.jpg', emoji: '🎊' },
+    { id: 'walima', name: 'Walima', image: '/illustrations/valima.jpg', emoji: '💕' },
+    { id: 'birthday', name: 'Birthday', image: '/illustrations/birthday.jpg', emoji: '🎂' },
+    { id: 'corporate', name: 'Corporate', image: '/illustrations/corporate.jpg', emoji: '💼' }
   ];
 
-  // Process API response - filter and sort tracks by popularity
-  const processTopTracks = (apiResponse) => {
-    if (!apiResponse || !apiResponse.tracks) return [];
+  // Load saved tracks on mount
+  useEffect(() => {
+    const saved = JSON.parse(localStorage.getItem('savedTracks') || '[]');
+    setSavedTracks(saved);
+  }, []);
+
+  // Cleanup audio on unmount
+  useEffect(() => {
+    return () => {
+      if (audioRef.current) {
+        audioRef.current.pause();
+      }
+    };
+  }, []);
+
+  // ==================== File Upload Handlers ====================
+
+  const handleDrag = useCallback((e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.type === "dragenter" || e.type === "dragover") {
+      setDragActive(true);
+    } else if (e.type === "dragleave") {
+      setDragActive(false);
+    }
+  }, []);
+
+  const handleDrop = useCallback((e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragActive(false);
     
-    return apiResponse.tracks
-      .sort((a, b) => {
-        const popA = a.popularity || 0;
-        const popB = b.popularity || 0;
-        return popB - popA;
-      })
-      .slice(0, 12)
-      .map(track => ({
-        id: track.id,
-        title: track.title,
-        artist: track.artist,
-        imageUrl: track.imageUrl,
-        previewUrl: track.previewUrl,
-        duration: track.duration,
-        popularity: track.popularity || 0
-      }));
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+      handleFile(e.dataTransfer.files[0]);
+    }
+  }, []);
+
+  const handleFileInput = (e) => {
+    if (e.target.files && e.target.files[0]) {
+      handleFile(e.target.files[0]);
+    }
   };
 
-  // Fetch tracks for selected event using search
+  /**
+   * Handle file upload - supports both images and videos
+   * For videos, creates a video element for preview
+   * For images, creates a data URL for preview
+   */
+  const handleFile = async (file) => {
+    // Check if file is image or video
+    const isImage = file.type.startsWith('image/');
+    const isVideo = file.type.startsWith('video/');
+    
+    if (!isImage && !isVideo) {
+      alert('Please upload an image (JPG, PNG) or video (MP4, MOV) file');
+      return;
+    }
+
+    // Create preview based on file type
+    if (isImage) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        setFilePreview(e.target.result);
+      };
+      reader.readAsDataURL(file);
+      setFileType('image');
+    } else if (isVideo) {
+      // For video, create object URL for preview
+      const videoUrl = URL.createObjectURL(file);
+      setFilePreview(videoUrl);
+      setFileType('video');
+    }
+
+    // Store file for upload
+    setUploadedFile(file);
+    setAnalysis(null);
+    setTracks([]);
+  };
+
+  const clearFile = () => {
+    // Clean up video URL if exists
+    if (fileType === 'video' && filePreview) {
+      URL.revokeObjectURL(filePreview);
+    }
+    setUploadedFile(null);
+    setFilePreview(null);
+    setFileType(null);
+    setAnalysis(null);
+    setTracks([]);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+  // ==================== AI Analysis & Suggestions ====================
+
+  /**
+   * CLIP-Based Event & Mood Detection
+   * =================================
+   * Uses the new /api/ai/detect-event-mood endpoint which leverages
+   * CLIP (Contrastive Language-Image Pre-training) for zero-shot classification.
+   * 
+   * For VIDEOS:
+   * - Backend extracts frames using ffmpeg
+   * - Analyzes multiple frames
+   * - Aggregates predictions for final result
+   * 
+   * For IMAGES:
+   * - Direct CLIP analysis with event and mood prompts
+   * - Returns confidence scores for all categories
+   */
+  const analyzeAndGetSuggestions = async () => {
+    if (!uploadedFile) return;
+
+    setAnalyzing(true);
+    setTracks([]);
+
+    try {
+      // Create FormData for file upload (works for both image and video)
+      const formData = new FormData();
+      formData.append('file', uploadedFile);
+
+      // Call the new CLIP-based AI detection endpoint
+      const response = await fetch(`${API_BASE}/api/ai/detect-event-mood`, {
+        method: 'POST',
+        body: formData  // No Content-Type header - browser sets it with boundary
+      });
+
+      const data = await response.json();
+
+      // Check if image was rejected as not a valid event
+      if (data.is_valid_event === false) {
+        setAnalysis({
+          error: data.rejection_reason || "This doesn't appear to be an event photo.",
+          is_not_event: true,
+          not_event_score: data.not_event_score,
+          all_event_scores: data.all_event_scores
+        });
+        return;
+      }
+
+      if (data.success) {
+        // Set analysis results with CLIP detection
+        setAnalysis({
+          detected_event: data.detected_event,
+          event_confidence: Math.round(data.event_confidence * 100),
+          event_label: data.event_label,
+          detected_mood: data.detected_mood,
+          mood_confidence: Math.round(data.mood_confidence * 100),
+          mood_label: data.mood_label,
+          all_event_scores: data.all_event_scores,
+          all_mood_scores: data.all_mood_scores,
+          not_event_score: data.not_event_score,
+          file_type: fileType
+        });
+        
+        // Set music suggestions if provided
+        if (data.music_suggestions && data.music_suggestions.length > 0) {
+          setTracks(data.music_suggestions.map(track => ({
+            id: track.id,
+            title: track.name,
+            artist: track.artist,
+            imageUrl: track.image,
+            previewUrl: track.preview_url,
+            spotifyUrl: track.spotify_url,
+            duration: '3:30' // Default duration
+          })));
+        } else {
+          // Fallback: Fetch tracks using detected event type
+          await fetchTracksForEvent(data.detected_event);
+        }
+      } else {
+        console.error('AI detection failed:', data.error);
+        setAnalysis({ error: data.error || 'Analysis failed' });
+      }
+    } catch (error) {
+      console.error('Error in AI detection:', error);
+      setAnalysis({ error: 'Failed to connect to AI service. Make sure the backend is running.' });
+    } finally {
+      setAnalyzing(false);
+    }
+  };
+
+  // ==================== Browse Mode Handlers ====================
+
   const fetchTracksForEvent = async (eventId) => {
     setLoading(true);
     setShowAll(false);
     try {
-      const event = events.find(e => e.id === eventId);
-      if (!event) {
-        console.error('Event not found:', eventId);
-        setTracks([]);
-        setLoading(false);
-        return;
-      }
-
-      const API_BASE = process.env.REACT_APP_API_URL || "http://localhost:5000";
       const response = await fetch(
-        `${API_BASE}/api/music/suggestions?eventType=${eventId}&limit=10`
+        `${API_BASE}/api/music/suggestions?eventType=${eventId}&limit=15`
       );
-      
-      if (!response.ok) {
-        throw new Error(`Failed to fetch tracks: ${response.statusText}`);
-      }
-      
       const data = await response.json();
       
       if (data.success && data.tracks) {
         setTracks(data.tracks);
-        console.log('Tracks loaded:', data.tracks.length, 
-                   '| Vibe Matched:', data.vibeMatched, 
-                   '| Source:', data.source);
       } else {
-        console.error('API returned error:', data.error);
         setTracks([]);
       }
     } catch (error) {
@@ -110,7 +274,12 @@ const MusicDiscoveryUI = () => {
     }
   };
 
-  // Handle search form submission
+  const handleEventClick = (eventId) => {
+    setSelectedEvent(eventId);
+    setSearchQuery('');
+    fetchTracksForEvent(eventId);
+  };
+
   const handleSearch = async (e) => {
     e.preventDefault();
     if (!searchQuery.trim()) return;
@@ -119,7 +288,7 @@ const MusicDiscoveryUI = () => {
     setShowAll(false);
     try {
       const response = await fetch(
-        `http://localhost:8000/api/music/suggestions?search=${encodeURIComponent(searchQuery)}&limit=10`
+        `${API_BASE}/api/music/suggestions?search=${encodeURIComponent(searchQuery)}&limit=15`
       );
       const data = await response.json();
       
@@ -134,46 +303,11 @@ const MusicDiscoveryUI = () => {
     }
   };
 
-  // Load saved tracks from localStorage on mount
-  useEffect(() => {
-    const saved = JSON.parse(localStorage.getItem('savedTracks') || '[]');
-    setSavedTracks(saved);
-  }, []);
+  // ==================== Audio Player Handlers ====================
 
-  // Handle event card click
-  const handleEventClick = (eventId) => {
-    setSelectedEvent(eventId);
-    setSearchQuery('');
-    fetchTracksForEvent(eventId);
-  };
-
-  // Toggle bookmark/save for a track
-  const toggleSave = (track) => {
-    const isSaved = savedTracks.some(t => t.id === track.id);
-    let updated;
-    
-    if (isSaved) {
-      updated = savedTracks.filter(t => t.id !== track.id);
-    } else {
-      updated = [...savedTracks, track];
-    }
-    
-    setSavedTracks(updated);
-    localStorage.setItem('savedTracks', JSON.stringify(updated));
-  };
-
-  const isSaved = (trackId) => savedTracks.some(t => t.id === trackId);
-
-  // Open Spotify embed player in modal-like view
-  const openSpotifyPlayer = (track) => {
-    setSelectedTrackForPlayer(track);
-  };
-
-  // Play or pause audio preview (for tracks with preview URLs)
   const playTrack = (track) => {
     if (!track.previewUrl) {
-      // If no preview, open Spotify embed instead
-      openSpotifyPlayer(track);
+      setSelectedTrackForPlayer(track);
       return;
     }
 
@@ -187,426 +321,278 @@ const MusicDiscoveryUI = () => {
         audioRef.current.pause();
       }
       const audio = new Audio(track.previewUrl);
-      audio.onended = handleAudioEnd;
+      audio.onended = () => setPlayingTrack(null);
       audio.play();
       audioRef.current = audio;
       setPlayingTrack(track);
     }
   };
 
-  const handleAudioEnd = () => {
-    setPlayingTrack(null);
+  // ==================== Save/Bookmark Handlers ====================
+
+  const toggleSave = (track) => {
+    const isSavedTrack = savedTracks.some(t => t.id === track.id);
+    let updated;
+    
+    if (isSavedTrack) {
+      updated = savedTracks.filter(t => t.id !== track.id);
+    } else {
+      updated = [...savedTracks, track];
+    }
+    
+    setSavedTracks(updated);
+    localStorage.setItem('savedTracks', JSON.stringify(updated));
   };
 
-  const selectedEventData = events.find(e => e.id === selectedEvent);
+  const isSaved = (trackId) => savedTracks.some(t => t.id === trackId);
 
-  return (
-    <div style={{ 
-      minHeight: '100vh', 
-      background: 'linear-gradient(to bottom, #f8f9fa 0%, #ffffff 100%)',
-      paddingBottom: '4rem'
-    }}>
-      <div className="container py-4" style={{ maxWidth: '1400px' }}>
-        {/* Header */}
-        <div className="mb-4">
-          <div className="d-flex justify-content-between align-items-center mb-3">
-            <div>
-              <h1 className="fw-bold mb-1" style={{ fontSize: '2rem', color: '#1a1a1a' }}>
-                Music Discovery
-              </h1>
-              <p className="text-muted mb-0">Find the perfect soundtrack for your event</p>
-            </div>
-            <Link to="/client/dashboard" className="btn btn-outline-secondary">
-              ← Back
-            </Link>
+  // ==================== Track List Render Function ====================
+  const renderTrackList = () => {
+    const isLoadingState = mode === 'browse' ? loading : analyzing;
+    const hasResults = tracks.length > 0;
+    const selectedEventData = events.find(e => e.id === selectedEvent);
+    const title = mode === 'smart' 
+      ? (analysis ? `${analysis.event_label || 'Recommended'} Music` : 'Recommended Music')
+      : (searchQuery ? `Results for "${searchQuery}"` : `${selectedEventData?.name || 'Select Event'} Music`);
+
+    return (
+      <div>
+        <div className="d-flex justify-content-between align-items-center mb-3">
+          <div className="d-flex align-items-center gap-2">
+            <Sparkles size={20} style={{ color: '#667eea' }} />
+            <h5 className="fw-bold mb-0" style={{ color: '#1a1a1a' }}>{title}</h5>
           </div>
-
-          {/* Search Bar */}
-          <form onSubmit={handleSearch}>
-            <div className="input-group input-group-lg shadow-sm">
-              <span className="input-group-text bg-white border-end-0" style={{ borderRadius: '12px 0 0 12px' }}>
-                <Search size={20} className="text-muted" />
-              </span>
-              <input
-                type="text"
-                className="form-control border-start-0 border-end-0"
-                placeholder="Search for any song, artist, or album..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                style={{ 
-                  fontSize: '1rem',
-                  border: '1px solid #dee2e6'
-                }}
-              />
-              <button 
-                className="btn btn-primary px-4" 
-                type="submit"
-                style={{ borderRadius: '0 12px 12px 0' }}
-                disabled={loading}
-              >
-                {loading ? 'Searching...' : 'Search'}
-              </button>
-            </div>
-          </form>
+          {savedTracks.length > 0 && (
+            <span className="badge" style={{ 
+              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+              padding: '0.5rem 1rem',
+              fontSize: '0.85rem'
+            }}>
+              <Heart size={14} fill="white" /> {savedTracks.length} Saved
+            </span>
+          )}
         </div>
 
-        {/* Event Grid */}
-        <div className="mb-4">
-          <h5 className="fw-bold mb-3" style={{ color: '#1a1a1a' }}>Browse by Event</h5>
-          <div className="row g-3">
-            {events.map((event) => (
-              <div key={event.id} className="col">
-                <div
-                  onClick={() => handleEventClick(event.id)}
-                  className="music-event-card"
-                  style={{
-                    border: selectedEvent === event.id ? '2px solid #225ea1' : '2px solid transparent',
-                    transform: selectedEvent === event.id ? 'translateY(-5px)' : 'translateY(0)',
-                    boxShadow: selectedEvent === event.id 
-                      ? '0 8px 25px rgba(34, 94, 161, 0.2), 0 0 0 2px #225ea1, 0 0 15px rgba(34, 94, 161, 0.3)'
-                      : '0 4px 15px rgba(0, 0, 0, 0.1)'
-                  }}
-                >
-                  {/* Image Header */}
-                  <div style={{
-                    position: 'relative',
-                    height: '160px',
-                    overflow: 'hidden',
-                    borderTopLeftRadius: '12px',
-                    borderTopRightRadius: '12px'
-                  }}>
-                    <img 
-                      src={event.image}
-                      alt={event.name}
-                      style={{
-                        width: '100%',
-                        height: '100%',
-                        objectFit: 'cover',
-                        objectPosition: event.id === 'barat' ? 'center 65%' : 'center',
-                        transition: 'transform 0.4s ease'
-                      }}
-                      className="event-card-img"
-                    />
-                    {/* Black overlay for text readability */}
-                    <div className="music-card-overlay" style={{
-                      position: 'absolute',
-                      top: 0,
-                      left: 0,
-                      right: 0,
-                      bottom: 0,
-                      background: selectedEvent === event.id
-                        ? 'linear-gradient(to bottom, rgba(0, 0, 0, 0.3), rgba(0, 0, 0, 0.6))'
-                        : 'linear-gradient(to bottom, rgba(0, 0, 0, 0.2), rgba(0, 0, 0, 0.5))',
-                      transition: 'background 0.3s ease'
-                    }} />
-                    
-                    {/* Event Name on Image */}
-                    <div style={{
-                      position: 'absolute',
-                      bottom: '1rem',
-                      left: '1rem',
-                      right: '1rem',
-                      zIndex: 2
-                    }}>
-                      <h3 style={{
-                        color: 'white',
-                        fontSize: '1.35rem',
-                        fontWeight: '600',
-                        margin: 0,
-                        textShadow: '0 2px 8px rgba(0,0,0,0.5)'
-                      }}>
-                        {event.name}
-                      </h3>
-                    </div>
-                    
-                    {/* Selected Indicator */}
-                    {selectedEvent === event.id && (
-                      <div style={{
-                        position: 'absolute',
-                        top: '12px',
-                        right: '12px',
-                        zIndex: 3,
-                        background: 'rgba(255,255,255,0.95)',
-                        borderRadius: '50%',
-                        width: '32px',
-                        height: '32px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        boxShadow: '0 2px 8px rgba(0,0,0,0.2)'
-                      }}>
-                        <Music size={16} style={{ color: '#225ea1' }} />
-                      </div>
-                    )}
-                  </div>
+        {/* Loading State */}
+        {isLoadingState && (
+          <div className="text-center py-5">
+            <div className="spinner-border" style={{ color: '#667eea' }} role="status">
+              <span className="visually-hidden">Loading...</span>
+            </div>
+            <p className="mt-3 text-muted">
+              {mode === 'smart' 
+                ? (fileType === 'video' 
+                    ? 'AI is extracting frames and analyzing your video...' 
+                    : 'AI is analyzing your image with CLIP...') 
+                : 'Discovering music...'}
+            </p>
+          </div>
+        )}
+
+        {/* Empty State */}
+        {!isLoadingState && !hasResults && (
+          <div className="text-center py-5" style={{ 
+            background: 'white',
+            borderRadius: '16px',
+            padding: '3rem',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.05)'
+          }}>
+            {mode === 'smart' ? (
+              <>
+                <div className="d-flex justify-content-center gap-3 mb-3">
+                  <Image size={40} className="text-muted" />
+                  <FileVideo size={40} className="text-muted" />
                 </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Recommendations Section */}
-        <div>
-          <div className="d-flex justify-content-between align-items-center mb-3">
-            <div className="d-flex align-items-center gap-2">
-              <Sparkles size={20} style={{ color: '#667eea' }} />
-              <h5 className="fw-bold mb-0" style={{ color: '#1a1a1a' }}>
-                {searchQuery ? `Results for "${searchQuery}"` : `${selectedEventData?.name} Music`}
-              </h5>
-            </div>
-            {savedTracks.length > 0 && (
-              <span className="badge" style={{ 
-                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                padding: '0.5rem 1rem',
-                fontSize: '0.85rem'
-              }}>
-                <Heart size={14} fill="white" /> {savedTracks.length} Saved
-              </span>
+                <p className="text-muted mb-0">
+                  Upload a photo or video to get AI-powered music suggestions
+                </p>
+                <small className="text-muted d-block mt-2">
+                  Supports: JPG, PNG, MP4, MOV
+                </small>
+              </>
+            ) : (
+              <>
+                <Music size={48} className="text-muted mb-3" />
+                <p className="text-muted mb-0">
+                  {searchQuery ? 'No results found. Try a different search.' : 'Select an event or search to discover music.'}
+                </p>
+              </>
             )}
           </div>
+        )}
 
-          {/* Loading State */}
-          {loading && (
-            <div className="text-center py-5">
-              <div className="spinner-border" style={{ color: '#667eea' }} role="status">
-                <span className="visually-hidden">Loading...</span>
-              </div>
-              <p className="mt-3 text-muted">Discovering music...</p>
-            </div>
-          )}
+        {/* Track List */}
+        {!isLoadingState && hasResults && (
+          <div style={{
+            background: 'white',
+            borderRadius: '16px',
+            padding: '1.5rem',
+            boxShadow: '0 2px 12px rgba(0,0,0,0.08)'
+          }}>
+            {tracks.slice(0, showAll ? 15 : 5).map((track, index) => (
+              <div
+                key={track.id}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '1rem',
+                  padding: '0.75rem',
+                  borderRadius: '12px',
+                  transition: 'all 0.2s ease',
+                  background: playingTrack?.id === track.id ? '#f8f9ff' : 'transparent',
+                  borderBottom: index < (showAll ? Math.min(tracks.length, 15) : Math.min(tracks.length, 5)) - 1 ? '1px solid #f0f0f0' : 'none'
+                }}
+              >
+                {/* Rank Badge */}
+                <div style={{
+                  width: '32px',
+                  height: '32px',
+                  borderRadius: '50%',
+                  background: index < 3 ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' : '#f0f0f0',
+                  color: index < 3 ? 'white' : '#6c757d',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontWeight: '700',
+                  fontSize: '0.9rem',
+                  flexShrink: 0
+                }}>
+                  {index + 1}
+                </div>
 
-          {/* Empty State */}
-          {!loading && tracks.length === 0 && (
-            <div className="text-center py-5" style={{ 
-              background: 'white',
-              borderRadius: '16px',
-              padding: '3rem',
-              boxShadow: '0 2px 8px rgba(0,0,0,0.05)'
-            }}>
-              <Music size={48} className="text-muted mb-3" />
-              <p className="text-muted mb-0">
-                {searchQuery 
-                  ? 'No results found. Try a different search.' 
-                  : 'Select an event to discover music.'}
-              </p>
-            </div>
-          )}
+                {/* Album Art */}
+                <div style={{ position: 'relative', flexShrink: 0 }}>
+                  <img
+                    src={track.imageUrl || '/illustrations/Generatereel.jpg'}
+                    alt={track.title}
+                    style={{
+                      width: '56px',
+                      height: '56px',
+                      borderRadius: '8px',
+                      objectFit: 'cover'
+                    }}
+                  />
+                </div>
 
-          {/* Track List */}
-          {!loading && tracks.length > 0 && (
-            <div style={{
-              background: 'white',
-              borderRadius: '16px',
-              padding: '1.5rem',
-              boxShadow: '0 2px 12px rgba(0,0,0,0.08)'
-            }}>
-              {tracks.slice(0, showAll ? 10 : 5).map((track, index) => (
-                <div
-                  key={track.id}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '1rem',
-                    padding: '0.75rem',
-                    borderRadius: '12px',
-                    transition: 'all 0.2s ease',
-                    background: playingTrack?.id === track.id ? '#f8f9ff' : 'transparent',
-                    borderBottom: index < (showAll ? Math.min(tracks.length, 10) : Math.min(tracks.length, 5)) - 1 ? '1px solid #f0f0f0' : 'none'
-                  }}
-                  className="track-row"
-                >
-                  {/* Rank Badge */}
-                  <div style={{
-                    width: '32px',
-                    height: '32px',
-                    borderRadius: '50%',
-                    background: index < 3 ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' : '#f0f0f0',
-                    color: index < 3 ? 'white' : '#6c757d',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    fontWeight: '700',
-                    fontSize: '0.9rem',
-                    flexShrink: 0
+                {/* Track Info */}
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ 
+                    fontWeight: '600', 
+                    fontSize: '0.95rem',
+                    color: '#1a1a1a',
+                    marginBottom: '0.25rem',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap'
                   }}>
-                    {index + 1}
+                    {track.title}
                   </div>
-
-                  {/* Album Art */}
-                  <div style={{ position: 'relative', flexShrink: 0 }}>
-                    <img
-                      src={track.imageUrl || '/illustrations/Generatereel.jpg'}
-                      alt={track.title}
-                      style={{
-                        width: '64px',
-                        height: '64px',
-                        borderRadius: '8px',
-                        objectFit: 'cover'
-                      }}
-                    />
-                    {playingTrack?.id === track.id && (
-                      <div style={{
-                        position: 'absolute',
-                        top: 0,
-                        left: 0,
-                        right: 0,
-                        bottom: 0,
-                        background: 'rgba(102, 126, 234, 0.7)',
-                        borderRadius: '8px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center'
-                      }}>
-                        <Music size={20} className="text-white" />
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Track Info */}
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ 
-                      fontWeight: '600', 
-                      fontSize: '0.95rem',
-                      color: '#1a1a1a',
-                      marginBottom: '0.25rem',
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                      whiteSpace: 'nowrap'
-                    }}>
-                      {track.title}
-                    </div>
-                    <div style={{ 
-                      fontSize: '0.85rem',
-                      color: '#6c757d',
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                      whiteSpace: 'nowrap'
-                    }}>
-                      {track.artist}
-                    </div>
-                  </div>
-
-                  {/* Duration */}
                   <div style={{ 
                     fontSize: '0.85rem',
                     color: '#6c757d',
-                    flexShrink: 0
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap'
                   }}>
-                    {track.duration}
-                  </div>
-
-                  {/* Actions */}
-                  <div style={{ display: 'flex', gap: '0.5rem', flexShrink: 0 }}>
-                    {/* Play Button - always visible */}
-                    <button
-                      onClick={() => playTrack(track)}
-                      style={{
-                        width: '40px',
-                        height: '40px',
-                        borderRadius: '50%',
-                        border: 'none',
-                        background: playingTrack?.id === track.id 
-                          ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
-                          : '#f0f0f0',
-                        color: playingTrack?.id === track.id ? 'white' : '#1a1a1a',
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        transition: 'all 0.2s ease'
-                      }}
-                      title={track.previewUrl ? 'Play 30s preview' : 'Listen on Spotify'}
-                    >
-                      {playingTrack?.id === track.id ? (
-                        <Pause size={18} />
-                      ) : (
-                        <Play size={18} style={{ marginLeft: '2px' }} />
-                      )}
-                    </button>
-
-                    {/* Open in New Tab Button */}
-                    <button
-                      onClick={() => window.open(track.spotifyUrl, '_blank')}
-                      style={{
-                        width: '40px',
-                        height: '40px',
-                        borderRadius: '50%',
-                        border: 'none',
-                        background: '#1DB954',
-                        color: 'white',
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        transition: 'all 0.2s ease'
-                      }}
-                      title="Open in Spotify"
-                    >
-                      <ExternalLink size={18} />
-                    </button>
-
-                    <button
-                      onClick={() => toggleSave(track)}
-                      style={{
-                        width: '40px',
-                        height: '40px',
-                        borderRadius: '50%',
-                        border: 'none',
-                        background: isSaved(track.id) ? '#fef3c7' : '#f0f0f0',
-                        color: isSaved(track.id) ? '#f59e0b' : '#6c757d',
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        transition: 'all 0.2s ease'
-                      }}
-                      title={isSaved(track.id) ? 'Remove from saved' : 'Save track'}
-                    >
-                      <Heart 
-                        size={18} 
-                        fill={isSaved(track.id) ? 'currentColor' : 'none'}
-                      />
-                    </button>
+                    {track.artist}
                   </div>
                 </div>
-              ))}
-              
-              {/* Show More/Less Button */}
-              {tracks.length > 5 && (
-                <div style={{ textAlign: 'center', marginTop: '1.5rem' }}>
+
+                {/* Duration */}
+                <div style={{ fontSize: '0.85rem', color: '#6c757d', flexShrink: 0 }}>
+                  {track.duration}
+                </div>
+
+                {/* Actions */}
+                <div style={{ display: 'flex', gap: '0.5rem', flexShrink: 0 }}>
                   <button
-                    onClick={() => setShowAll(!showAll)}
+                    onClick={() => playTrack(track)}
                     style={{
-                      padding: '0.75rem 2rem',
-                      background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                      color: 'white',
+                      width: '40px',
+                      height: '40px',
+                      borderRadius: '50%',
                       border: 'none',
-                      borderRadius: '12px',
-                      fontSize: '0.95rem',
-                      fontWeight: '600',
+                      background: playingTrack?.id === track.id 
+                        ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
+                        : '#f0f0f0',
+                      color: playingTrack?.id === track.id ? 'white' : '#1a1a1a',
                       cursor: 'pointer',
-                      transition: 'all 0.3s ease',
-                      boxShadow: '0 4px 12px rgba(102, 126, 234, 0.3)'
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center'
                     }}
-                    onMouseEnter={(e) => {
-                      e.target.style.transform = 'translateY(-2px)';
-                      e.target.style.boxShadow = '0 6px 20px rgba(102, 126, 234, 0.4)';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.target.style.transform = 'translateY(0)';
-                      e.target.style.boxShadow = '0 4px 12px rgba(102, 126, 234, 0.3)';
-                    }}
+                    title={track.previewUrl ? 'Play 30s preview' : 'Listen on Spotify'}
                   >
-                    {showAll ? '← Show Less' : `Show More (${Math.min(tracks.length, 10) - 5} more) →`}
+                    {playingTrack?.id === track.id ? <Pause size={18} /> : <Play size={18} style={{ marginLeft: '2px' }} />}
+                  </button>
+
+                  <button
+                    onClick={() => window.open(track.spotifyUrl, '_blank')}
+                    style={{
+                      width: '40px',
+                      height: '40px',
+                      borderRadius: '50%',
+                      border: 'none',
+                      background: '#1DB954',
+                      color: 'white',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center'
+                    }}
+                    title="Open in Spotify"
+                  >
+                    <ExternalLink size={18} />
+                  </button>
+
+                  <button
+                    onClick={() => toggleSave(track)}
+                    style={{
+                      width: '40px',
+                      height: '40px',
+                      borderRadius: '50%',
+                      border: 'none',
+                      background: isSaved(track.id) ? '#fef3c7' : '#f0f0f0',
+                      color: isSaved(track.id) ? '#f59e0b' : '#6c757d',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center'
+                    }}
+                    title={isSaved(track.id) ? 'Remove from saved' : 'Save track'}
+                  >
+                    <Heart size={18} fill={isSaved(track.id) ? 'currentColor' : 'none'} />
                   </button>
                 </div>
-              )}
-            </div>
-          )}
-        </div>
+              </div>
+            ))}
+            
+            {/* Show More/Less Button */}
+            {tracks.length > 5 && (
+              <div style={{ textAlign: 'center', marginTop: '1.5rem' }}>
+                <button
+                  onClick={() => setShowAll(!showAll)}
+                  style={{
+                    padding: '0.75rem 2rem',
+                    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '12px',
+                    fontSize: '0.95rem',
+                    fontWeight: '600',
+                    cursor: 'pointer',
+                    boxShadow: '0 4px 12px rgba(102, 126, 234, 0.3)'
+                  }}
+                >
+                  {showAll ? '← Show Less' : `Show More (${Math.min(tracks.length, 15) - 5} more) →`}
+                </button>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Footer Badge */}
-        {tracks.length > 0 && (
+        {hasResults && (
           <div className="text-center mt-4">
             <span style={{
               display: 'inline-block',
@@ -617,13 +603,646 @@ const MusicDiscoveryUI = () => {
               color: '#6c757d',
               boxShadow: '0 2px 8px rgba(0,0,0,0.05)'
             }}>
-              🎵 Powered by Spotify • Curated by BookYourShoot
+              {mode === 'smart' ? '✨ AI-Powered • ' : ''}🎵 Powered by Spotify • Curated by BookYourShoot
             </span>
           </div>
         )}
       </div>
+    );
+  };
 
-      {/* Spotify Embed Player Modal */}
+  // ==================== UI Components ====================
+  const selectedEventData = events.find(e => e.id === selectedEvent);
+
+  return (
+    <div style={{ 
+      minHeight: '100vh', 
+      background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 50%, #e2e8f0 100%)',
+      paddingBottom: '4rem'
+    }}>
+      <div className="container py-4" style={{ maxWidth: '1400px' }}>
+        {/* Header */}
+        <div className="mb-4">
+          <div className="d-flex justify-content-between align-items-center mb-3">
+            <div>
+              <h1 className="fw-bold mb-1" style={{ fontSize: '2rem', color: '#1a1a1a' }}>
+                <Sparkles className="me-2" style={{ color: '#667eea' }} size={28} />
+                Smart Music Discovery
+              </h1>
+              <p className="text-muted mb-0">AI-powered song recommendations for your moments</p>
+            </div>
+            <Link to="/client/dashboard" className="btn btn-outline-secondary">
+              ← Back
+            </Link>
+          </div>
+
+          {/* Mode Toggle */}
+          <div className="d-flex gap-2 mb-4">
+            <button
+              onClick={() => { setMode('smart'); setTracks([]); setSelectedEvent(null); }}
+              style={{
+                padding: '0.75rem 1.5rem',
+                borderRadius: '12px',
+                border: 'none',
+                fontWeight: '600',
+                cursor: 'pointer',
+                transition: 'all 0.3s ease',
+                background: mode === 'smart' 
+                  ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' 
+                  : '#fff',
+                color: mode === 'smart' ? '#fff' : '#6c757d',
+                boxShadow: mode === 'smart' 
+                  ? '0 4px 15px rgba(102, 126, 234, 0.4)' 
+                  : '0 2px 8px rgba(0,0,0,0.08)'
+              }}
+            >
+              <Wand2 size={18} className="me-2" />
+              AI Smart Mode
+            </button>
+            <button
+              onClick={() => { setMode('browse'); setTracks([]); clearFile(); }}
+              style={{
+                padding: '0.75rem 1.5rem',
+                borderRadius: '12px',
+                border: 'none',
+                fontWeight: '600',
+                cursor: 'pointer',
+                transition: 'all 0.3s ease',
+                background: mode === 'browse' 
+                  ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' 
+                  : '#fff',
+                color: mode === 'browse' ? '#fff' : '#6c757d',
+                boxShadow: mode === 'browse' 
+                  ? '0 4px 15px rgba(102, 126, 234, 0.4)' 
+                  : '0 2px 8px rgba(0,0,0,0.08)'
+              }}
+            >
+              <Music size={18} className="me-2" />
+              Browse by Event
+            </button>
+          </div>
+        </div>
+
+        {/* ==================== SMART MODE (AI) ==================== */}
+        {mode === 'smart' && (
+          <div className="row g-4">
+            {/* Left Column - Upload & Analysis */}
+            <div className="col-lg-5">
+              {/* Upload Card */}
+              <div style={{
+                background: '#fff',
+                borderRadius: '20px',
+                padding: '2rem',
+                boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
+                marginBottom: '1.5rem'
+              }}>
+                <h5 className="fw-bold mb-3" style={{ color: '#1a1a1a' }}>
+                  <Camera className="me-2" style={{ color: '#667eea' }} size={20} />
+                  Upload Photo or Video
+                </h5>
+                <p className="text-muted mb-3" style={{ fontSize: '0.9rem' }}>
+                  Upload a photo or video from your event and our CLIP-based AI will 
+                  detect the event type (Mehndi, Barat, Walima, etc.) and suggest perfect songs!
+                </p>
+
+                {!filePreview ? (
+                  <div
+                    onDragEnter={handleDrag}
+                    onDragLeave={handleDrag}
+                    onDragOver={handleDrag}
+                    onDrop={handleDrop}
+                    onClick={() => fileInputRef.current?.click()}
+                    style={{
+                      border: `2px dashed ${dragActive ? '#667eea' : '#dee2e6'}`,
+                      borderRadius: '16px',
+                      padding: '3rem 2rem',
+                      textAlign: 'center',
+                      cursor: 'pointer',
+                      transition: 'all 0.3s ease',
+                      background: dragActive ? 'rgba(102, 126, 234, 0.05)' : '#fafafa'
+                    }}
+                  >
+                    <div className="d-flex justify-content-center gap-3 mb-3">
+                      <Upload 
+                        size={40} 
+                        style={{ color: dragActive ? '#667eea' : '#adb5bd' }} 
+                      />
+                      <Video 
+                        size={40} 
+                        style={{ color: dragActive ? '#667eea' : '#adb5bd' }} 
+                      />
+                    </div>
+                    <p style={{ fontWeight: '600', color: '#1a1a1a', marginBottom: '0.5rem' }}>
+                      Drop your image or video here
+                    </p>
+                    <p className="text-muted mb-3" style={{ fontSize: '0.85rem' }}>
+                      Supports: JPG, PNG, MP4, MOV
+                    </p>
+                    <span style={{
+                      display: 'inline-block',
+                      padding: '0.5rem 1.5rem',
+                      background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                      color: '#fff',
+                      borderRadius: '8px',
+                      fontSize: '0.9rem',
+                      fontWeight: '500'
+                    }}>
+                      Select File
+                    </span>
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="image/*,video/*"
+                      onChange={handleFileInput}
+                      style={{ display: 'none' }}
+                    />
+                  </div>
+                ) : (
+                  <div>
+                    {/* File Preview - Image or Video */}
+                    <div style={{ 
+                      position: 'relative', 
+                      marginBottom: '1rem',
+                      background: '#f0f0f0',
+                      borderRadius: '12px',
+                      overflow: 'hidden'
+                    }}>
+                      {fileType === 'image' ? (
+                        <img
+                          src={filePreview}
+                          alt="Uploaded preview"
+                          style={{
+                            width: '100%',
+                            borderRadius: '12px',
+                            maxHeight: '400px',
+                            objectFit: 'contain',
+                            display: 'block'
+                          }}
+                        />
+                      ) : (
+                        <video
+                          ref={videoRef}
+                          src={filePreview}
+                          controls
+                          style={{
+                            width: '100%',
+                            borderRadius: '12px',
+                            maxHeight: '400px',
+                            objectFit: 'contain',
+                            display: 'block',
+                            background: '#000'
+                          }}
+                        />
+                      )}}
+                      <button
+                        onClick={clearFile}
+                        style={{
+                          position: 'absolute',
+                          top: '10px',
+                          right: '10px',
+                          background: 'rgba(0,0,0,0.6)',
+                          border: 'none',
+                          borderRadius: '50%',
+                          width: '36px',
+                          height: '36px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          cursor: 'pointer',
+                          zIndex: 10
+                        }}
+                      >
+                        <X size={18} color="#fff" />
+                      </button>
+                      {/* File type badge */}
+                      <span style={{
+                        position: 'absolute',
+                        bottom: '10px',
+                        left: '10px',
+                        background: 'rgba(0,0,0,0.6)',
+                        color: '#fff',
+                        padding: '0.25rem 0.75rem',
+                        borderRadius: '20px',
+                        fontSize: '0.75rem',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.25rem'
+                      }}>
+                        {fileType === 'image' ? <Image size={12} /> : <Video size={12} />}
+                        {fileType === 'image' ? 'Image' : 'Video'}
+                      </span>
+                    </div>
+
+                    {/* Analyze Button */}
+                    <button
+                      onClick={analyzeAndGetSuggestions}
+                      disabled={analyzing}
+                      style={{
+                        width: '100%',
+                        padding: '1rem',
+                        background: analyzing 
+                          ? '#e2e8f0'
+                          : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                        color: analyzing ? '#64748b' : '#fff',
+                        border: 'none',
+                        borderRadius: '12px',
+                        fontSize: '1rem',
+                        fontWeight: '600',
+                        cursor: analyzing ? 'not-allowed' : 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '0.5rem',
+                        boxShadow: analyzing ? 'none' : '0 4px 15px rgba(102, 126, 234, 0.4)'
+                      }}
+                    >
+                      {analyzing ? (
+                        <>
+                          <Loader2 size={20} className="animate-spin" style={{ animation: 'spin 1s linear infinite' }} />
+                          Analyzing with AI...
+                        </>
+                      ) : (
+                        <>
+                          <Wand2 size={20} />
+                          Analyze & Get Music
+                        </>
+                      )}
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {/* Analysis Results Card - Enhanced for CLIP Detection */}
+              {analysis && !analysis.error && (
+                <div style={{
+                  background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                  borderRadius: '20px',
+                  padding: '1.5rem',
+                  color: '#fff',
+                  boxShadow: '0 8px 30px rgba(102, 126, 234, 0.3)'
+                }}>
+                  <div className="d-flex align-items-center gap-2 mb-3">
+                    <CheckCircle2 size={24} />
+                    <h5 className="fw-bold mb-0">CLIP AI Detection Results</h5>
+                    {analysis.file_type === 'video' && (
+                      <span style={{
+                        background: 'rgba(255,255,255,0.2)',
+                        padding: '0.2rem 0.5rem',
+                        borderRadius: '4px',
+                        fontSize: '0.7rem'
+                      }}>
+                        <Video size={10} /> Video Analysis
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Event Detection */}
+                  <div style={{
+                    background: 'rgba(255,255,255,0.15)',
+                    borderRadius: '12px',
+                    padding: '1rem',
+                    marginBottom: '1rem'
+                  }}>
+                    <div className="d-flex justify-content-between align-items-center mb-2">
+                      <span style={{ opacity: 0.9, fontSize: '0.85rem' }}>Detected Event</span>
+                      <span style={{ fontWeight: '700', fontSize: '1.1rem' }}>
+                        {analysis.event_label || analysis.detected_event}
+                      </span>
+                    </div>
+                    <div className="d-flex align-items-center gap-2">
+                      <div style={{
+                        flex: 1,
+                        height: '8px',
+                        background: 'rgba(255,255,255,0.3)',
+                        borderRadius: '4px',
+                        overflow: 'hidden'
+                      }}>
+                        <div style={{
+                          width: `${analysis.event_confidence || 0}%`,
+                          height: '100%',
+                          background: '#fff',
+                          borderRadius: '4px',
+                          transition: 'width 0.5s ease'
+                        }} />
+                      </div>
+                      <span style={{ fontWeight: '600', minWidth: '45px', textAlign: 'right' }}>
+                        {analysis.event_confidence || 0}%
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Mood Detection */}
+                  <div style={{
+                    background: 'rgba(255,255,255,0.15)',
+                    borderRadius: '12px',
+                    padding: '1rem',
+                    marginBottom: '1rem'
+                  }}>
+                    <div className="d-flex justify-content-between align-items-center mb-2">
+                      <span style={{ opacity: 0.9, fontSize: '0.85rem' }}>Detected Mood</span>
+                      <span style={{ fontWeight: '700', fontSize: '1.1rem' }}>
+                        {analysis.mood_label || analysis.detected_mood}
+                      </span>
+                    </div>
+                    <div className="d-flex align-items-center gap-2">
+                      <div style={{
+                        flex: 1,
+                        height: '8px',
+                        background: 'rgba(255,255,255,0.3)',
+                        borderRadius: '4px',
+                        overflow: 'hidden'
+                      }}>
+                        <div style={{
+                          width: `${analysis.mood_confidence || 0}%`,
+                          height: '100%',
+                          background: '#fff',
+                          borderRadius: '4px',
+                          transition: 'width 0.5s ease'
+                        }} />
+                      </div>
+                      <span style={{ fontWeight: '600', minWidth: '45px', textAlign: 'right' }}>
+                        {analysis.mood_confidence || 0}%
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* All Scores (Expandable) */}
+                  {analysis.all_event_scores && (
+                    <details style={{ marginTop: '0.5rem' }}>
+                      <summary style={{ 
+                        cursor: 'pointer', 
+                        opacity: 0.9, 
+                        fontSize: '0.85rem',
+                        marginBottom: '0.5rem'
+                      }}>
+                        View all detection scores
+                      </summary>
+                      <div style={{
+                        background: 'rgba(255,255,255,0.1)',
+                        borderRadius: '8px',
+                        padding: '0.75rem',
+                        fontSize: '0.8rem'
+                      }}>
+                        <div style={{ marginBottom: '0.5rem', fontWeight: '600' }}>Event Scores:</div>
+                        {Object.entries(analysis.all_event_scores).map(([event, score]) => (
+                          <div key={event} className="d-flex justify-content-between mb-1">
+                            <span style={{ textTransform: 'capitalize' }}>{event}</span>
+                            <span>{Math.round(score * 100)}%</span>
+                          </div>
+                        ))}
+                        {analysis.all_mood_scores && (
+                          <>
+                            <div style={{ marginTop: '0.75rem', marginBottom: '0.5rem', fontWeight: '600' }}>Mood Scores:</div>
+                            {Object.entries(analysis.all_mood_scores).map(([mood, score]) => (
+                              <div key={mood} className="d-flex justify-content-between mb-1">
+                                <span style={{ textTransform: 'capitalize' }}>{mood}</span>
+                                <span>{Math.round(score * 100)}%</span>
+                              </div>
+                            ))}
+                          </>
+                        )}
+                      </div>
+                    </details>
+                  )}
+
+                  {/* AI Method Badge */}
+                  <div style={{
+                    marginTop: '1rem',
+                    padding: '0.75rem',
+                    background: 'rgba(255,255,255,0.1)',
+                    borderRadius: '8px',
+                    fontSize: '0.8rem',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem'
+                  }}>
+                    <Sparkles size={14} />
+                    <span>Powered by CLIP Zero-Shot Classification</span>
+                  </div>
+                </div>
+              )}
+
+              {/* Not an Event Warning - Special case for random images */}
+              {analysis && analysis.is_not_event && (
+                <div style={{
+                  background: 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)',
+                  border: '2px solid #f59e0b',
+                  borderRadius: '16px',
+                  padding: '1.5rem',
+                  color: '#92400e'
+                }}>
+                  <div className="d-flex align-items-center gap-2 mb-3">
+                    <AlertCircle size={24} />
+                    <h5 className="fw-bold mb-0">Not an Event Photo</h5>
+                  </div>
+                  
+                  <p style={{ margin: '0.5rem 0 1rem', fontSize: '0.95rem', lineHeight: '1.5' }}>
+                    {analysis.error}
+                  </p>
+                  
+                  <div style={{
+                    background: 'rgba(255,255,255,0.6)',
+                    borderRadius: '8px',
+                    padding: '1rem',
+                    marginBottom: '1rem'
+                  }}>
+                    <p style={{ fontWeight: '600', marginBottom: '0.5rem', fontSize: '0.9rem' }}>
+                      📸 What works best:
+                    </p>
+                    <ul style={{ margin: 0, paddingLeft: '1.25rem', fontSize: '0.85rem' }}>
+                      <li>Wedding photos (Mehndi, Barat, Walima)</li>
+                      <li>Birthday party celebrations</li>
+                      <li>Corporate events and conferences</li>
+                      <li>Family gatherings and reunions</li>
+                    </ul>
+                  </div>
+                  
+                  <div className="d-flex gap-2">
+                    <button
+                      onClick={clearFile}
+                      style={{
+                        padding: '0.75rem 1.25rem',
+                        background: '#f59e0b',
+                        color: '#fff',
+                        border: 'none',
+                        borderRadius: '8px',
+                        cursor: 'pointer',
+                        fontSize: '0.9rem',
+                        fontWeight: '600',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.5rem'
+                      }}
+                    >
+                      <Upload size={16} />
+                      Upload Different Photo
+                    </button>
+                    <button
+                      onClick={() => { setMode('browse'); clearFile(); }}
+                      style={{
+                        padding: '0.75rem 1.25rem',
+                        background: '#fff',
+                        color: '#6c757d',
+                        border: '1px solid #dee2e6',
+                        borderRadius: '8px',
+                        cursor: 'pointer',
+                        fontSize: '0.9rem'
+                      }}
+                    >
+                      Browse by Event Instead
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Error State - General errors */}
+              {analysis && analysis.error && !analysis.is_not_event && (
+                <div style={{
+                  background: analysis.error.includes('CLIP') ? '#fef3c7' : '#fef2f2',
+                  border: `1px solid ${analysis.error.includes('CLIP') ? '#fcd34d' : '#fecaca'}`,
+                  borderRadius: '12px',
+                  padding: '1.25rem',
+                  color: analysis.error.includes('CLIP') ? '#92400e' : '#dc2626'
+                }}>
+                  <div className="d-flex align-items-center gap-2 mb-2">
+                    <AlertCircle size={20} />
+                    <strong>{analysis.error.includes('CLIP') ? 'Model Loading...' : 'Analysis Failed'}</strong>
+                  </div>
+                  <p style={{ margin: '0.5rem 0', fontSize: '0.9rem' }}>
+                    {analysis.error.includes('CLIP') 
+                      ? 'The CLIP model is loading for the first time. This may take 30-60 seconds. Please try again.'
+                      : analysis.error}
+                  </p>
+                  <div className="d-flex gap-2 mt-3">
+                    <button
+                      onClick={analyzeAndGetSuggestions}
+                      style={{
+                        padding: '0.5rem 1rem',
+                        background: analysis.error.includes('CLIP') ? '#f59e0b' : '#dc2626',
+                        color: '#fff',
+                        border: 'none',
+                        borderRadius: '8px',
+                        cursor: 'pointer',
+                        fontSize: '0.9rem',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.5rem'
+                      }}
+                    >
+                      <RefreshCw size={16} />
+                      Try Again
+                    </button>
+                    <button
+                      onClick={() => { setMode('browse'); clearFile(); }}
+                      style={{
+                        padding: '0.5rem 1rem',
+                        background: '#fff',
+                        color: '#6c757d',
+                        border: '1px solid #dee2e6',
+                        borderRadius: '8px',
+                        cursor: 'pointer',
+                        fontSize: '0.9rem'
+                      }}
+                    >
+                      Use Browse Mode Instead
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Right Column - Track Results */}
+            <div className="col-lg-7">
+              {renderTrackList()}
+            </div>
+          </div>
+        )}
+
+        {/* ==================== BROWSE MODE ==================== */}
+        {mode === 'browse' && (
+          <>
+            {/* Search Bar */}
+            <form onSubmit={handleSearch} className="mb-4">
+              <div className="input-group input-group-lg shadow-sm">
+                <span className="input-group-text bg-white border-end-0" style={{ borderRadius: '12px 0 0 12px' }}>
+                  <Search size={20} className="text-muted" />
+                </span>
+                <input
+                  type="text"
+                  className="form-control border-start-0 border-end-0"
+                  placeholder="Search for any song, artist, or album..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  style={{ fontSize: '1rem', border: '1px solid #dee2e6' }}
+                />
+                <button 
+                  className="btn btn-primary px-4" 
+                  type="submit"
+                  style={{ borderRadius: '0 12px 12px 0' }}
+                  disabled={loading}
+                >
+                  {loading ? 'Searching...' : 'Search'}
+                </button>
+              </div>
+            </form>
+
+            {/* Event Grid */}
+            <div className="mb-4">
+              <h5 className="fw-bold mb-3" style={{ color: '#1a1a1a' }}>Browse by Event</h5>
+              <div className="row g-3">
+                {events.map((event) => (
+                  <div key={event.id} className="col">
+                    <div
+                      onClick={() => handleEventClick(event.id)}
+                      style={{
+                        background: '#fff',
+                        borderRadius: '12px',
+                        overflow: 'hidden',
+                        cursor: 'pointer',
+                        transition: 'all 0.3s ease',
+                        border: selectedEvent === event.id ? '2px solid #667eea' : '2px solid transparent',
+                        transform: selectedEvent === event.id ? 'translateY(-5px)' : 'translateY(0)',
+                        boxShadow: selectedEvent === event.id 
+                          ? '0 8px 25px rgba(102, 126, 234, 0.3)'
+                          : '0 4px 15px rgba(0, 0, 0, 0.1)'
+                      }}
+                    >
+                      <div style={{ position: 'relative', height: '140px', overflow: 'hidden' }}>
+                        <img 
+                          src={event.image}
+                          alt={event.name}
+                          style={{
+                            width: '100%',
+                            height: '100%',
+                            objectFit: 'cover'
+                          }}
+                        />
+                        <div style={{
+                          position: 'absolute',
+                          bottom: 0,
+                          left: 0,
+                          right: 0,
+                          padding: '1rem',
+                          background: 'linear-gradient(transparent, rgba(0,0,0,0.7))'
+                        }}>
+                          <h6 style={{ color: '#fff', margin: 0, fontWeight: '600' }}>
+                            {event.emoji} {event.name}
+                          </h6>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Track Results */}
+            {renderTrackList()}
+          </>
+        )}
+      </div>
+
+      {/* Spotify Embed Modal */}
       {selectedTrackForPlayer && (
         <div
           onClick={() => setSelectedTrackForPlayer(null)}
@@ -652,12 +1271,7 @@ const MusicDiscoveryUI = () => {
               boxShadow: '0 20px 60px rgba(0,0,0,0.3)'
             }}
           >
-            <div style={{ 
-              display: 'flex', 
-              justifyContent: 'space-between', 
-              alignItems: 'center',
-              marginBottom: '1rem'
-            }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
               <h5 style={{ margin: 0, color: '#1a1a1a' }}>Now Playing</h5>
               <button
                 onClick={() => setSelectedTrackForPlayer(null)}
@@ -666,13 +1280,7 @@ const MusicDiscoveryUI = () => {
                   border: 'none',
                   fontSize: '1.5rem',
                   cursor: 'pointer',
-                  color: '#6c757d',
-                  padding: '0',
-                  width: '32px',
-                  height: '32px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center'
+                  color: '#6c757d'
                 }}
               >
                 ×
@@ -688,90 +1296,23 @@ const MusicDiscoveryUI = () => {
               allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
               loading="lazy"
               style={{ borderRadius: '12px' }}
+              title="Spotify Player"
             />
-            
-            <p style={{ 
-              marginTop: '1rem', 
-              fontSize: '0.85rem', 
-              color: '#6c757d',
-              textAlign: 'center',
-              marginBottom: 0
-            }}>
-              Click play to listen • No sign-in required
-            </p>
           </div>
         </div>
       )}
 
       {/* Hidden Audio Player */}
-      <audio 
-        ref={audioRef} 
-        onEnded={handleAudioEnd}
-        style={{ display: 'none' }}
-      />
+      <audio ref={audioRef} style={{ display: 'none' }} />
 
-      {/* CSS for Hover Effects */}
+      {/* CSS Animation for spinner */}
       <style>{`
-        .music-event-card {
-          background: white;
-          border-radius: 12px;
-          overflow: hidden;
-          cursor: pointer;
-          transition: all 0.3s ease;
-          height: 100%;
-          display: flex;
-          flex-direction: column;
+        @keyframes spin {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
         }
-        
-        .music-event-card:hover {
-          transform: translateY(-5px) !important;
-          border-color: #225ea1 !important;
-          box-shadow: 
-            0 8px 25px rgba(34, 94, 161, 0.2),
-            0 0 0 2px #225ea1,
-            0 0 15px rgba(34, 94, 161, 0.3) !important;
-        }
-        
-        .music-event-card:hover .event-card-img {
-          transform: scale(1.05);
-        }
-        
-        .music-event-card:hover .music-card-overlay {
-          background: linear-gradient(to bottom, rgba(0, 0, 0, 0.25), rgba(0, 0, 0, 0.55));
-        }
-        
-        .music-event-card:active {
-          transform: translateY(-3px) !important;
-        }
-        
-        .track-row {
-          position: relative;
-        }
-        
-        .track-row:hover {
-          background: #f8f9ff !important;
-        }
-        
-        .track-row button {
-          transition: all 0.2s ease;
-        }
-        
-        .track-row button:hover {
-          transform: scale(1.1);
-          filter: brightness(1.1);
-        }
-        
-        .track-row button:active {
-          transform: scale(0.95);
-        }
-        
-        @keyframes pulse {
-          0%, 100% { transform: scale(1); }
-          50% { transform: scale(1.05); }
-        }
-        
-        .event-card[data-selected="true"] {
-          animation: pulse 2s ease-in-out infinite;
+        .animate-spin {
+          animation: spin 1s linear infinite;
         }
       `}</style>
     </div>

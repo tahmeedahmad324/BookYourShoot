@@ -389,7 +389,7 @@ CREATE TABLE complaints (
     photographer_id UUID REFERENCES photographer_profile(id),
     subject VARCHAR(255) NOT NULL,
     description TEXT NOT NULL,
-    category VARCHAR(50) CHECK (category IN ('payment', 'service_quality', 'cancellation', 'behavior', 'other')),
+    category VARCHAR(50) CHECK (category IN ('payment', 'service_quality', 'cancellation', 'behavior', 'equipment_rental', 'other')),
     priority VARCHAR(20) DEFAULT 'medium' CHECK (priority IN ('low', 'medium', 'high', 'urgent')),
     status VARCHAR(20) DEFAULT 'open' CHECK (status IN ('open', 'investigating', 'resolved', 'closed', 'escalated')),
     assigned_to UUID REFERENCES users(id), -- Admin handling case
@@ -402,6 +402,7 @@ CREATE TABLE complaints (
 CREATE INDEX idx_complaints_user ON complaints(user_id);
 CREATE INDEX idx_complaints_photographer ON complaints(photographer_id);
 CREATE INDEX idx_complaints_status ON complaints(status);
+CREATE INDEX idx_complaints_category ON complaints(category);
 ```
 
 ---

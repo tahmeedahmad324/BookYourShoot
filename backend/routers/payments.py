@@ -68,6 +68,7 @@ async def create_checkout(payment: PaymentRequest):
         }
         
         # Prepare metadata for receipt/notifications
+        is_equipment_rental = "equipment" in (payment.service_type or "").lower() or "rental" in (payment.service_type or "").lower()
         metadata = {
             "client_name": payment.client_name or "Client",
             "client_email": payment.customer_email or "client@example.com",
@@ -76,7 +77,8 @@ async def create_checkout(payment: PaymentRequest):
             "service_type": payment.service_type or "Photography Service",
             "event_date": payment.event_date or "",
             "total_price": str(payment.total_price or payment.amount),
-            "advance_payment": str(payment.advance_payment or payment.amount)
+            "advance_payment": str(payment.advance_payment or payment.amount),
+            "is_equipment_rental": "true" if is_equipment_rental else "false"
         }
         
         # Create checkout session with metadata

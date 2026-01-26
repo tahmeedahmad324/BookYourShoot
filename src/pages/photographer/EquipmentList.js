@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useNavigate, Link } from 'react-router-dom';
 import StripeCheckout from '../../components/StripeCheckout';
+import api from '../../api/api';
 
 const EquipmentList = () => {
   const { user } = useAuth();
@@ -237,12 +238,80 @@ const EquipmentList = () => {
   ];
 
   useEffect(() => {
-    // Simulate API call to fetch equipment
-    setTimeout(() => {
+    fetchEquipment();
+  }, [selectedCategory]);
+
+  const fetchEquipment = async () => {
+    setLoading(true);
+    try {
+      // Build query params
+      let url = '/equipment/rentable';
+      const params = new URLSearchParams();
+      if (selectedCategory !== 'all') {
+        params.append('category', selectedCategory.toLowerCase());
+      }
+      if (params.toString()) {
+        url += `?${params.toString()}`;
+      }
+
+      const response = await api.get(url);
+      if (response.data.success && response.data.data.length > 0) {
+        // Transform API data to match our UI format
+        const transformedEquipment = response.data.data.map(item => ({
+          id: item.id,
+          name: item.name,
+          category: item.category?.charAt(0).toUpperCase() + item.category?.slice(1) || 'Other',
+          type: item.model || item.category || 'Equipment',
+          brand: item.brand || 'Unknown',
+          dailyRate: item.rental_price_per_day || 0,
+          weeklyRate: (item.rental_price_per_day || 0) * 6, // 6 days price for a week
+          monthlyRate: (item.rental_price_per_day || 0) * 25, // 25 days price for a month
+          deposit: (item.rental_price_per_day || 0) * 5, // 5 days as deposit
+          description: item.description || `${item.brand} ${item.model} - ${item.condition} condition`,
+          specifications: {
+            brand: item.brand || 'N/A',
+            model: item.model || 'N/A',
+            condition: item.condition || 'N/A'
+          },
+          image: getCategoryEmoji(item.category),
+          available: item.available !== false,
+          rating: 4.5 + Math.random() * 0.5,
+          reviews: Math.floor(Math.random() * 100) + 10,
+          rentalCount: Math.floor(Math.random() * 50) + 5,
+          condition: item.condition?.charAt(0).toUpperCase() + item.condition?.slice(1) || 'Good',
+          includes: ['Item', 'Accessories', 'Carry Case'],
+          popular: item.rental_price_per_day > 2000,
+          owner: item.photographer_profile,
+          original: item // Keep original data for API calls
+        }));
+        setEquipment(transformedEquipment);
+      } else {
+        // Fallback to mock data if API returns empty
+        setEquipment(mockEquipment);
+      }
+    } catch (error) {
+      console.error('Error fetching equipment:', error);
+      // Use mock data as fallback
       setEquipment(mockEquipment);
+    } finally {
       setLoading(false);
-    }, 1000);
-  }, []);
+    }
+  };
+
+  const getCategoryEmoji = (category) => {
+    const emojis = {
+      'camera': '📷',
+      'lens': '🔭',
+      'lighting': '💡',
+      'audio': '🎤',
+      'accessory': '🎒',
+      'video': '🎥',
+      'drone': '🚁',
+      'support': '🗼',
+      'other': '📦'
+    };
+    return emojis[category?.toLowerCase()] || '📦';
+  };
 
   const categories = ['all', 'Camera', 'Lighting', 'Video', 'Audio', 'Support', 'Drone'];
 

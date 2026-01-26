@@ -43,7 +43,9 @@ from backend.routers import (
     albums,
     notifications,
     jobs,
-    settings
+    settings,
+    chatbot,
+    ai_detection
 )
 from backend.services.payment_service import payment_service, StripeGateway
 from pathlib import Path
@@ -122,6 +124,8 @@ app.include_router(albums.router, prefix="/api")
 app.include_router(notifications.router, prefix="/api")
 app.include_router(jobs.router, prefix="/api")
 app.include_router(settings.router, prefix="/api")
+app.include_router(chatbot.router, prefix="/api")
+app.include_router(ai_detection.router, prefix="/api")  # AI Event & Mood Detection
 
 
 @app.get("/")
@@ -150,7 +154,8 @@ def root():
             "albums": "/api/albums",
             "notifications": "/api/notifications",
             "jobs": "/api/jobs",
-            "settings": "/api/settings"
+            "settings": "/api/settings",
+            "ai": "/api/ai"  # AI Event & Mood Detection
         }
     }
 

@@ -1062,22 +1062,25 @@ class EmailService:
         date: str,
         advance_amount: float,
         remaining_amount: float,
-        dashboard_url: str = "http://localhost:3000/client/bookings"
+        dashboard_url: str = "http://localhost:3000/client/bookings",
+        is_equipment_rental: bool = False
     ) -> Email:
-        """Send email when 50% advance payment is received"""
+        """Send email when 50% advance payment is received or equipment rental payment"""
+        template = EmailTemplate.EQUIPMENT_RENTAL_CONFIRMATION if is_equipment_rental else EmailTemplate.ADVANCE_PAYMENT_RECEIVED
         return self.send_email(
             to_email=client_email,
             to_name=client_name,
-            template=EmailTemplate.ADVANCE_PAYMENT_RECEIVED,
+            template=template,
             data={
                 "client_name": client_name,
                 "booking_id": booking_id,
                 "service_type": service_type,
-                "photographer_name": photographer_name,
+                "photographer_name": photographer_name if not is_equipment_rental else f"Equipment Owner: {photographer_name}",
                 "date": date,
                 "advance_amount": f"{advance_amount:,.0f}",
-                "remaining_amount": f"{remaining_amount:,.0f}",
-                "dashboard_url": dashboard_url
+                "remaining_amount": f"{remaining_amount:,.0f}" if not is_equipment_rental else "0",
+                "dashboard_url": dashboard_url,
+                "is_equipment_rental": is_equipment_rental
             }
         )
 

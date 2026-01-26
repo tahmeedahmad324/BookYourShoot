@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useSearchParams, Link, useNavigate } from 'react-router-dom';
 
-const API_BASE = 'http://localhost:5000/api';
+const API_BASE = 'http://localhost:8000/api';
 
 export default function BookingSuccess() {
   const [searchParams] = useSearchParams();
@@ -27,7 +27,7 @@ export default function BookingSuccess() {
 
       // Verify payment with backend
       console.log('BookingSuccess: Calling /status API...');
-      fetch(`http://localhost:5000/api/payments/status/${sessionId}`)
+      fetch(`http://localhost:8000/api/payments/status/${sessionId}`)
         .then(res => res.json())
         .then(async (data) => {
           console.log('BookingSuccess: Payment status =', data);

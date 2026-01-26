@@ -98,6 +98,14 @@ const PhotographerDashboard = () => {
       badge: null,
     },
     {
+      id: "rental-requests",
+      title: "Equipment Rental Requests",
+      description: "Review and approve equipment rental requests",
+      icon: Shield,
+      link: "/photographer/rental-requests",
+      badge: null,
+    },
+    {
       id: "music",
       title: "Travel Estimator",
       description: "Calculate travel costs for client locations",

@@ -5,7 +5,7 @@ const isLocalhost = window.location.hostname === 'localhost' || window.location.
 
 // Use the same host as the frontend, just change the port
 const API_HOST = isLocalhost ? 'localhost' : window.location.hostname;
-const API_BASE_URL = process.env.REACT_APP_API_URL || `http://${API_HOST}:5000`;
+const API_BASE_URL = process.env.REACT_APP_API_URL || `http://${API_HOST}:8000`;
 
 const SUPABASE_URL = process.env.REACT_APP_SUPABASE_URL;
 const SUPABASE_ANON_KEY = process.env.REACT_APP_SUPABASE_ANON_KEY;
@@ -626,8 +626,9 @@ export const cnicAPI = {
   },
 };
 
-// Export all APIs
-export default {
+// Convenience HTTP methods for direct usage
+const api = {
+  // Nested API modules
   auth: authAPI,
   photographers: photographerAPI,
   bookings: bookingAPI,
@@ -641,4 +642,62 @@ export default {
   complaints: complaintAPI,
   support: supportAPI,
   cnic: cnicAPI,
+  
+  // Convenience methods for direct HTTP calls
+  get: async (endpoint) => {
+    const headers = await getAuthHeaders();
+    const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+      method: 'GET',
+      headers,
+    });
+    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(data.detail || data.error || 'API request failed');
+    }
+    return data;
+  },
+  
+  post: async (endpoint, body) => {
+    const headers = await getAuthHeaders();
+    const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(body),
+    });
+    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(data.detail || data.error || 'API request failed');
+    }
+    return data;
+  },
+  
+  put: async (endpoint, body) => {
+    const headers = await getAuthHeaders();
+    const isFormData = body instanceof FormData;
+    const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+      method: 'PUT',
+      headers: isFormData ? { 'Authorization': headers['Authorization'] } : headers,
+      body: isFormData ? body : JSON.stringify(body),
+    });
+    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(data.detail || data.error || 'API request failed');
+    }
+    return data;
+  },
+  
+  delete: async (endpoint) => {
+    const headers = await getAuthHeaders();
+    const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+      method: 'DELETE',
+      headers,
+    });
+    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(data.detail || data.error || 'API request failed');
+    }
+    return data;
+  },
 };
+
+export default api;
