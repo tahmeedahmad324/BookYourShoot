@@ -9,7 +9,16 @@ const AlbumBuilder = () => {
   const [selectedCategory, setSelectedCategory] = useState('wedding');
   const [isCreating, setIsCreating] = useState(false);
   const [draggedImage, setDraggedImage] = useState(null);
+  const [createdAlbums, setCreatedAlbums] = useState([]);
+  const [showSuccess, setShowSuccess] = useState(false);
+  const [viewingAlbum, setViewingAlbum] = useState(null);
   const fileInputRef = useRef(null);
+
+  // Load existing albums on mount
+  React.useEffect(() => {
+    const existingAlbums = JSON.parse(localStorage.getItem('userAlbums') || '[]');
+    setCreatedAlbums(existingAlbums);
+  }, []);
 
   const categories = [
     { id: 'wedding', name: 'Wedding', icon: '💒', color: 'var(--primary-orange)' },
@@ -110,45 +119,370 @@ const AlbumBuilder = () => {
       return;
     }
     
-    if (!albumTitle.trim()) {
-      alert('Please enter an album title.');
-      return;
-    }
-    
     setIsCreating(true);
     
-    // Simulate album creation process
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    
-    const albumData = {
-      id: Date.now(),
-      title: albumTitle,
-      description: albumDescription,
-      category: selectedCategory,
-      images: selectedImages,
-      imageCount: selectedImages.length,
-      createdAt: new Date().toISOString(),
-      coverImage: selectedImages[0]?.url || null
-    };
-    
-    // Store album data (in real app, this would be sent to API)
-    const existingAlbums = JSON.parse(localStorage.getItem('userAlbums') || '[]');
-    existingAlbums.push(albumData);
-    localStorage.setItem('userAlbums', JSON.stringify(existingAlbums));
-    
-    alert('Album created successfully! 🎉');
-    
-    // Reset form
-    setAlbumTitle('My Photography Album');
-    setAlbumDescription('');
-    setSelectedImages([]);
-    setUploadedImages([]);
-    setIsCreating(false);
+    try {
+      // Get token from different auth methods
+      let token = null;
+      
+      // Method 1: Check for mock_user (proper mock login)
+      const mockUserStr = localStorage.getItem('mock_user');
+      if (mockUserStr) {
+        const userData = JSON.parse(mockUserStr);
+        token = `mock-jwt-token-${userData.role}`;
+        console.log('Using mock account token:', token);
+      }
+      
+      // Method 2: Check for userRole (alternative login method)
+      if (!token) {
+        const userRole = localStorage.getItem('userRole');
+        if (userRole) {
+          token = `mock-jwt-token-${userRole}`;
+          console.log('Using userRole token:', token);
+        }
+      }
+      
+      // Method 3: Check for real Supabase token
+      if (!token) {
+        token = localStorage.getItem('token');
+        console.log('Using real token:', token);
+      }
+      
+      if (!token) {
+        console.error('No auth found! Keys:', Object.keys(localStorage));
+        alert('Please login first to use AI album features');
+        setIsCreating(false);
+        return;
+      }
+      
+      console.log('✅ Token ready for API call');
+      
+      // Step 0: Clear old albums from backend before uploading new ones
+      try {
+        await fetch('http://localhost:8000/api/albums/smart/albums', {
+          method: 'DELETE',
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
+        console.log('Old albums cleared from backend');
+      } catch (err) {
+        console.log('No old albums to clear or delete failed (non-critical)');
+      }
+      
+      // Step 1: Upload photos to backend
+      const formData = new FormData();
+      for (const image of selectedImages) {
+        formData.append('files', image.file);
+      }
+      
+      const uploadResponse = await fetch('http://localhost:8000/api/albums/smart/upload', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        },
+        body: formData
+      });
+      
+      const uploadData = await uploadResponse.json();
+      
+      if (!uploadResponse.ok) {
+        throw new Error(uploadData.detail || 'Failed to upload photos');
+      }
+      
+      console.log('Upload successful:', uploadData);
+      
+      // Step 2: Start AI processing (ResNet-50 face clustering)
+      const processResponse = await fetch('http://localhost:8000/api/albums/smart/process', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      const processData = await processResponse.json();
+      
+      if (!processResponse.ok) {
+        throw new Error(processData.detail || 'Failed to start AI processing');
+      }
+      
+      console.log('Processing started:', processData);
+      
+      // Step 3: Poll for completion (increased timeout for ResNet-50)
+      let isComplete = false;
+      let attempts = 0;
+      const maxAttempts = 180; // 3 minutes timeout (64 images can take time)
+      
+      while (!isComplete && attempts < maxAttempts) {
+        await new Promise(resolve => setTimeout(resolve, 2000)); // Check every 2 seconds
+        
+        const statusResponse = await fetch('http://localhost:8000/api/albums/smart/status', {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
+        
+        const statusData = await statusResponse.json();
+        
+        console.log(`Processing status (${attempts}/${maxAttempts}):`, statusData.data?.status);
+        
+        if (statusData.data?.status === 'completed') {
+          isComplete = true;
+          console.log('✅ AI processing completed!');
+        } else if (statusData.data?.status === 'error') {
+          throw new Error('AI processing failed: ' + (statusData.data?.message || 'Unknown error'));
+        }
+        
+        attempts++;
+      }
+      
+      if (!isComplete) {
+        throw new Error(`Processing is taking longer than expected (${maxAttempts * 2}s). The album might still be processing. Try refreshing the page in a few minutes to see if it completed.`);
+      }
+      
+      // Step 4: Get organized albums (Highlights, Person_1, Person_2, etc.)
+      const albumsResponse = await fetch('http://localhost:8000/api/albums/smart/albums', {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      
+      const albumsData = await albumsResponse.json();
+      
+      if (albumsData.success) {
+        // Store the AI-organized albums
+        const organizedAlbums = {
+          id: Date.now(),
+          title: albumTitle,
+          description: albumDescription,
+          category: selectedCategory,
+          createdAt: new Date().toISOString(),
+          highlights: albumsData.data.highlights,
+          persons: albumsData.data.persons,
+          totalAlbums: albumsData.data.total_albums
+        };
+        
+        const existingAlbums = JSON.parse(localStorage.getItem('userAlbums') || '[]');
+        existingAlbums.push(organizedAlbums);
+        localStorage.setItem('userAlbums', JSON.stringify(existingAlbums));
+        
+        setCreatedAlbums(existingAlbums);
+        setShowSuccess(true);
+        
+        // Reset form
+        setAlbumTitle('My Photography Album');
+        setAlbumDescription('');
+        setSelectedImages([]);
+        setUploadedImages([]);
+        
+        setTimeout(() => setShowSuccess(false), 5000);
+      }
+      
+    } catch (error) {
+      console.error('Album creation error:', error);
+      alert(`Failed to create album: ${error.message}`);
+    } finally {
+      setIsCreating(false);
+    }
   };
 
   return (
     <div className="album-builder py-4">
       <div className="container">
+        {/* Album Viewer Modal */}
+        {viewingAlbum && (
+          <div className="modal show d-block" style={{ backgroundColor: 'rgba(0,0,0,0.8)' }} onClick={() => setViewingAlbum(null)}>
+            <div className="modal-dialog modal-xl modal-dialog-scrollable" onClick={(e) => e.stopPropagation()}>
+              <div className="modal-content">
+                <div className="modal-header">
+                  <div>
+                    <h4 className="modal-title fw-bold">{viewingAlbum.title}</h4>
+                    <p className="text-muted small mb-0">{viewingAlbum.description}</p>
+                  </div>
+                  <button type="button" className="btn-close" onClick={() => setViewingAlbum(null)}></button>
+                </div>
+                <div className="modal-body">
+                  {/* Highlights Album */}
+                  {viewingAlbum.highlights && viewingAlbum.highlights.count > 0 && (
+                    <div className="mb-5">
+                      <div className="d-flex justify-content-between align-items-center mb-3">
+                        <h5 className="fw-bold mb-0">✨ Highlights ({viewingAlbum.highlights.count} photos)</h5>
+                        <button 
+                          className="btn btn-sm btn-success"
+                          onClick={() => {
+                            const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
+                            const token = localStorage.getItem('token') || 
+                                        localStorage.getItem('mock_user') ? 'mock-jwt-token-client' : null;
+                            if (token) {
+                              window.open(`${API_URL}/api/albums/smart/download/highlights?token=${token}`, '_blank');
+                            }
+                          }}
+                        >
+                          📥 Download ZIP
+                        </button>
+                      </div>
+                      <div className="row g-3">
+                        {viewingAlbum.highlights.photos.map((photo, idx) => (
+                          <div key={idx} className="col-md-3 col-sm-4 col-6">
+                            <img 
+                              src={`http://localhost:8000${photo}`} 
+                              alt={`Highlight ${idx + 1}`}
+                              className="img-fluid rounded w-100"
+                              style={{ height: '200px', objectFit: 'cover', cursor: 'pointer' }}
+                              onClick={() => {
+                                // Open original quality in new tab
+                                const originalPath = photo.replace('/thumbnails/', '/organized/');
+                                window.open(`http://localhost:8000${originalPath}`, '_blank');
+                              }}
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Groups Album */}
+                  {viewingAlbum.groups && viewingAlbum.groups.count > 0 && (
+                    <div className="mb-5">
+                      <div className="d-flex justify-content-between align-items-center mb-3">
+                        <h5 className="fw-bold mb-0">👥 Groups ({viewingAlbum.groups.count} photos)</h5>
+                        <button 
+                          className="btn btn-sm btn-success"
+                          onClick={() => {
+                            const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
+                            const token = localStorage.getItem('token') || 
+                                        localStorage.getItem('mock_user') ? 'mock-jwt-token-client' : null;
+                            if (token) {
+                              window.open(`${API_URL}/api/albums/smart/download/groups?token=${token}`, '_blank');
+                            }
+                          }}
+                        >
+                          📥 Download ZIP
+                        </button>
+                      </div>
+                      <div className="row g-3">
+                        {viewingAlbum.groups.photos.map((photo, idx) => (
+                          <div key={idx} className="col-md-3 col-sm-4 col-6">
+                            <img 
+                              src={`http://localhost:8000${photo}`} 
+                              alt={`Group ${idx + 1}`}
+                              className="img-fluid rounded w-100"
+                              style={{ height: '200px', objectFit: 'cover', cursor: 'pointer' }}
+                              onClick={() => {
+                                const originalPath = photo.replace('/thumbnails/', '/organized/');
+                                window.open(`http://localhost:8000${originalPath}`, '_blank');
+                              }}
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Person Albums (Solo - 1 face only) */}
+                  {viewingAlbum.persons && Object.keys(viewingAlbum.persons).length > 0 && (
+                    <div>
+                      <h5 className="fw-bold mb-3">👤 Individual People - Solo Photos ({Object.keys(viewingAlbum.persons).length} persons detected)</h5>
+                      {Object.entries(viewingAlbum.persons).map(([personName, personData]) => (
+                        <div key={personName} className="mb-4">
+                          <div className="d-flex justify-content-between align-items-center mb-3">
+                            <h6 className="fw-semibold mb-0">{personName} ({personData.count} solo photos)</h6>
+                            <button 
+                              className="btn btn-sm btn-success"
+                              onClick={() => {
+                                const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
+                                const token = localStorage.getItem('token') || 
+                                            localStorage.getItem('mock_user') ? 'mock-jwt-token-client' : null;
+                                if (token) {
+                                  window.open(`${API_URL}/api/albums/smart/download/${personName}?token=${token}`, '_blank');
+                                }
+                              }}
+                            >
+                              📥 Download ZIP
+                            </button>
+                          </div>
+                          <div className="row g-3">
+                            {personData.photos.map((photo, idx) => (
+                              <div key={idx} className="col-md-3 col-sm-4 col-6">
+                                <img 
+                                  src={`http://localhost:8000${photo}`} 
+                                  alt={`${personName} ${idx + 1}`}
+                                  className="img-fluid rounded w-100"
+                                  style={{ height: '200px', objectFit: 'cover', cursor: 'pointer' }}
+                                  onClick={() => {
+                                    const originalPath = photo.replace('/thumbnails/', '/organized/');
+                                    window.open(`http://localhost:8000${originalPath}`, '_blank');
+                                  }}
+                                />
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Success Banner */}
+        {showSuccess && (
+          <div className="alert alert-success alert-dismissible fade show" role="alert">
+            <h5 className="alert-heading">🎉 Album Created Successfully!</h5>
+            <p className="mb-0">Your album has been created. Scroll down to view all your albums.</p>
+            <button type="button" className="btn-close" onClick={() => setShowSuccess(false)}></button>
+          </div>
+        )}
+
+        {/* Check Existing Albums Banner */}
+        <div className="alert alert-info alert-dismissible fade show" role="alert">
+          <strong>💡 Tip:</strong> If you previously created albums and they're not showing, click here to load them:
+          <button 
+            className="btn btn-sm btn-primary ms-2"
+            onClick={async () => {
+              try {
+                const userRole = localStorage.getItem('userRole');
+                const token = userRole ? `mock-jwt-token-${userRole}` : null;
+                if (!token) { alert('Please login first'); return; }
+                
+                const response = await fetch('http://localhost:8000/api/albums/smart/albums', {
+                  headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const data = await response.json();
+                
+                if (data.success && data.data) {
+                  const backendAlbum = {
+                    id: Date.now(),
+                    title: 'My Smart Album',
+                    description: 'AI-organized photos',
+                    category: selectedCategory,
+                    createdAt: new Date().toISOString(),
+                    highlights: data.data.highlights,
+                    persons: data.data.persons,
+                    totalAlbums: data.data.total_albums
+                  };
+                  
+                  const existingAlbums = JSON.parse(localStorage.getItem('userAlbums') || '[]');
+                  existingAlbums.push(backendAlbum);
+                  localStorage.setItem('userAlbums', JSON.stringify(existingAlbums));
+                  setCreatedAlbums(existingAlbums);
+                  alert('✅ Albums loaded successfully!');
+                } else {
+                  alert('No albums found');
+                }
+              } catch (error) {
+                alert('Error: ' + error.message);
+              }
+            }}
+          >
+            Load My Albums
+          </button>
+          <button type="button" className="btn-close" onClick={(e) => e.target.closest('.alert').remove()}></button>
+        </div>
+
         {/* Header */}
         <div className="gradient-header rounded-3 p-4 mb-4">
           <div className="row align-items-center">
@@ -244,53 +578,43 @@ const AlbumBuilder = () => {
                 </div>
                 
                 {uploadedImages.length > 0 && (
-                  <div className="mt-3">
-                    <h6 className="small text-muted mb-2">Uploaded Images ({uploadedImages.length})</h6>
-                    <div className="max-height-200 overflow-y-auto">
-                      {uploadedImages.map((image) => (
-                        <div key={image.id} className="d-flex align-items-center mb-2 p-2 bg-light rounded">
-                          <div className="me-2">
-                            <img 
-                              src={image.url} 
-                              alt={image.name}
-                              style={{ width: '40px', height: '40px', objectFit: 'cover' }}
-                            />
-                          </div>
-                          <div className="flex-grow-1">
-                            <div className="small fw-semibold text-truncate">{image.name}</div>
-                            <div className="small text-muted">{formatFileSize(image.size)}</div>
-                          </div>
-                          <div className="ms-2">
-                            <button 
-                              className="btn btn-sm btn-outline-danger"
-                              onClick={() => removeImage(image.id)}
-                            >
-                              ✕
-                            </button>
-                          </div>
-                        </div>
-                      ))}
+                  <div className="mt-3 text-center">
+                    <div className="alert alert-success py-2 mb-0">
+                      <strong>{uploadedImages.length}</strong> photos uploaded
                     </div>
                   </div>
                 )}
               </div>
             </div>
 
-            {/* Create Album Button */}
-            <button 
-              className="btn btn-primary w-100 btn-lg"
-              onClick={createAlbum}
-              disabled={isCreating || selectedImages.length === 0}
-            >
-              {isCreating ? (
-                <>
-                  <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
-                  Creating Album...
-                </>
-              ) : (
-                '🎨 Create Album'
+            {/* Create Album Button - Sticky */}
+            <div className="position-sticky" style={{ bottom: '20px', zIndex: 1000 }}>
+              <button 
+                className="btn btn-primary w-100 btn-lg shadow-lg"
+                onClick={createAlbum}
+                disabled={isCreating || selectedImages.length === 0}
+              >
+                {isCreating ? (
+                  <>
+                    <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                    AI Processing (ResNet-50)...
+                    <div className="small mt-1">This may take 2-3 minutes for {selectedImages.length} photos</div>
+                  </>
+                ) : (
+                  <>
+                    🤖 Create AI Albums ({selectedImages.length})
+                  </>
+                )}
+              </button>
+              {selectedImages.length > 0 && !isCreating && (
+                <div className="alert alert-info mt-2 small mb-0">
+                  <strong>🧠 ResNet-50 will:</strong><br/>
+                  • Detect faces in photos<br/>
+                  • Group by individual people<br/>
+                  • Select best highlights
+                </div>
               )}
-            </button>
+            </div>
           </div>
 
           {/* Main Content - Album Preview */}
@@ -313,11 +637,11 @@ const AlbumBuilder = () => {
                 </div>
               </div>
               <div className="card-body p-4">
-                {selectedImages.length === 0 ? (
+                {uploadedImages.length === 0 ? (
                   <div className="text-center py-5">
                     <div className="mb-4" style={{ fontSize: '4rem' }}>🖼️</div>
-                    <h4 className="fw-bold mb-3">No Photos Selected</h4>
-                    <p className="text-muted mb-4">Upload and select photos to start building your album</p>
+                    <h4 className="fw-bold mb-3">No Photos Uploaded</h4>
+                    <p className="text-muted mb-4">Upload photos to start building your album</p>
                     <button 
                       className="btn btn-primary"
                       onClick={() => fileInputRef.current?.click()}
@@ -327,24 +651,36 @@ const AlbumBuilder = () => {
                   </div>
                 ) : (
                   <div>
-                    {/* Album Cover */}
-                    <div className="text-center mb-4">
-                      <h3 className="fw-bold mb-2">{albumTitle || 'Untitled Album'}</h3>
-                      <p className="text-muted">{albumDescription || 'No description'}</p>
+                    {/* Selection Controls */}
+                    <div className="d-flex justify-content-between align-items-center mb-3">
+                      <div>
+                        <h5 className="fw-bold mb-0">Select photos for your album</h5>
+                        <p className="text-muted small mb-0">Click images to select/deselect • {selectedImages.length} selected</p>
+                      </div>
+                      <button 
+                        className="btn btn-outline-primary"
+                        onClick={() => {
+                          if (selectedImages.length === uploadedImages.length) {
+                            setSelectedImages([]);
+                          } else {
+                            setSelectedImages([...uploadedImages]);
+                          }
+                        }}
+                      >
+                        {selectedImages.length === uploadedImages.length ? 'Deselect All' : 'Select All'}
+                      </button>
                     </div>
                     
-                    {/* Album Grid */}
-                    <div className="row g-2">
-                      {selectedImages.map((image, index) => (
+                    {/* Image Selection Grid */}
+                    <div className="row g-3">
+                      {uploadedImages.map((image, index) => (
                         <div 
                           key={image.id}
                           className="col-md-3 col-sm-4 col-6"
-                          draggable
-                          onDragStart={(e) => handleDragStart(e, image)}
-                          onDragOver={handleDragOverImage}
-                          onDrop={(e) => handleDropOnImage(e, image)}
+                          onClick={() => selectImage(image)}
+                          style={{ cursor: 'pointer' }}
                         >
-                          <div className="album-image-container position-relative">
+                          <div className="position-relative">
                             <img 
                               src={image.url}
                               alt={image.name}
@@ -352,23 +688,33 @@ const AlbumBuilder = () => {
                               style={{ 
                                 height: '200px', 
                                 objectFit: 'cover',
-                                cursor: 'move',
-                                border: '2px solid var(--soft-gray)'
+                                border: selectedImages.find(img => img.id === image.id) 
+                                  ? '4px solid var(--primary-blue)' 
+                                  : '2px solid #e0e0e0',
+                                transition: 'all 0.2s ease'
                               }}
                             />
-                            <div className="position-absolute top-2 right-2">
+                            {/* Selection Indicator */}
+                            {selectedImages.find(img => img.id === image.id) && (
+                              <div className="position-absolute top-0 end-0 m-2">
+                                <div className="bg-primary text-white rounded-circle d-flex align-items-center justify-content-center" 
+                                     style={{ width: '32px', height: '32px', fontWeight: 'bold' }}>
+                                  ✓
+                                </div>
+                              </div>
+                            )}
+                            {/* Delete Button */}
+                            <div className="position-absolute top-0 start-0 m-2">
                               <button 
-                                className="btn btn-sm btn-danger btn-circle"
-                                onClick={() => removeImage(image.id)}
-                                style={{ borderRadius: '50%', width: '30px', height: '30px', padding: '0' }}
+                                className="btn btn-sm btn-danger"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  removeImage(image.id);
+                                }}
+                                style={{ borderRadius: '50%', width: '32px', height: '32px', padding: '0' }}
                               >
                                 ✕
                               </button>
-                            </div>
-                            <div className="position-absolute bottom-2 left-2">
-                              <span className="badge bg-dark bg-opacity-75 text-white">
-                                #{index + 1}
-                              </span>
                             </div>
                           </div>
                         </div>
@@ -455,6 +801,133 @@ const AlbumBuilder = () => {
             )}
           </div>
         </div>
+
+        {/* My Albums Section */}
+        {createdAlbums.length > 0 && (
+          <div className="row mt-5">
+            <div className="col-12">
+              <div className="d-flex justify-content-between align-items-center mb-4">
+                <h3 className="fw-bold">📚 My Albums ({createdAlbums.length})</h3>
+                <button 
+                  className="btn btn-outline-danger btn-sm"
+                  onClick={async () => {
+                    if (window.confirm('Are you sure you want to delete all albums?')) {
+                      // Clear from localStorage
+                      localStorage.removeItem('userAlbums');
+                      setCreatedAlbums([]);
+                      
+                      // Clear from backend
+                      try {
+                        const token = localStorage.getItem('token') || 
+                                    (localStorage.getItem('userRole') ? `mock-jwt-token-${localStorage.getItem('userRole')}` : null) ||
+                                    (localStorage.getItem('mock_user') ? `mock-jwt-token-client` : null);
+                        
+                        if (token) {
+                          await fetch('http://localhost:8000/api/albums/smart/albums', {
+                            method: 'DELETE',
+                            headers: {
+                              'Authorization': `Bearer ${token}`
+                            }
+                          });
+                          console.log('Albums deleted from backend');
+                        }
+                      } catch (err) {
+                        console.error('Failed to delete from backend:', err);
+                      }
+                    }
+                  }}
+                >
+                  Clear All
+                </button>
+              </div>
+
+              <div className="row g-4">
+                {createdAlbums.map((album) => (
+                  <div key={album.id} className="col-md-4 col-sm-6">
+                    <div className="card border-0 shadow-sm h-100">
+                      {/* Album Cover */}
+                      <div className="position-relative" style={{ height: '200px', overflow: 'hidden', background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' }}>
+                        <div className="w-100 h-100 d-flex flex-column align-items-center justify-content-center text-white p-3">
+                          <div style={{ fontSize: '3rem' }}>🎨</div>
+                          <h6 className="fw-bold mt-2">{album.totalAlbums} AI-Organized Albums</h6>
+                          <p className="small mb-0">
+                            {album.highlights?.count || 0} Highlights • {album.groups?.count || 0} Groups • {Object.keys(album.persons || {}).length} Solo
+                          </p>
+                        </div>
+                        <div className="position-absolute top-0 end-0 m-2">
+                          <span className="badge bg-dark bg-opacity-75">
+                            {categories.find(c => c.id === album.category)?.icon} {categories.find(c => c.id === album.category)?.name}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Album Info */}
+                      <div className="card-body">
+                        <h5 className="fw-bold mb-2">{album.title}</h5>
+                        <p className="text-muted small mb-3">
+                          {album.description || 'AI-organized by ResNet-50 face recognition'}
+                        </p>
+                        
+                        <div className="alert alert-info py-2 small mb-3">
+                          <strong>🤖 AI Processing Complete:</strong><br/>
+                          ✨ {album.highlights?.count || 0} best photos (Highlights)<br/>
+                          👥 {album.groups?.count || 0} group photos (2+ faces)<br/>
+                          👤 {Object.keys(album.persons || {}).length} solo person albums (1 face each)
+                        </div>
+
+                        <div className="d-flex justify-content-between align-items-center mb-3">
+                          <div className="small text-muted">
+                            Created {new Date(album.createdAt).toLocaleDateString()}
+                          </div>
+                        </div>
+
+                        <div className="mt-3">
+                          <button 
+                            className="btn btn-sm btn-primary w-100 mb-2"
+                            onClick={() => setViewingAlbum(album)}
+                          >
+                            📂 View All Albums
+                          </button>
+                          <button 
+                            className="btn btn-sm btn-outline-danger w-100"
+                            onClick={async () => {
+                              if (window.confirm(`Delete "${album.title}"?`)) {
+                                // Clear from localStorage
+                                const updatedAlbums = createdAlbums.filter(a => a.id !== album.id);
+                                localStorage.setItem('userAlbums', JSON.stringify(updatedAlbums));
+                                setCreatedAlbums(updatedAlbums);
+                                
+                                // Clear from backend
+                                try {
+                                  const token = localStorage.getItem('token') || 
+                                              (localStorage.getItem('userRole') ? `mock-jwt-token-${localStorage.getItem('userRole')}` : null) ||
+                                              (localStorage.getItem('mock_user') ? `mock-jwt-token-client` : null);
+                                  
+                                  if (token) {
+                                    await fetch('http://localhost:8000/api/albums/smart/albums', {
+                                      method: 'DELETE',
+                                      headers: {
+                                        'Authorization': `Bearer ${token}`
+                                      }
+                                    });
+                                  }
+                                } catch (err) {
+                                  console.error('Failed to delete from backend:', err);
+                                }
+                              }
+                            }}
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

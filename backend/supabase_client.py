@@ -12,11 +12,12 @@ else:
 	load_dotenv()
 
 SUPABASE_URL = os.getenv("SUPABASE_URL")
-SUPABASE_ANON_KEY = os.getenv("SUPABASE_ANON_KEY")
+SUPABASE_SERVICE_ROLE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
 
 
-# Use ANON KEY — required for OTP sign-in, signup, magic link, etc.
-if not SUPABASE_URL or not SUPABASE_ANON_KEY:
+# Use SERVICE ROLE KEY — bypasses RLS for backend operations
+# This is secure because this key is never exposed to the frontend
+if not SUPABASE_URL or not SUPABASE_SERVICE_ROLE_KEY:
 	# Create a dummy supabase object that surfaces clear errors at runtime
 	class _DummyQuery:
 		def __init__(self, *args, **kwargs):
@@ -50,20 +51,20 @@ if not SUPABASE_URL or not SUPABASE_ANON_KEY:
 			return self
 
 		def execute(self, *args, **kwargs):
-			raise RuntimeError("Supabase not configured. Set SUPABASE_URL and SUPABASE_ANON_KEY in backend/.env")
+			raise RuntimeError("Supabase not configured. Set SUPABASE_URL and SUPABASE_SERVICE_KEY in backend/.env")
 
 	class _DummyStorage:
 		def from_(self, *args, **kwargs):
-			raise RuntimeError("Supabase storage not available because SUPABASE_URL/KEY are not set")
+			raise RuntimeError("Supabase storage not available because SUPABASE_URL/SERVICE_KEY are not set")
 
 	class _DummyAuth:
 		def get_user(self, *args, **kwargs):
-			raise RuntimeError("Supabase auth not available because SUPABASE_URL/KEY are not set")
+			raise RuntimeError("Supabase auth not available because SUPABASE_URL/SERVICE_KEY are not set")
 
 		class api:
 			@staticmethod
 			def get_user(*args, **kwargs):
-				raise RuntimeError("Supabase auth API not available because SUPABASE_URL/KEY are not set")
+				raise RuntimeError("Supabase auth API not available because SUPABASE_URL/SERVICE_KEY are not set")
 
 	class _DummySupabase:
 		def table(self, *args, **kwargs):
@@ -79,4 +80,4 @@ if not SUPABASE_URL or not SUPABASE_ANON_KEY:
 
 	supabase = _DummySupabase()
 else:
-	supabase = create_client(SUPABASE_URL, SUPABASE_ANON_KEY)
+	supabase = create_client(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)

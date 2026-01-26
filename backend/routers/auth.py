@@ -1,8 +1,29 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
 from backend.supabase_client import supabase
+from backend.config import MOCK_ACCOUNTS
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
+
+
+@router.get("/check-email")
+def check_email_exists(email: str = Query(..., description="Email to check")):
+    """
+    Check if an email is already registered in the system
+    Returns: {"exists": true/false}
+    """
+    try:
+        # Check if user exists in our database
+        result = supabase.table("users").select("id").eq("email", email.lower()).limit(1).execute()
+        
+        return {
+            "exists": bool(result.data and len(result.data) > 0),
+            "email": email
+        }
+    except Exception as e:
+        # On error, return false to allow registration to proceed
+        print(f"Error checking email: {str(e)}")
+        return {"exists": False, "email": email}
 
 
 class SignupRequest(BaseModel):
@@ -105,51 +126,54 @@ def verify_otp(payload: VerifyOtpRequest):
 
 class RegisterRequest(BaseModel):
     email: str
-    otp: str
-    full_name: str = None  # Make optional
-    phone: str = None  # Make optional
-    city: str = None  # Make optional
+    user_id: str  # Supabase auth user ID (from frontend after OTP verification)
+    full_name: str
+    phone: str
+    city: str
+    role: str  # Required: 'client', 'photographer', or 'admin'
 
 
 @router.post("/register")
 def register(payload: RegisterRequest):
+    """
+    Complete user registration after OTP verification.
+    Frontend verifies OTP with Supabase, then calls this with user_id to save profile.
+    """
     try:
-        print(f"Registration attempt for email: {payload.email}")
-        print(f"OTP received: {payload.otp}")
+        print(f"Registration attempt for email: {payload.email}, user_id: {payload.user_id}")
         
-        # Verify OTP and create session
-        response = supabase.auth.verify_otp({
-            "email": payload.email,
-            "token": payload.otp,
-            "type": "email"
-        })
-
-        print(f"Supabase response - Session: {response.session is not None}, User: {response.user is not None}")
-
-        if response.session is None or response.user is None:
-            raise HTTPException(status_code=400, detail="Invalid OTP code. Please check and try again.")
-
-        user_id = response.user.id
-        print(f"User ID from Supabase: {user_id}")
-
+        # Validate role
+        valid_roles = ['client', 'photographer', 'admin']
+        if payload.role not in valid_roles:
+            raise HTTPException(status_code=400, detail=f"Invalid role. Must be one of: {', '.join(valid_roles)}")
+        
         # Check if user already exists
-        existing_user = supabase.table("users").select("*").eq("id", user_id).execute()
+        existing_user = supabase.table("users").select("*").eq("id", payload.user_id).execute()
         
-        if not existing_user.data:
-            print(f"Creating new user in database")
-            # Insert user into our users table
-            supabase.table("users").insert({
-                "id": user_id,
-                "email": payload.email,
-                "full_name": payload.full_name,
-                "phone": payload.phone,
-                "city": payload.city,
-                "role": "client"
-            }).execute()
-        else:
+        if existing_user.data and len(existing_user.data) > 0:
             print(f"User already exists in database")
-
-        return {"message": "User registered successfully.", "access_token": response.session.access_token, "user_id": user_id}
+            return {
+                "message": "User already registered.", 
+                "user_id": existing_user.data[0]['id']
+            }
+        
+        # Create new user in our database
+        print(f"Creating new user in database with role: {payload.role}")
+        supabase.table("users").insert({
+            "id": payload.user_id,
+            "email": payload.email,
+            "full_name": payload.full_name,
+            "phone": payload.phone,
+            "city": payload.city,
+            "role": payload.role
+        }).execute()
+        
+        print(f"User created successfully")
+        return {
+            "message": "User registered successfully.", 
+            "user_id": payload.user_id
+        }
+            
     except HTTPException:
         raise
     except Exception as e:
@@ -157,6 +181,42 @@ def register(payload: RegisterRequest):
         import traceback
         print(traceback.format_exc())
         raise HTTPException(status_code=400, detail=f"Registration failed: {str(e)}")
+
+
+class MockLoginRequest(BaseModel):
+    email: str
+    password: str
+
+
+@router.post("/mock-login")
+def mock_login(payload: MockLoginRequest):
+    """
+    Mock login for testing - bypasses Supabase auth and rate limits.
+    Only works with predefined test accounts.
+    """
+    try:
+        email = payload.email.lower()
+        
+        # Check if this is a mock account
+        if email not in MOCK_ACCOUNTS:
+            raise HTTPException(status_code=401, detail="Invalid credentials. This endpoint only accepts test accounts.")
+        
+        mock_account = MOCK_ACCOUNTS[email]
+        
+        # Verify password
+        if payload.password != mock_account["password"]:
+            raise HTTPException(status_code=401, detail="Invalid password")
+        
+        # Return mock session data (frontend will handle it like a real session)
+        return {
+            "message": "Mock login successful",
+            "user": mock_account,
+            "is_mock": True
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Login failed: {str(e)}")
 
 
 class LoginRequest(BaseModel):

@@ -20,6 +20,7 @@ from fastapi import FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
 
 # Import routers via package-qualified names
 from backend.routers import (
@@ -45,8 +46,18 @@ from backend.routers import (
     settings
 )
 from backend.services.payment_service import payment_service, StripeGateway
+from pathlib import Path
 
 app = FastAPI(title="BookYourShoot API", version="1.0.0")
+
+# Mount static files for album images (Module 6: Smart Album Builder)
+# Use absolute path to avoid issues when running from different directories
+import os
+BASE_DIR = Path(__file__).resolve().parent
+storage_path = BASE_DIR / "storage"
+storage_path.mkdir(parents=True, exist_ok=True)
+app.mount("/storage", StaticFiles(directory=str(storage_path)), name="storage")
+print(f"✅ Static file serving enabled: /storage -> {storage_path.absolute()}")
 
 # Initialize Stripe for payments (FYP Demo)
 stripe_secret = os.getenv("STRIPE_SECRET_KEY", "")

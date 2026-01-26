@@ -9,13 +9,8 @@ router = APIRouter(prefix="/admin", tags=["Admin"])
 
 def verify_admin(current_user: dict = Depends(get_current_user)):
     """Verify user is an admin"""
-    user_id = current_user.get("id") or current_user.get("sub")
-    if not user_id:
-        raise HTTPException(status_code=401, detail="Unauthorized")
-    
-    # Check if user has admin role
-    user = supabase.table('users').select('role').eq('id', user_id).limit(1).execute()
-    if not user.data or user.data[0].get('role') != 'admin':
+    # get_current_user already fetches role from database
+    if current_user.get('role') != 'admin':
         raise HTTPException(status_code=403, detail="Admin access required")
     
     return current_user
@@ -69,7 +64,7 @@ class VerifyPhotographerRequest(BaseModel):
 def verify_photographer(photographer_id: str, payload: VerifyPhotographerRequest, current_user: dict = Depends(verify_admin)):
     """Approve or reject photographer verification"""
     try:
-        updates = {
+        updates: dict = {
             "admin_approved": payload.approved,
             "verified": payload.approved
         }
@@ -109,9 +104,14 @@ def get_user_details(user_id: str, current_user: dict = Depends(verify_admin)):
         
         # Get user's bookings (need to lookup photographer_id first if user is photographer)
         bookings = supabase.table('booking').select('*').eq('client_id', user_id).execute()
-        if photographer.data:
-            photographer_bookings = supabase.table('booking').select('*').eq('photographer_id', photographer.data[0]['id']).execute()
-            bookings.data.extend(photographer_bookings.data if photographer_bookings.data else [])
+        if photographer.data and len(photographer.data) > 0:
+            photographer_profile = photographer.data[0]
+            if isinstance(photographer_profile, dict):
+                photographer_id = photographer_profile.get('id')
+                if photographer_id:
+                    photographer_bookings = supabase.table('booking').select('*').eq('photographer_id', photographer_id).execute()
+                    if bookings.data and photographer_bookings.data:
+                        bookings.data.extend(photographer_bookings.data)
         
         return {
             "success": True,
@@ -134,7 +134,7 @@ class UpdateUserStatusRequest(BaseModel):
 def update_user_status(user_id: str, payload: UpdateUserStatusRequest, current_user: dict = Depends(verify_admin)):
     """Activate or deactivate a user account"""
     try:
-        updates = {"is_active": payload.is_active}
+        updates: dict = {"is_active": payload.is_active}
         
         if not payload.is_active and payload.reason:
             updates["deactivation_reason"] = payload.reason
