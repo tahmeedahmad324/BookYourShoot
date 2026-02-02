@@ -3,8 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { yupResolver } from '@hookform/resolvers/yup';
 import * as yup from 'yup';
-import { useAuth } from '../../context/AuthContext';
-import { sendOTP, registerWithOTP } from '../../api/auth';
+import { registerWithPassword } from '../../api/auth';
 
 // Validation schema
 const registerSchema = yup.object().shape({
@@ -123,7 +122,6 @@ const normalizePhone = (phone) => {
 
 const Register = () => {
   const navigate = useNavigate();
-  const { login } = useAuth();
   const [loading, setLoading] = useState(false);
   const [serverError, setServerError] = useState('');
   const [selectedRole, setSelectedRole] = useState('');
@@ -139,7 +137,6 @@ const Register = () => {
     resolver: yupResolver(registerSchema)
   });
 
-  const watchRole = watch('role');
   const watchPassword = watch('password');
 
   const handleRoleSelect = (role) => {
@@ -156,22 +153,54 @@ const Register = () => {
       // Normalize phone number
       const normalizedPhone = normalizePhone(data.phone);
       
-      // Send OTP to user's email via backend
-      const response = await sendOTP(data.email);
+      // Check if email is already registered
+      const API_BASE = process.env.REACT_APP_API_URL || "http://localhost:8000";
+      const checkResponse = await fetch(`${API_BASE}/api/auth/check-email?email=${encodeURIComponent(data.email)}`);
+      const checkData = await checkResponse.json();
       
-      // Store registration data in session for OTP verification step
-      sessionStorage.setItem('registrationData', JSON.stringify({
+      if (checkData.exists) {
+        setServerError('This email is already registered. Please login instead.');
+        setLoading(false);
+        return;
+      }
+      
+      // Register with email and password
+      const result = await registerWithPassword({
         email: data.email.toLowerCase(),
+        password: data.password,
         full_name: data.name,
         phone: normalizedPhone,
         city: 'Lahore', // Default, can add city field to form
         role: data.role
-      }));
+      });
       
-      // Navigate to OTP verification with email in state
-      navigate('/verify-otp', { state: { email: data.email, flow: 'register' } });
+      // Check if email confirmation is required
+      if (result.requires_email_confirmation) {
+        // Store registration data temporarily for OTP verification
+        sessionStorage.setItem('pendingRegistration', JSON.stringify({
+          email: data.email,
+          role: data.role,
+          full_name: data.name
+        }));
+        
+        // Navigate to OTP verification page
+        navigate('/verify-otp', { 
+          state: { 
+            email: data.email,
+            role: data.role,
+            message: 'Please check your email for the verification code'
+          } 
+        });
+      } else {
+        // Email auto-confirmed (development mode) - navigate to appropriate page
+        if (data.role === 'photographer') {
+          navigate('/register/cnic');
+        } else {
+          navigate(`/${data.role}/dashboard`);
+        }
+      }
     } catch (error) {
-      setServerError(error.message || 'Failed to send OTP. Please try again.');
+      setServerError(error.message || 'Registration failed. Please try again.');
     } finally {
       setLoading(false);
     }

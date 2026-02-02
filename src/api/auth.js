@@ -1,69 +1,104 @@
-const API_BASE = process.env.REACT_APP_API_URL || "http://localhost:5000"
+import { supabase } from '../supabaseClient';
+import api from '../services/api';
 
-// Send OTP
-export const sendOTP = async (email) => {
+// Mock test accounts - bypass Supabase auth for testing
+const MOCK_ACCOUNTS = [
+  'client@test.com',
+  'photographer@test.com', 
+  'admin@test.com'
+];
+
+const isMockAccount = (email) => MOCK_ACCOUNTS.includes(email.toLowerCase());
+
+/**
+ * Register with email and password
+ * Creates Supabase auth user and saves profile to our database
+ */
+export const registerWithPassword = async (userData) => {
   try {
-    const response = await fetch(`${API_BASE}/api/auth/send-otp`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email }),
-    })
+    // Sign up with Supabase (creates auth user with password)
+    const { data, error } = await supabase.auth.signUp({
+      email: userData.email,
+      password: userData.password,
+      options: {
+        data: {
+          full_name: userData.full_name,
+        },
+        emailRedirectTo: `${window.location.origin}/verify-otp`
+      }
+    });
 
-    if (!response.ok) throw new Error("Failed to send OTP")
-    return await response.json()
+    if (error) throw error;
+
+    if (!data.user) {
+      throw new Error("Failed to create account. Please try again.");
+    }
+
+    // Check if email confirmation is required
+    if (data.session === null) {
+      // Email confirmation required - user will receive OTP email
+      console.log('Email confirmation required - check inbox for OTP');
+    }
+
+    // Save user profile to our database
+    const response = await api.post('/api/auth/register', {
+      email: userData.email,
+      user_id: data.user.id,
+      full_name: userData.full_name,
+      phone: userData.phone,
+      city: userData.city,
+      role: userData.role
+    });
+
+    return {
+      ...response.data,
+      user_id: data.user.id,
+      requires_email_confirmation: data.session === null
+    };
   } catch (error) {
-    console.error("Send OTP error:", error)
-    throw error
+    console.error("Register error:", error);
+    throw new Error(error.response?.data?.detail || error.message || "Registration failed");
   }
-}
+};
 
-// Verify OTP
-export const verifyOTP = async (email, otp) => {
+/**
+ * Login with email and password
+ * Authenticates user with Supabase, or uses mock accounts for testing
+ */
+export const loginWithPassword = async (email, password) => {
   try {
-    const response = await fetch(`${API_BASE}/api/auth/verify-otp`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, otp }),
-    })
+    // Check if this is a mock account (bypasses Supabase and rate limits)
+    if (isMockAccount(email)) {
+      const response = await api.post('/api/auth/mock-login', {
+        email: email.toLowerCase(),
+        password: password
+      });
+      
+      return {
+        user: response.data.user,
+        is_mock: true
+      };
+    }
+    
+    // Real Supabase authentication
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email: email,
+      password: password,
+    });
 
-    if (!response.ok) throw new Error("Failed to verify OTP")
-    return await response.json()
+    if (error) throw error;
+
+    if (!data.session || !data.user) {
+      throw new Error("Invalid email or password.");
+    }
+
+    return {
+      access_token: data.session.access_token,
+      user_id: data.user.id,
+      user: data.user
+    };
   } catch (error) {
-    console.error("Verify OTP error:", error)
-    throw error
+    console.error("Login error:", error);
+    throw new Error(error.response?.data?.detail || error.message || "Login failed");
   }
-}
-
-// Register with OTP
-export const registerWithOTP = async (userData, otp) => {
-  try {
-    const response = await fetch(`${API_BASE}/api/auth/register`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ...userData, otp }),
-    })
-
-    if (!response.ok) throw new Error("Registration failed")
-    return await response.json()
-  } catch (error) {
-    console.error("Register error:", error)
-    throw error
-  }
-}
-
-// Login with OTP
-export const loginWithOTP = async (email, otp) => {
-  try {
-    const response = await fetch(`${API_BASE}/api/auth/login`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, otp }),
-    })
-
-    if (!response.ok) throw new Error("Login failed")
-    return await response.json()
-  } catch (error) {
-    console.error("Login error:", error)
-    throw error
-  }
-}
+};

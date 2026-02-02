@@ -11,6 +11,12 @@ const Navbar = () => {
   const location = useLocation()
   const [expanded, setExpanded] = useState(false)
 
+  // Hide navbar on authentication pages
+  const authPages = ['/login', '/register', '/verify-otp', '/register/cnic']
+  if (authPages.includes(location.pathname)) {
+    return null
+  }
+
   const handleLogout = () => {
     logout()
     navigate("/")
