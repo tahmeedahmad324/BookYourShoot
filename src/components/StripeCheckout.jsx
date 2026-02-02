@@ -19,7 +19,7 @@ export default function StripeCheckout({ bookingId, amount, photographerName, on
 
     try {
       // Call your backend to create checkout session
-      const response = await fetch('http://localhost:8000/api/payments/create-checkout', {
+      const response = await fetch('http://localhost:5000/api/payments/create-checkout', {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',

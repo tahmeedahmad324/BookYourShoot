@@ -4,7 +4,7 @@ import { useAuth } from '../../context/AuthContext';
 import EscrowStatus from '../../components/EscrowStatus';
 import StripeCheckout from '../../components/StripeCheckout';
 
-const API_BASE = 'http://localhost:8000/api';
+const API_BASE = 'http://localhost:5000/api';
 
 const ClientBookings = () => {
   const { user } = useAuth();
