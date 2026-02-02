@@ -3,37 +3,29 @@ import { Link } from 'react-router-dom';
 import { 
   Music, Play, Pause, Heart, Search, Sparkles, ExternalLink, 
   Upload, Image, Wand2, X, Camera, CheckCircle2,
-  Loader2, AlertCircle, RefreshCw, Video, FileVideo
+  Loader2, AlertCircle, RefreshCw, Video, FileVideo, ImageIcon
 } from 'lucide-react';
 
 /**
  * =============================================================================
- * SMART MUSIC DISCOVERY WITH CLIP-BASED AI DETECTION
+ * SMART MUSIC DISCOVERY FOR EVENTS
  * =============================================================================
  * 
- * This component provides AI-powered music suggestions using CLIP zero-shot
- * classification for event and mood detection. Unlike simple Spotify search,
- * this approach:
+ * Intelligent music suggestions using event detection from your photos.
+ * Upload images from your event and get perfectly matched music recommendations.
  * 
- * 1. ANALYZES VISUAL CONTENT: Uses CLIP to understand images/videos
- * 2. DETECTS EVENT TYPE: Mehndi, Barat, Walima, Birthday, Corporate, etc.
- * 3. DETECTS MOOD: Romantic, Energetic, Dance, Calm
- * 4. SUGGESTS MUSIC: Based on detected event + mood combination
- * 
- * SUPPORTS:
- * - Image upload (JPG, PNG, WebP, etc.)
- * - Video upload (MP4, MOV, AVI) with frame extraction
- * - Drag and drop
- * - Click to browse
+ * MODES:
+ * 1. Smart Detection - Upload single image/video for instant suggestions
+ * 2. Batch Analysis - Upload multiple images for better accuracy
+ * 3. Browse - Search by event type or keywords
  * 
  * Author: BookYourShoot Team
- * Course: Final Year Project (FYP)
  * =============================================================================
  */
 
 const MusicDiscoveryUI = () => {
   // Core state
-  const [mode, setMode] = useState('smart'); // 'smart' (AI) or 'browse'
+  const [mode, setMode] = useState('smart'); // 'smart' (AI single), 'batch' (AI multi-image), or 'browse'
   const [tracks, setTracks] = useState([]);
   const [savedTracks, setSavedTracks] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -51,6 +43,12 @@ const MusicDiscoveryUI = () => {
   const [dragActive, setDragActive] = useState(false);
   const fileInputRef = useRef(null);
   const videoRef = useRef(null);
+
+  // Batch/Multi-Image mode state (NEW!)
+  const [uploadedImages, setUploadedImages] = useState([]);     // Array of {file, preview}
+  const [batchAnalyzing, setBatchAnalyzing] = useState(false);
+  const [batchAnalysis, setBatchAnalysis] = useState(null);     // Aggregate analysis results
+  const batchInputRef = useRef(null);
 
   // Browse mode state
   const [selectedEvent, setSelectedEvent] = useState(null);
@@ -158,6 +156,130 @@ const MusicDiscoveryUI = () => {
     setTracks([]);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
+    }
+  };
+
+  // ==================== Multi-Image Batch Handlers ====================
+
+  const handleBatchImageInput = (e) => {
+    if (e.target.files && e.target.files.length > 0) {
+      handleMultipleImages(Array.from(e.target.files));
+    }
+  };
+
+  const handleMultipleImages = async (files) => {
+    // Limit to 20 images
+    const imageFiles = files.filter(f => f.type.startsWith('image/')).slice(0, 20);
+    
+    if (imageFiles.length === 0) {
+      alert('Please select at least 1 image file (JPG, PNG)');
+      return;
+    }
+
+    if (imageFiles.length > 20) {
+      alert('Maximum 20 images allowed. First 20 will be used.');
+    }
+
+    // Create previews for all images
+    const imagePreviews = await Promise.all(
+      imageFiles.map(file => {
+        return new Promise((resolve) => {
+          const reader = new FileReader();
+          reader.onload = (e) => {
+            resolve({
+              file: file,
+              preview: e.target.result,
+              name: file.name
+            });
+          };
+          reader.readAsDataURL(file);
+        });
+      })
+    );
+
+    setUploadedImages(imagePreviews);
+    setBatchAnalysis(null);
+    setTracks([]);
+  };
+
+  const removeBatchImage = (index) => {
+    const updated = uploadedImages.filter((_, i) => i !== index);
+    setUploadedImages(updated);
+    if (updated.length === 0) {
+      setBatchAnalysis(null);
+      setTracks([]);
+    }
+  };
+
+  const clearBatchImages = () => {
+    setUploadedImages([]);
+    setBatchAnalysis(null);
+    setTracks([]);
+    if (batchInputRef.current) {
+      batchInputRef.current.value = '';
+    }
+  };
+
+  /**
+   * Analyze Multiple Images with Aggregate AI Detection
+   * ====================================================
+   * Sends all images to /api/music/suggest-from-images endpoint
+   * which uses confidence-weighted voting to determine event type
+   */
+  const analyzeBatchAndGetSuggestions = async () => {
+    if (uploadedImages.length === 0) return;
+
+    setBatchAnalyzing(true);
+    setTracks([]);
+
+    try {
+      // Create FormData with all images
+      const formData = new FormData();
+      uploadedImages.forEach(img => {
+        formData.append('images', img.file);
+      });
+
+      // Call the multi-image aggregate endpoint
+      const response = await fetch(`${API_BASE}/api/music/suggest-from-images`, {
+        method: 'POST',
+        body: formData
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        // Set aggregate analysis results
+        setBatchAnalysis({
+          total_images: data.analysis.total_images_uploaded,
+          analyzed_count: data.analysis.successfully_analyzed,
+          aggregate_event: data.analysis.aggregate_event_type,
+          aggregate_confidence: data.analysis.aggregate_confidence,
+          confidence_percentage: data.analysis.confidence_percentage,
+          all_event_votes: data.analysis.all_event_votes,
+          individual_predictions: data.analysis.individual_predictions
+        });
+        
+        // Set music suggestions
+        if (data.music_suggestions && data.music_suggestions.tracks) {
+          setTracks(data.music_suggestions.tracks.map(track => ({
+            id: track.id,
+            title: track.title,
+            artist: track.artist,
+            imageUrl: track.imageUrl,
+            previewUrl: track.previewUrl,
+            spotifyUrl: track.spotifyUrl,
+            duration: track.duration || '3:30'
+          })));
+        }
+      } else {
+        console.error('Batch analysis failed:', data.error);
+        setBatchAnalysis({ error: data.detail || data.error || 'Analysis failed' });
+      }
+    } catch (error) {
+      console.error('Error in batch analysis:', error);
+      setBatchAnalysis({ error: 'Failed to connect to AI service. Make sure the backend is running.' });
+    } finally {
+      setBatchAnalyzing(false);
     }
   };
 
@@ -348,12 +470,18 @@ const MusicDiscoveryUI = () => {
 
   // ==================== Track List Render Function ====================
   const renderTrackList = () => {
-    const isLoadingState = mode === 'browse' ? loading : analyzing;
+    const isLoadingState = mode === 'browse' ? loading : (mode === 'batch' ? batchAnalyzing : analyzing);
     const hasResults = tracks.length > 0;
     const selectedEventData = events.find(e => e.id === selectedEvent);
-    const title = mode === 'smart' 
-      ? (analysis ? `${analysis.event_label || 'Recommended'} Music` : 'Recommended Music')
-      : (searchQuery ? `Results for "${searchQuery}"` : `${selectedEventData?.name || 'Select Event'} Music`);
+    
+    let title = 'Recommended Music';
+    if (mode === 'smart' && analysis) {
+      title = `${analysis.event_label || 'Recommended'} Music`;
+    } else if (mode === 'batch' && batchAnalysis && !batchAnalysis.error) {
+      title = `${batchAnalysis.aggregate_event.charAt(0).toUpperCase() + batchAnalysis.aggregate_event.slice(1)} Music (${batchAnalysis.confidence_percentage})`;
+    } else if (mode === 'browse') {
+      title = searchQuery ? `Results for "${searchQuery}"` : `${selectedEventData?.name || 'Select Event'} Music`;
+    }
 
     return (
       <div>
@@ -376,7 +504,7 @@ const MusicDiscoveryUI = () => {
         {/* Loading State */}
         {isLoadingState && (
           <div className="text-center py-5">
-            <div className="spinner-border" style={{ color: '#667eea' }} role="status">
+            <div className="spinner-border" style={{ color: mode === 'batch' ? '#f5576c' : '#667eea' }} role="status">
               <span className="visually-hidden">Loading...</span>
             </div>
             <p className="mt-3 text-muted">
@@ -384,7 +512,9 @@ const MusicDiscoveryUI = () => {
                 ? (fileType === 'video' 
                     ? 'AI is extracting frames and analyzing your video...' 
                     : 'AI is analyzing your image with CLIP...') 
-                : 'Discovering music...'}
+                : mode === 'batch'
+                  ? `AI is analyzing ${uploadedImages.length} images with confidence-weighted voting...`
+                  : 'Discovering music...'}
             </p>
           </div>
         )}
@@ -408,6 +538,19 @@ const MusicDiscoveryUI = () => {
                 </p>
                 <small className="text-muted d-block mt-2">
                   Supports: JPG, PNG, MP4, MOV
+                </small>
+              </>
+            ) : mode === 'batch' ? (
+              <>
+                <div className="d-flex justify-content-center gap-3 mb-3">
+                  <ImageIcon size={40} className="text-muted" />
+                  <Sparkles size={40} className="text-muted" />
+                </div>
+                <p className="text-muted mb-0">
+                  Upload 5-10 event photos for best accuracy
+                </p>
+                <small className="text-muted d-block mt-2">
+                  More images provide better event detection!
                 </small>
               </>
             ) : (
@@ -637,48 +780,45 @@ const MusicDiscoveryUI = () => {
           </div>
 
           {/* Mode Toggle */}
-          <div className="d-flex gap-2 mb-4">
+          <div className="d-flex gap-2 mb-4 flex-wrap">
             <button
-              onClick={() => { setMode('smart'); setTracks([]); setSelectedEvent(null); }}
+              onClick={() => { setMode('smart'); setTracks([]); setSelectedEvent(null); clearBatchImages(); }}
+              className={`btn ${mode === 'smart' ? 'btn-primary' : 'btn-outline-secondary'}`}
               style={{
                 padding: '0.75rem 1.5rem',
                 borderRadius: '12px',
-                border: 'none',
                 fontWeight: '600',
-                cursor: 'pointer',
-                transition: 'all 0.3s ease',
-                background: mode === 'smart' 
-                  ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' 
-                  : '#fff',
-                color: mode === 'smart' ? '#fff' : '#6c757d',
-                boxShadow: mode === 'smart' 
-                  ? '0 4px 15px rgba(102, 126, 234, 0.4)' 
-                  : '0 2px 8px rgba(0,0,0,0.08)'
+                transition: 'all 0.3s ease'
               }}
             >
               <Wand2 size={18} className="me-2" />
-              AI Smart Mode
+              Smart Detection
             </button>
             <button
-              onClick={() => { setMode('browse'); setTracks([]); clearFile(); }}
+              onClick={() => { setMode('batch'); setTracks([]); setSelectedEvent(null); clearFile(); }}
+              className={`btn ${mode === 'batch' ? 'btn-primary' : 'btn-outline-secondary'}`}
               style={{
                 padding: '0.75rem 1.5rem',
                 borderRadius: '12px',
-                border: 'none',
                 fontWeight: '600',
-                cursor: 'pointer',
-                transition: 'all 0.3s ease',
-                background: mode === 'browse' 
-                  ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' 
-                  : '#fff',
-                color: mode === 'browse' ? '#fff' : '#6c757d',
-                boxShadow: mode === 'browse' 
-                  ? '0 4px 15px rgba(102, 126, 234, 0.4)' 
-                  : '0 2px 8px rgba(0,0,0,0.08)'
+                transition: 'all 0.3s ease'
+              }}
+            >
+              <ImageIcon size={18} className="me-2" />
+              Multiple Images <span className="badge bg-success ms-1" style={{fontSize: '0.7rem'}}>Better</span>
+            </button>
+            <button
+              onClick={() => { setMode('browse'); setTracks([]); clearFile(); clearBatchImages(); setSelectedEvent(null); }}
+              className={`btn ${mode === 'browse' ? 'btn-primary' : 'btn-outline-secondary'}`}
+              style={{
+                padding: '0.75rem 1.5rem',
+                borderRadius: '12px',
+                fontWeight: '600',
+                transition: 'all 0.3s ease'
               }}
             >
               <Music size={18} className="me-2" />
-              Browse by Event
+              Browse Events
             </button>
           </div>
         </div>
@@ -697,12 +837,12 @@ const MusicDiscoveryUI = () => {
                 marginBottom: '1.5rem'
               }}>
                 <h5 className="fw-bold mb-3" style={{ color: '#1a1a1a' }}>
-                  <Camera className="me-2" style={{ color: '#667eea' }} size={20} />
+                  <Camera className="me-2" style={{ color: '#0d6efd' }} size={20} />
                   Upload Photo or Video
                 </h5>
                 <p className="text-muted mb-3" style={{ fontSize: '0.9rem' }}>
-                  Upload a photo or video from your event and our CLIP-based AI will 
-                  detect the event type (Mehndi, Barat, Walima, etc.) and suggest perfect songs!
+                  Upload a photo or video from your event and get instant music suggestions
+                  perfectly matched to your event type (Mehndi, Barat, Walima, etc.).
                 </p>
 
                 {!filePreview ? (
@@ -713,23 +853,23 @@ const MusicDiscoveryUI = () => {
                     onDrop={handleDrop}
                     onClick={() => fileInputRef.current?.click()}
                     style={{
-                      border: `2px dashed ${dragActive ? '#667eea' : '#dee2e6'}`,
+                      border: `2px dashed ${dragActive ? '#0d6efd' : '#dee2e6'}`,
                       borderRadius: '16px',
                       padding: '3rem 2rem',
                       textAlign: 'center',
                       cursor: 'pointer',
                       transition: 'all 0.3s ease',
-                      background: dragActive ? 'rgba(102, 126, 234, 0.05)' : '#fafafa'
+                      background: dragActive ? 'rgba(13, 110, 253, 0.05)' : '#f8f9fa'
                     }}
                   >
                     <div className="d-flex justify-content-center gap-3 mb-3">
                       <Upload 
                         size={40} 
-                        style={{ color: dragActive ? '#667eea' : '#adb5bd' }} 
+                        style={{ color: dragActive ? '#0d6efd' : '#6c757d' }} 
                       />
                       <Video 
                         size={40} 
-                        style={{ color: dragActive ? '#667eea' : '#adb5bd' }} 
+                        style={{ color: dragActive ? '#0d6efd' : '#6c757d' }} 
                       />
                     </div>
                     <p style={{ fontWeight: '600', color: '#1a1a1a', marginBottom: '0.5rem' }}>
@@ -1146,6 +1286,302 @@ const MusicDiscoveryUI = () => {
                     >
                       Use Browse Mode Instead
                     </button>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Right Column - Track Results */}
+            <div className="col-lg-7">
+              {renderTrackList()}
+            </div>
+          </div>
+        )}
+
+        {/* ==================== BATCH MODE (Multi-Image AI) ==================== */}
+        {mode === 'batch' && (
+          <div className="row g-4">
+            {/* Left Column - Multi-Image Upload */}
+            <div className="col-lg-5">
+              <div style={{
+                background: '#fff',
+                borderRadius: '20px',
+                padding: '2rem',
+                boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
+                marginBottom: '1.5rem'
+              }}>
+                <h5 className="fw-bold mb-3" style={{ color: '#1a1a1a' }}>
+                  <ImageIcon className="me-2" style={{ color: '#f5576c' }} size={20} />
+                  Upload Multiple Event Photos
+                </h5>
+                <p className="text-muted mb-3" style={{ fontSize: '0.9rem' }}>
+                  Upload 5-10 photos from your event for best results. Our system will analyze all images and use 
+                  confidence-weighted voting to determine the event type.
+                </p>
+
+                {uploadedImages.length === 0 ? (
+                  <div
+                    onClick={() => batchInputRef.current?.click()}
+                    style={{
+                      border: '2px dashed #dee2e6',
+                      borderRadius: '16px',
+                      padding: '3rem 2rem',
+                      textAlign: 'center',
+                      cursor: 'pointer',
+                      transition: 'all 0.3s ease',
+                      background: '#fafafa'
+                    }}
+                  >
+                    <div className="d-flex justify-content-center gap-3 mb-3">
+                      <Upload size={40} style={{ color: '#f5576c' }} />
+                      <ImageIcon size={40} style={{ color: '#f5576c' }} />
+                    </div>
+                    <p style={{ fontWeight: '600', color: '#1a1a1a', marginBottom: '0.5rem' }}>
+                      Select 2-20 images from your event
+                    </p>
+                    <p className="text-muted mb-3" style={{ fontSize: '0.85rem' }}>
+                      More images = higher accuracy
+                    </p>
+                    <span style={{
+                      display: 'inline-block',
+                      padding: '0.5rem 1.5rem',
+                      background: '#0d6efd',
+                      color: '#fff',
+                      borderRadius: '8px',
+                      fontSize: '0.9rem',
+                      fontWeight: '500'
+                    }}>
+                      Choose Files
+                    </span>
+                    <input
+                      ref={batchInputRef}
+                      type="file"
+                      accept="image/*"
+                      multiple
+                      onChange={handleBatchImageInput}
+                      style={{ display: 'none' }}
+                    />
+                  </div>
+                ) : (
+                  <div>
+                    {/* Image Grid Preview */}
+                    <div style={{
+                      display: 'grid',
+                      gridTemplateColumns: 'repeat(auto-fill, minmax(80px, 1fr))',
+                      gap: '0.5rem',
+                      marginBottom: '1rem',
+                      maxHeight: '400px',
+                      overflowY: 'auto',
+                      padding: '0.5rem',
+                      background: '#f8f9fa',
+                      borderRadius: '12px'
+                    }}>
+                      {uploadedImages.map((img, idx) => (
+                        <div key={idx} style={{ position: 'relative' }}>
+                          <img
+                            src={img.preview}
+                            alt={`Preview ${idx + 1}`}
+                            style={{
+                              width: '100%',
+                              height: '80px',
+                              objectFit: 'cover',
+                              borderRadius: '8px'
+                            }}
+                          />
+                          <button
+                            onClick={() => removeBatchImage(idx)}
+                            style={{
+                              position: 'absolute',
+                              top: '4px',
+                              right: '4px',
+                              width: '20px',
+                              height: '20px',
+                              borderRadius: '50%',
+                              border: 'none',
+                              background: 'rgba(255,0,0,0.8)',
+                              color: 'white',
+                              cursor: 'pointer',
+                              fontSize: '12px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              padding: 0
+                            }}
+                          >
+                            <X size={14} />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Image Count & Actions */}
+                    <div className="d-flex justify-content-between align-items-center mb-3">
+                      <span className="text-muted">
+                        {uploadedImages.length} image{uploadedImages.length !== 1 ? 's' : ''} selected
+                      </span>
+                      <button
+                        onClick={clearBatchImages}
+                        style={{
+                          padding: '0.5rem 1rem',
+                          border: '1px solid #dee2e6',
+                          background: 'white',
+                          borderRadius: '8px',
+                          cursor: 'pointer',
+                          fontSize: '0.85rem'
+                        }}
+                      >
+                        Clear All
+                      </button>
+                    </div>
+
+                    {/* Analyze Button */}
+                    <button
+                      onClick={analyzeBatchAndGetSuggestions}
+                      disabled={batchAnalyzing}
+                      style={{
+                        width: '100%',
+                        padding: '1rem',
+                        background: batchAnalyzing 
+                          ? '#ccc' 
+                          : 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
+                        color: '#fff',
+                        border: 'none',
+                        borderRadius: '12px',
+                        fontWeight: '600',
+                        fontSize: '1rem',
+                        cursor: batchAnalyzing ? 'not-allowed' : 'pointer',
+                        transition: 'all 0.3s ease',
+                        boxShadow: batchAnalyzing ? 'none' : '0 4px 15px rgba(245, 87, 108, 0.3)'
+                      }}
+                    >
+                      {batchAnalyzing ? (
+                        <>
+                          <Loader2 className="spinner-border spinner-border-sm me-2" size={18} />
+                          Analyzing {uploadedImages.length} images...
+                        </>
+                      ) : (
+                        <>
+                          <Sparkles className="me-2" size={18} />
+                          Analyze & Get Music Suggestions
+                        </>
+                      )}
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {/* Batch Analysis Results */}
+              {batchAnalysis && !batchAnalysis.error && (
+                <div className="alert alert-success" style={{
+                  borderRadius: '20px',
+                  padding: '2rem',
+                  boxShadow: '0 4px 20px rgba(0,0,0,0.08)'
+                }}>
+                  <div className="d-flex align-items-center gap-2 mb-3">
+                    <CheckCircle2 size={24} />
+                    <h5 className="fw-bold mb-0">Aggregate Analysis Complete!</h5>
+                  </div>
+
+                  {/* Detected Event */}
+                  <div style={{
+                    background: 'rgba(13, 110, 253, 0.1)',
+                    borderRadius: '12px',
+                    padding: '1rem',
+                    marginBottom: '1rem',
+                    border: '1px solid rgba(13, 110, 253, 0.2)'
+                  }}>
+                    <div className="d-flex justify-content-between align-items-center mb-2">
+                      <span className="text-muted" style={{ fontSize: '0.85rem' }}>Detected Event</span>
+                      <span className="text-primary" style={{ fontWeight: '700', fontSize: '1.2rem', textTransform: 'capitalize' }}>
+                        {batchAnalysis.aggregate_event}
+                      </span>
+                    </div>
+                    <div className="d-flex align-items-center gap-2">
+                      <div style={{
+                        flex: 1,
+                        height: '8px',
+                        background: 'rgba(13, 110, 253, 0.2)',
+                        borderRadius: '4px',
+                        overflow: 'hidden'
+                      }}>
+                        <div style={{
+                          width: `${(batchAnalysis.aggregate_confidence * 100)}%`,
+                          height: '100%',
+                          background: '#0d6efd',
+                          borderRadius: '4px',
+                          transition: 'width 0.5s ease'
+                        }} />
+                      </div>
+                      <span className="text-primary" style={{ fontWeight: '600', minWidth: '45px', textAlign: 'right' }}>
+                        {batchAnalysis.confidence_percentage}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Analysis Stats */}
+                  <div className="row g-2 mb-3">
+                    <div className="col-6">
+                      <div className="card border-0" style={{
+                        background: 'rgba(13, 110, 253, 0.1)',
+                        borderRadius: '8px',
+                        padding: '0.75rem'
+                      }}>
+                        <div className="text-center">
+                          <div className="text-primary" style={{ fontSize: '1.5rem', fontWeight: '700' }}>{batchAnalysis.total_images}</div>
+                          <div className="text-muted" style={{ fontSize: '0.75rem' }}>Total Images</div>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="col-6">
+                      <div className="card border-0" style={{
+                        background: 'rgba(25, 135, 84, 0.1)',
+                        borderRadius: '8px',
+                        padding: '0.75rem'
+                      }}>
+                        <div className="text-center">
+                          <div className="text-success" style={{ fontSize: '1.5rem', fontWeight: '700' }}>{batchAnalysis.analyzed_count}</div>
+                          <div className="text-muted" style={{ fontSize: '0.75rem' }}>Successfully Analyzed</div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* All Event Votes */}
+                  <details style={{ marginTop: '1rem' }}>
+                    <summary className="text-primary" style={{ cursor: 'pointer', fontSize: '0.9rem', fontWeight: '500' }}>
+                      View detailed breakdown
+                    </summary>
+                    <div className="mt-3">
+                      {Object.entries(batchAnalysis.all_event_votes || {})
+                        .sort((a, b) => b[1] - a[1])
+                        .map(([event, score]) => (
+                          <div key={event} className="d-flex justify-content-between align-items-center mb-2 pb-2 border-bottom">
+                            <span className="text-capitalize">{event}</span>
+                            <span className="badge bg-primary">{(score * 100).toFixed(1)}%</span>
+                          </div>
+                        ))}
+                    </div>
+                  </details>
+                </div>
+              )}
+
+              {/* Error Display */}
+              {batchAnalysis?.error && (
+                <div style={{
+                  background: '#fff3cd',
+                  border: '1px solid #ffc107',
+                  borderRadius: '12px',
+                  padding: '1rem',
+                  marginTop: '1rem'
+                }}>
+                  <div className="d-flex align-items-start gap-2">
+                    <AlertCircle size={20} className="text-warning mt-1" />
+                    <div>
+                      <strong>Analysis Failed</strong>
+                      <p className="mb-0 mt-1 text-muted" style={{ fontSize: '0.9rem' }}>
+                        {batchAnalysis.error}
+                      </p>
+                    </div>
                   </div>
                 </div>
               )}

@@ -87,10 +87,13 @@ class SpotifyService:
                 if genre and genre != 'all':
                     search_query = f"{query} {genre}"
                 
+                # Spotify API max limit is 50
+                search_limit = min(50, limit // len(queries) + 2)
+                
                 results = self.client.search(
                     q=search_query,
                     type='track',
-                    limit=limit // len(queries) + 2,
+                    limit=search_limit,
                     market='PK'  # Pakistani market for better local results
                 )
                 
@@ -233,6 +236,29 @@ class SpotifyService:
         minutes = seconds // 60
         seconds = seconds % 60
         return f"{minutes}:{seconds:02d}"
+    
+    def get_mood_aware_recommendations(self, event_type, mood="calm", limit=10):
+        """
+        Get music recommendations for event type.
+        
+        Note: Audio features filtering requires Spotify Web API extended quota.
+        For basic API access, we skip mood filtering and return event-based results.
+        """
+        if not self.client:
+            print("ERROR: Spotify client not initialized")
+            return []
+        
+        # Get tracks using event keywords (cap at 50 to avoid API limits)
+        fetch_limit = min(50, limit)
+        base_tracks = self.get_event_recommendations(event_type, limit=fetch_limit)
+        
+        print(f"🎵 Fetched {len(base_tracks) if base_tracks else 0} tracks for '{event_type}' event")
+        
+        if not base_tracks:
+            print(f"⚠️ No tracks found for event '{event_type}'.")
+            return []
+        
+        return base_tracks[:limit]
 
 
 # Singleton instance

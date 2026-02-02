@@ -5,14 +5,47 @@ Transfer learning approach for face embeddings and clustering
 
 import numpy as np
 import cv2
-from keras.applications.resnet50 import ResNet50, preprocess_input
-from keras.preprocessing import image
-from keras.models import Model
-from sklearn.cluster import DBSCAN
-from sklearn.preprocessing import normalize
 import os
 from typing import List, Tuple
 import logging
+
+logger = logging.getLogger(__name__)
+
+# Optional imports - make ResNet optional to allow app to run without it
+RESNET_AVAILABLE = False
+try:
+    # Try TensorFlow 2.x first (recommended)
+    from tensorflow.keras.applications.resnet50 import ResNet50, preprocess_input
+    from tensorflow.keras.preprocessing import image
+    from tensorflow.keras.models import Model
+    RESNET_AVAILABLE = True
+except ImportError:
+    try:
+        # Fallback to standalone Keras (legacy)
+        from keras.applications.resnet50 import ResNet50, preprocess_input
+        from keras.preprocessing import image
+        from keras.models import Model
+        RESNET_AVAILABLE = True
+    except ImportError:
+        logger.warning("ResNet not available. Face recognition features will be disabled. Install tensorflow with: pip install tensorflow")
+        # Create dummy classes to prevent import errors
+        ResNet50 = None
+        preprocess_input = None
+        image = None
+        Model = None
+
+# Optional sklearn imports
+try:
+    from sklearn.cluster import DBSCAN
+    from sklearn.preprocessing import normalize
+    SKLEARN_AVAILABLE = True
+except ImportError:
+    logger.warning("sklearn not available. Install with: pip install scikit-learn")
+    DBSCAN = None
+    normalize = None
+    SKLEARN_AVAILABLE = False
+    if RESNET_AVAILABLE:
+        RESNET_AVAILABLE = False  # ResNet needs sklearn to work
 
 logger = logging.getLogger(__name__)
 
@@ -24,6 +57,13 @@ class ResNetFaceRecognizer:
     """
     
     def __init__(self):
+        if not RESNET_AVAILABLE:
+            raise ImportError(
+                "ResNet face recognition requires TensorFlow. "
+                "Install it with: pip install tensorflow\n"
+                "Or enable Windows Long Paths: https://pip.pypa.io/warnings/enable-long-paths"
+            )
+        
         # Load ResNet-50 pre-trained on ImageNet
         # Remove top layer to get feature embeddings
         base_model = ResNet50(weights='imagenet', include_top=False, pooling='avg')
@@ -206,6 +246,17 @@ def process_album_with_resnet(
             "total_faces": 45
         }
     """
+    if not RESNET_AVAILABLE:
+        logger.warning("ResNet not available - album processing disabled")
+        return {
+            "error": "ResNet face recognition requires TensorFlow. Install with: pip install tensorflow",
+            "person_folders": [],
+            "highlights": [],
+            "groups": {"count": 0},
+            "total_faces": 0,
+            "status": "disabled"
+        }
+    
     os.makedirs(output_folder, exist_ok=True)
     
     face_recognizer = ResNetFaceRecognizer()

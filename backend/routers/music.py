@@ -1,11 +1,13 @@
-from fastapi import APIRouter, HTTPException, Query
-from typing import Optional
+from fastapi import APIRouter, HTTPException, Query, UploadFile, File
+from typing import Optional, List
 import os
 import sys
 from pathlib import Path
 import requests
 import random
 from datetime import datetime, timedelta
+from collections import Counter
+import base64
 
 # Add backend directory to path
 backend_dir = str(Path(__file__).resolve().parent.parent)
@@ -14,12 +16,21 @@ if backend_dir not in sys.path:
 
 # Import the Spotify service
 try:
-    from services.spotify_service import spotify_service
+    from backend.services.spotify_service import spotify_service
     SPOTIFY_AVAILABLE = True
 except ImportError:
     print("WARNING: Could not import spotify_service")
     SPOTIFY_AVAILABLE = False
     spotify_service = None
+
+# Import CLIP analysis service for multi-image detection
+try:
+    from backend.services.clip_analysis_service import clip_analysis_service
+    CLIP_AVAILABLE = True
+except ImportError:
+    print("WARNING: Could not import clip_analysis_service")
+    CLIP_AVAILABLE = False
+    clip_analysis_service = None
 
 router = APIRouter(prefix="/music", tags=["Music"])
 
@@ -671,3 +682,185 @@ def get_playlist_tracks(
             detail=f"Failed to fetch playlist: {str(e)}"
         )
 
+
+@router.post('/suggest-from-images')
+async def suggest_music_from_multiple_images(
+    images: List[UploadFile] = File(..., description="Multiple event images (2-20 recommended)")
+):
+    """
+    🎵 AI-Powered Music Suggestion from Multiple Images (Aggregate Analysis)
+    
+    Upload 2-20 event images and get music suggestions based on:
+    1. Aggregate event type detection across all images
+    2. Confidence-weighted voting system
+    3. Mood and vibe analysis
+    
+    **How it works:**
+    - Each image is analyzed by CLIP AI to detect event type
+    - Confidence scores are aggregated (weighted voting)
+    - Most likely event type is selected
+    - Music suggestions are tailored to that event
+    
+    **Example Use Case:**
+    - Upload 10 photos from your mehndi ceremony
+    - AI detects "mehndi" with 85% confidence
+    - Suggests upbeat Pakistani/Bollywood dance tracks
+    
+    **Returns:**
+    - Detected event type (mehndi, barat, walima, birthday, corporate)
+    - Aggregate confidence score
+    - Individual image predictions (for transparency)
+    - 20-50 curated music tracks from Spotify
+    """
+    
+    # Validation
+    if not CLIP_AVAILABLE or not clip_analysis_service:
+        raise HTTPException(
+            status_code=503,
+            detail="AI Analysis service not available. Please ensure CLIP model is installed."
+        )
+    
+    if not SPOTIFY_AVAILABLE or not spotify_service:
+        raise HTTPException(
+            status_code=503,
+            detail="Music service not available. Please check Spotify configuration."
+        )
+    
+    if not images or len(images) == 0:
+        raise HTTPException(
+            status_code=400,
+            detail="Please upload at least 1 image"
+        )
+    
+    if len(images) > 20:
+        raise HTTPException(
+            status_code=400,
+            detail="Maximum 20 images allowed per request"
+        )
+    
+    try:
+        # Step 1: Analyze all images
+        print(f"📸 Analyzing {len(images)} images with AI...")
+        
+        image_predictions = []
+        event_votes = {}  # {event_type: total_confidence}
+        mood_votes = {}   # {mood: total_confidence}
+        
+        for idx, image_file in enumerate(images):
+            # Read image bytes
+            image_bytes = await image_file.read()
+            
+            # Convert to base64
+            image_base64 = base64.b64encode(image_bytes).decode('utf-8')
+            
+            # Analyze with CLIP
+            result = clip_analysis_service.detect_event_and_mood(image_data=image_base64, is_base64=True)
+            
+            if result.get("success"):
+                event_type = result.get("detected_event", "unknown")
+                confidence = result.get("event_confidence", 0)
+                
+                # Store individual prediction
+                image_predictions.append({
+                    "image_index": idx + 1,
+                    "filename": image_file.filename,
+                    "detected_event": event_type,
+                    "confidence": round(confidence, 2),
+                    "confidence_percentage": f"{confidence * 100:.1f}%",
+                    "detected_mood": result.get("detected_mood", "calm"),
+                    "mood_confidence": round(result.get("mood_confidence", 0), 2),
+                    "all_scores": result.get("event_scores", {})
+                })
+                
+                # Aggregate votes (confidence-weighted)
+                if event_type not in event_votes:
+                    event_votes[event_type] = 0
+                event_votes[event_type] += confidence
+                
+                # Track mood votes
+                mood = result.get("detected_mood", "calm")
+                mood_conf = result.get("mood_confidence", 0)
+                if mood not in mood_votes:
+                    mood_votes[mood] = 0
+                mood_votes[mood] += mood_conf
+            else:
+                # Failed to analyze this image
+                image_predictions.append({
+                    "image_index": idx + 1,
+                    "filename": image_file.filename,
+                    "detected_event": "unknown",
+                    "confidence": 0,
+                    "error": result.get("error", "Analysis failed")
+                })
+        
+        # Step 2: Determine aggregate event type (weighted majority vote)
+        if not event_votes:
+            raise HTTPException(
+                status_code=400,
+                detail="Could not detect event type from any image. Please upload clearer event photos."
+            )
+        
+        # Find event with highest total confidence
+        aggregate_event = max(event_votes, key=event_votes.get)
+        total_confidence = event_votes[aggregate_event]
+        num_valid_images = len([p for p in image_predictions if p["confidence"] > 0])
+        aggregate_confidence = total_confidence / num_valid_images if num_valid_images > 0 else 0
+        
+        # Find aggregate mood
+        aggregate_mood = max(mood_votes, key=mood_votes.get) if mood_votes else "calm"
+        aggregate_mood_confidence = mood_votes[aggregate_mood] / num_valid_images if num_valid_images > 0 else 0
+        
+        # Step 3: Get music suggestions for detected event + mood
+        print(f"🎵 Fetching music for event: {aggregate_event} (conf: {aggregate_confidence:.2%}), mood: {aggregate_mood} (conf: {aggregate_mood_confidence:.2%})")
+        
+        # Use mood-aware music recommendations
+        music_suggestions = spotify_service.get_mood_aware_recommendations(
+            event_type=aggregate_event,
+            mood=aggregate_mood,
+            limit=50
+        )
+        
+        # Handle case where Spotify returns None or empty list
+        if not music_suggestions:
+            music_suggestions = []
+        
+        # Step 4: Return comprehensive response
+        return {
+            "success": True,
+            "analysis": {
+                "total_images_uploaded": len(images),
+                "successfully_analyzed": num_valid_images,
+                "aggregate_event_type": aggregate_event,
+                "aggregate_confidence": round(aggregate_confidence, 2),
+                "confidence_percentage": f"{aggregate_confidence * 100:.1f}%",
+                "aggregate_mood": aggregate_mood,
+                "aggregate_mood_confidence": round(aggregate_mood_confidence, 2),
+                "mood_percentage": f"{aggregate_mood_confidence * 100:.1f}%",
+                "all_event_votes": {
+                    event: round(score / num_valid_images, 2) 
+                    for event, score in event_votes.items()
+                },
+                "all_mood_votes": {
+                    mood: round(score / num_valid_images, 2)
+                    for mood, score in mood_votes.items()
+                },
+                "individual_predictions": image_predictions
+            },
+            "music_suggestions": {
+                "event_type": aggregate_event,
+                "total_tracks": len(music_suggestions),
+                "tracks": music_suggestions[:30] if music_suggestions else []  # Return top 30 tracks
+            },
+            "message": f"Detected '{aggregate_event}' event with {aggregate_confidence * 100:.1f}% confidence. Found {len(music_suggestions)} matching tracks."
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"❌ Error in suggest_music_from_multiple_images: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to process images: {str(e)}"
+        )
