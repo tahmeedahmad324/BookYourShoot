@@ -18,6 +18,12 @@ try:
 except ImportError:
     payout_service = None
 
+# Import payment service for Stripe refunds
+try:
+    from backend.services.payment_service import payment_service
+except ImportError:
+    payment_service = None
+
 
 class EscrowStatus(Enum):
     HELD = "held"  # Payment received, held by platform
@@ -39,42 +45,34 @@ class CancellationPolicy:
         Calculate refund amount based on cancellation policy
         
         Policy:
-        - 14+ days before: 100% refund (photographer gets nothing)
-        - 7-13 days before: 50% refund (photographer gets 50%)
-        - 3-6 days before: 25% refund (photographer gets 75%)
-        - Less than 3 days: No refund (photographer gets 100%)
+        - 15+ days before: 100% refund (photographer gets nothing)
+        - 7-14 days before: 50% refund (photographer gets 50%)
+        - Less than 7 days: No refund (photographer gets 100%)
         """
         booking = datetime.fromisoformat(booking_date)
         cancelled = datetime.fromisoformat(cancellation_date)
         days_until_booking = (booking - cancelled).days
         
-        if days_until_booking >= 14:
+        if days_until_booking >= 15:
             return {
                 "client_refund": total_amount,
                 "photographer_payment": 0,
                 "platform_fee": 0,
-                "policy": "Full refund - 14+ days notice"
+                "policy": "Full refund - 15+ days notice"
             }
         elif days_until_booking >= 7:
             return {
                 "client_refund": total_amount * 0.5,
                 "photographer_payment": total_amount * 0.5,
                 "platform_fee": 0,
-                "policy": "50% refund - 7-13 days notice"
-            }
-        elif days_until_booking >= 3:
-            return {
-                "client_refund": total_amount * 0.25,
-                "photographer_payment": total_amount * 0.75,
-                "platform_fee": 0,
-                "policy": "25% refund - 3-6 days notice"
+                "policy": "50% refund - 7-14 days notice"
             }
         else:
             return {
                 "client_refund": 0,
                 "photographer_payment": total_amount,
                 "platform_fee": 0,
-                "policy": "No refund - Less than 3 days notice"
+                "policy": "No refund - Less than 7 days notice"
             }
 
 
@@ -82,13 +80,15 @@ class EscrowTransaction:
     """Represents a single escrow transaction"""
     
     def __init__(self, transaction_id: str, booking_id: str, amount: float, 
-                 client_id: str, photographer_id: str, transaction_type: str = "booking"):
+                 client_id: str, photographer_id: str, transaction_type: str = "booking",
+                 stripe_session_id: str = None):
         self.transaction_id = transaction_id
         self.booking_id = booking_id
         self.amount = amount
         self.client_id = client_id
         self.photographer_id = photographer_id
         self.transaction_type = transaction_type  # "booking" or "equipment_rental"
+        self.stripe_session_id = stripe_session_id  # For Stripe refunds
         self.status = EscrowStatus.HELD
         self.created_at = datetime.now().isoformat()
         self.released_at = None
@@ -106,6 +106,7 @@ class EscrowTransaction:
             "client_id": self.client_id,
             "photographer_id": self.photographer_id,
             "transaction_type": self.transaction_type,
+            "stripe_session_id": self.stripe_session_id,
             "status": self.status.value,
             "created_at": self.created_at,
             "released_at": self.released_at,
@@ -129,7 +130,7 @@ class EscrowService:
     
     def create_escrow(self, transaction_id: str, booking_id: str, amount: float,
                      client_id: str, photographer_id: str, transaction_type: str = "booking",
-                     deposit_amount: float = 0) -> EscrowTransaction:
+                     deposit_amount: float = 0, stripe_session_id: str = None) -> EscrowTransaction:
         """
         Create a new escrow transaction
         Money is received from client and held by platform
@@ -140,7 +141,8 @@ class EscrowService:
             amount=amount,
             client_id=client_id,
             photographer_id=photographer_id,
-            transaction_type=transaction_type
+            transaction_type=transaction_type,
+            stripe_session_id=stripe_session_id
         )
         escrow.deposit_amount = deposit_amount
         escrow.notes.append(f"{datetime.now().isoformat()}: Escrow created - Rs. {amount} held")
@@ -206,6 +208,7 @@ class EscrowService:
                         reason: str = "Booking cancelled") -> Dict:
         """
         Refund payment to client based on cancellation policy
+        Integrates with Stripe Refunds API for actual payment processing
         """
         if transaction_id not in self.transactions:
             return {"error": "Transaction not found", "status": "failed"}
@@ -225,6 +228,24 @@ class EscrowService:
         client_refund = cancellation["client_refund"]
         photographer_payment = cancellation["photographer_payment"]
         
+        # Process actual Stripe refund if we have a session ID and payment service
+        stripe_refund_result = None
+        if escrow.stripe_session_id and payment_service and client_refund > 0:
+            try:
+                # Get the Stripe gateway and process refund
+                stripe_gateway = payment_service.get_gateway("stripe")
+                stripe_refund_result = stripe_gateway.refund_payment(
+                    transaction_id=escrow.stripe_session_id,
+                    amount=client_refund
+                )
+                if stripe_refund_result.get("status") == "refund_initiated":
+                    escrow.notes.append(f"{datetime.now().isoformat()}: Stripe refund initiated - ID: {stripe_refund_result.get('refund_id')}")
+                else:
+                    escrow.notes.append(f"{datetime.now().isoformat()}: Stripe refund failed - {stripe_refund_result.get('error', 'Unknown error')}")
+            except Exception as e:
+                escrow.notes.append(f"{datetime.now().isoformat()}: Stripe refund error - {str(e)}")
+                stripe_refund_result = {"status": "failed", "error": str(e)}
+        
         # Update escrow status
         if client_refund == escrow.amount:
             escrow.status = EscrowStatus.REFUNDED
@@ -237,11 +258,6 @@ class EscrowService:
         if photographer_payment > 0:
             escrow.notes.append(f"{datetime.now().isoformat()}: Payment Rs. {photographer_payment} to photographer (cancellation fee)")
         
-        # In production: Process actual refund and transfer
-        # stripe.Refund.create(payment_intent=payment_intent_id, amount=int(client_refund * 100))
-        # if photographer_payment > 0:
-        #     stripe.Transfer.create(amount=int(photographer_payment * 100), destination=photographer_account)
-        
         return {
             "status": "success",
             "transaction_id": transaction_id,
@@ -249,6 +265,7 @@ class EscrowService:
             "photographer_payment": photographer_payment,
             "policy": cancellation["policy"],
             "refunded_at": escrow.refunded_at,
+            "stripe_refund": stripe_refund_result,
             "message": f"Rs. {client_refund} refunded to client. Rs. {photographer_payment} to photographer."
         }
     

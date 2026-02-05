@@ -28,15 +28,6 @@ const ClientBookings = () => {
     description: ''
   });
   const [submittingDispute, setSubmittingDispute] = useState(false);
-  
-  // Tip Modal State
-  const [showTipModal, setShowTipModal] = useState(false);
-  const [selectedBooking, setSelectedBooking] = useState(null);
-  const [tipAmount, setTipAmount] = useState(1000);
-  const [tipMessage, setTipMessage] = useState('');
-  const [tipSuggestions, setTipSuggestions] = useState(null);
-  const [tippedBookings, setTippedBookings] = useState({});
-  const [tipLoading, setTipLoading] = useState(false);
 
   // Mock bookings data
   const mockBookings = [
@@ -452,70 +443,56 @@ const ClientBookings = () => {
   };
 
   const handleCancel = (bookingId) => {
-    if (window.confirm('Are you sure you want to cancel this booking?')) {
-      // Simulate cancellation
-      setBookings(prev => prev.map(booking => 
-        booking.id === bookingId 
-          ? { ...booking, status: 'cancelled' }
-          : booking
-      ));
-      alert('Booking cancelled successfully');
-    }
-  };
-
-  // Tip Functions
-  const openTipModal = async (booking) => {
-    setSelectedBooking(booking);
-    setTipAmount(1000);
-    setTipMessage('');
-    setShowTipModal(true);
+    const booking = bookings.find(b => b.id === bookingId);
+    if (!booking) return;
     
-    // Fetch tip suggestions based on booking amount
-    try {
-      const res = await fetch(`${API_BASE}/payments/tips/suggestions/${booking.totalAmount}`);
-      const data = await res.json();
-      if (data.status === 'success') {
-        setTipSuggestions(data);
-      }
-    } catch (err) {
-      console.error('Failed to fetch tip suggestions:', err);
-    }
-  };
-
-  const handleSendTip = async () => {
-    if (!selectedBooking || tipAmount < 100) return;
+    // Calculate days until booking
+    const eventDate = new Date(booking.date);
+    const today = new Date();
+    const daysUntil = Math.ceil((eventDate - today) / (1000 * 60 * 60 * 24));
     
-    setTipLoading(true);
-    try {
-      const res = await fetch(`${API_BASE}/payments/tips/send`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          booking_id: String(selectedBooking.id),
-          client_id: user?.id || user?.email || 'client-1',
-          client_name: user?.name || 'Client',
-          photographer_id: String(selectedBooking.photographerId),
-          photographer_name: selectedBooking.photographerName,
-          amount: tipAmount,
-          message: tipMessage || null,
-          payment_method: 'card'
-        })
+    // Determine refund policy
+    let refundMessage = '';
+    if (daysUntil >= 15) {
+      refundMessage = 'You will receive a 100% refund (15+ days notice).';
+    } else if (daysUntil >= 7) {
+      refundMessage = 'You will receive a 50% refund (7-14 days notice).';
+    } else {
+      refundMessage = 'No refund will be issued (less than 7 days notice).';
+    }
+    
+    if (window.confirm(`Are you sure you want to cancel this booking?\n\nRefund Policy: ${refundMessage}\n\nDays until event: ${daysUntil}`)) {
+      // Call API to cancel booking
+      fetch(`http://localhost:8000/api/bookings/${bookingId}/cancel`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'Content-Type': 'application/json'
+        }
+      })
+      .then(response => response.json())
+      .then(data => {
+        if (data.success) {
+          alert(`Booking cancelled successfully.\n\n${data.refund_info.policy}\nRefund Amount: Rs. ${data.refund_info.client_refund.toLocaleString()}`);
+          setBookings(prev => prev.map(booking => 
+            booking.id === bookingId 
+              ? { ...booking, status: 'cancelled' }
+              : booking
+          ));
+        } else {
+          alert(data.detail || 'Failed to cancel booking');
+        }
+      })
+      .catch(error => {
+        console.error('Error:', error);
+        // Fallback to local update
+        setBookings(prev => prev.map(booking => 
+          booking.id === bookingId 
+            ? { ...booking, status: 'cancelled' }
+            : booking
+        ));
+        alert('Booking cancelled (local only - API unavailable)');
       });
-      
-      const data = await res.json();
-      
-      if (data.status === 'success') {
-        setTippedBookings(prev => ({ ...prev, [selectedBooking.id]: data.tip }));
-        setShowTipModal(false);
-        alert(`💝 Tip of PKR ${tipAmount.toLocaleString()} sent successfully to ${selectedBooking.photographerName}!`);
-      } else {
-        alert(data.message || 'Failed to send tip');
-      }
-    } catch (err) {
-      console.error('Failed to send tip:', err);
-      alert('Failed to send tip. Please try again.');
-    } finally {
-      setTipLoading(false);
     }
   };
 
@@ -732,14 +709,13 @@ const ClientBookings = () => {
                         <span className="text-muted small">Paid:</span>
                         <div className="fw-semibold">Rs. {booking.paidAmount.toLocaleString()}</div>
                       </div>
-                      <div className="mb-2">
-                        <span className="text-muted small">Remaining:</span>
-                        <div className="fw-semibold text-warning">Rs. {booking.remainingAmount.toLocaleString()}</div>
-                      </div>
+                      {booking.remainingAmount > 0 && (
+                        <div className="mb-2">
+                          <span className="text-muted small">Remaining:</span>
+                          <div className="fw-semibold text-warning">Rs. {booking.remainingAmount.toLocaleString()}</div>
+                        </div>
+                      )}
                       {getPaymentProgress(booking.paidAmount, booking.totalAmount)}
-                      <div className="mt-2">
-                        {getPaymentStatusBadge(booking)}
-                      </div>
                     </div>
 
                     {/* Actions */}
@@ -748,21 +724,13 @@ const ClientBookings = () => {
                         {getStatusBadge(booking.status)}
                       </div>
                       <div className="d-flex flex-column gap-1">
-                        {/* Pay Remaining button - show for confirmed/work_completed with remaining balance */}
-                        {(booking.status === 'confirmed' || booking.status === 'work_completed' || booking.status === 'completed') && booking.remainingAmount > 0 && (
+                        {/* Pay button - show for pending bookings that haven't been paid */}
+                        {booking.status === 'pending' && booking.paidAmount === 0 && (
                           <button 
                             className="btn btn-primary btn-sm"
                             onClick={() => handlePayRemaining(booking.id)}
                           >
-                            💰 Pay Remaining (Rs. {booking.remainingAmount.toLocaleString()})
-                          </button>
-                        )}
-                        {(booking.status === 'confirmed' || booking.status === 'pending') && (
-                          <button 
-                            className="btn btn-outline-primary btn-sm"
-                            onClick={() => handleReschedule(booking.id)}
-                          >
-                            📅 Reschedule
+                            💰 Pay Now (Rs. {booking.totalAmount.toLocaleString()})
                           </button>
                         )}
                         {(booking.status === 'completed' || booking.status === 'work_completed') && (
@@ -779,26 +747,15 @@ const ClientBookings = () => {
                             >
                               ⭐ Leave Review
                             </button>
-                            {tippedBookings[booking.id] ? (
-                              <span className="btn btn-success btn-sm disabled">
-                                💝 Tip Sent (Rs. {tippedBookings[booking.id].amount.toLocaleString()})
-                              </span>
-                            ) : (
-                              <button 
-                                className="btn btn-outline-success btn-sm"
-                                onClick={() => openTipModal(booking)}
-                              >
-                                💝 Send Tip
-                              </button>
-                            )}
                           </>
                         )}
-                        {(booking.status === 'pending' || booking.status === 'confirmed') && (
+                        {/* Cancel button for pending bookings only */}
+                        {booking.status === 'pending' && (
                           <button 
                             className="btn btn-outline-danger btn-sm"
                             onClick={() => handleCancel(booking.id)}
                           >
-                            ❌ Cancel
+                            ❌ Cancel Booking
                           </button>
                         )}
                       </div>
@@ -969,130 +926,6 @@ const ClientBookings = () => {
                 ))}
               </>
             )}
-          </div>
-        )}
-
-        {/* Tip Modal */}
-        {showTipModal && selectedBooking && (
-          <div className="modal fade show d-block" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
-            <div className="modal-dialog modal-dialog-centered">
-              <div className="modal-content">
-                <div className="modal-header border-0 pb-0">
-                  <h5 className="modal-title fw-bold">💝 Send a Tip</h5>
-                  <button 
-                    type="button" 
-                    className="btn-close" 
-                    onClick={() => setShowTipModal(false)}
-                  />
-                </div>
-                <div className="modal-body">
-                  <div className="text-center mb-4">
-                    <div className="rounded-circle bg-primary text-white d-inline-flex align-items-center justify-content-center mb-3" 
-                         style={{ width: '80px', height: '80px', fontSize: '2.5rem' }}>
-                      {selectedBooking.photographerImage}
-                    </div>
-                    <h5 className="fw-bold mb-1">{selectedBooking.photographerName}</h5>
-                    <p className="text-muted mb-0">{selectedBooking.serviceType}</p>
-                  </div>
-
-                  <div className="alert alert-success d-flex align-items-center">
-                    <span className="me-2">✨</span>
-                    <small>100% of your tip goes directly to the photographer!</small>
-                  </div>
-
-                  {/* Quick Tip Amounts */}
-                  <div className="mb-4">
-                    <label className="form-label fw-semibold">Quick Select</label>
-                    <div className="d-flex gap-2 flex-wrap">
-                      {(tipSuggestions?.preset_amounts || [500, 1000, 2000, 5000]).map(amount => (
-                        <button
-                          key={amount}
-                          className={`btn ${tipAmount === amount ? 'btn-primary' : 'btn-outline-primary'}`}
-                          onClick={() => setTipAmount(amount)}
-                        >
-                          Rs. {amount.toLocaleString()}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Percentage Tips */}
-                  {tipSuggestions?.percentage_tips && (
-                    <div className="mb-4">
-                      <label className="form-label fw-semibold">Or choose by percentage</label>
-                      <div className="d-flex gap-2 flex-wrap">
-                        {tipSuggestions.percentage_tips.map(tip => (
-                          <button
-                            key={tip.percentage}
-                            className={`btn btn-sm ${tipAmount === tip.amount ? 'btn-success' : 'btn-outline-success'}`}
-                            onClick={() => setTipAmount(tip.amount)}
-                          >
-                            {tip.label} (Rs. {tip.amount.toLocaleString()})
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Custom Amount */}
-                  <div className="mb-4">
-                    <label className="form-label fw-semibold">Custom Amount</label>
-                    <div className="input-group">
-                      <span className="input-group-text">Rs.</span>
-                      <input
-                        type="number"
-                        className="form-control"
-                        value={tipAmount}
-                        onChange={(e) => setTipAmount(Math.max(100, Math.min(50000, parseInt(e.target.value) || 0)))}
-                        min="100"
-                        max="50000"
-                      />
-                    </div>
-                    <small className="text-muted">Min: Rs. 100 | Max: Rs. 50,000</small>
-                  </div>
-
-                  {/* Message */}
-                  <div className="mb-3">
-                    <label className="form-label fw-semibold">Add a message (optional)</label>
-                    <textarea
-                      className="form-control"
-                      rows="2"
-                      placeholder="Thank you for the amazing photos!"
-                      value={tipMessage}
-                      onChange={(e) => setTipMessage(e.target.value)}
-                      maxLength={200}
-                    />
-                    <small className="text-muted">{tipMessage.length}/200 characters</small>
-                  </div>
-                </div>
-                <div className="modal-footer border-0 pt-0">
-                  <button 
-                    type="button" 
-                    className="btn btn-outline-secondary" 
-                    onClick={() => setShowTipModal(false)}
-                  >
-                    Cancel
-                  </button>
-                  <button 
-                    type="button" 
-                    className="btn btn-success d-flex align-items-center gap-2"
-                    onClick={handleSendTip}
-                    disabled={tipLoading || tipAmount < 100}
-                  >
-                    {tipLoading ? (
-                      <>
-                        <span className="spinner-border spinner-border-sm" />
-                        Sending...
-                      </>
-                    ) : (
-                      <>
-                        💝 Send Rs. {tipAmount.toLocaleString()} Tip
-                      </>
-                    )}
-                  </button>
-                </div>
-              </div>
-            </div>
           </div>
         )}
 

@@ -194,3 +194,65 @@ def upgrade_to_photographer(current_user: dict = Depends(get_current_user)):
         raise
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+@router.delete("/me/delete-account")
+def delete_account(current_user: dict = Depends(get_current_user)):
+    """
+    Delete user account and all associated data
+    WARNING: This action cannot be undone
+    """
+    try:
+        user_id = current_user.get("id") or current_user.get("sub")
+        if not user_id:
+            raise HTTPException(status_code=401, detail="Unauthorized")
+
+        # Check for active bookings
+        active_bookings = supabase.table('booking').select('id').or_(
+            f'client_id.eq.{user_id},photographer_id.eq.{user_id}'
+        ).in_('status', ['requested', 'accepted', 'confirmed', 'paid']).execute()
+        
+        if active_bookings.data:
+            raise HTTPException(
+                status_code=400, 
+                detail=f"Cannot delete account with {len(active_bookings.data)} active booking(s). Please cancel or complete all bookings first."
+            )
+        
+        # Delete in order (foreign key constraints)
+        # 1. Delete reviews given by user
+        supabase.table('review').delete().eq('client_id', user_id).execute()
+        
+        # 2. Delete equipment rentals
+        supabase.table('equipment_rental').delete().eq('client_id', user_id).execute()
+        
+        # 3. Delete bookings (past ones only, active already checked)
+        supabase.table('booking').delete().or_(
+            f'client_id.eq.{user_id},photographer_id.eq.{user_id}'
+        ).execute()
+        
+        # 4. Delete notifications
+        supabase.table('notification').delete().eq('user_id', user_id).execute()
+        
+        # 5. Delete equipment if photographer
+        supabase.table('equipment').delete().eq('photographer_id', user_id).execute()
+        
+        # 6. Delete photographer profile if exists
+        supabase.table('photographer_profile').delete().eq('user_id', user_id).execute()
+        
+        # 7. Delete user account
+        supabase.table('users').delete().eq('id', user_id).execute()
+        
+        # 8. Delete from Supabase Auth
+        try:
+            supabase.auth.admin.delete_user(user_id)
+        except:
+            pass  # Continue even if auth deletion fails
+        
+        return {
+            "success": True,
+            "message": "Account deleted successfully. All your data has been permanently removed."
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))

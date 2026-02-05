@@ -4,11 +4,23 @@ Module 6: Smart Album Builder
 """
 
 import os
-from moviepy.editor import ImageClip, concatenate_videoclips, AudioFileClip, vfx
 from typing import Optional
 import logging
 
 logger = logging.getLogger(__name__)
+
+# Optional moviepy import with graceful degradation
+try:
+    from moviepy.editor import ImageClip, concatenate_videoclips, AudioFileClip, vfx
+    MOVIEPY_AVAILABLE = True
+except ImportError:
+    logger.warning("MoviePy not available. Reel generation will not work.")
+    MOVIEPY_AVAILABLE = False
+    # Define dummy classes to prevent errors
+    ImageClip = None
+    concatenate_videoclips = None
+    AudioFileClip = None
+    vfx = None
 
 
 class ReelGenerator:
@@ -39,6 +51,12 @@ class ReelGenerator:
         Returns:
             dict with status and output path
         """
+        if not MOVIEPY_AVAILABLE:
+            return {
+                "success": False,
+                "error": "MoviePy is not installed. Video generation is not available."
+            }
+            
         try:
             # Check if highlights exist
             if not os.path.exists(self.highlights_path):

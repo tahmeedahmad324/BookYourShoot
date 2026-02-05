@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useState } from 'react';
 import './bookingSummary.css';
+import TermsModal from './legal/TermsModal';
 
 /**
  * BookingSummary Component
@@ -18,6 +19,8 @@ const BookingSummary = ({
   onConfirm,
   onCancel
 }) => {
+  const [showTermsModal, setShowTermsModal] = useState(false);
+  
   // Calculate costs
   const sessionCost = hourlyRate * duration;
   const advanceAmount = Math.floor(sessionCost * (advancePercent / 100));
@@ -150,12 +153,20 @@ const BookingSummary = ({
         <div className="mt-3 text-center">
           <small className="text-muted">
             By proceeding, you agree to our{' '}
-            <a href="/legal/terms" className="text-primary">Terms of Service</a>
+            <button 
+              type="button" 
+              className="btn btn-link p-0 text-primary text-decoration-none" 
+              onClick={(e) => { e.preventDefault(); setShowTermsModal(true); }}
+            >
+              Terms of Service
+            </button>
             {' '}and{' '}
             <a href="/legal/refund" className="text-primary">Cancellation Policy</a>
           </small>
         </div>
       </div>
+      
+      <TermsModal show={showTermsModal} onHide={() => setShowTermsModal(false)} />
     </div>
   );
 };

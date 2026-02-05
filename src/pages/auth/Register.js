@@ -4,6 +4,9 @@ import { useForm } from 'react-hook-form';
 import { yupResolver } from '@hookform/resolvers/yup';
 import * as yup from 'yup';
 import { registerWithPassword } from '../../api/auth';
+import TermsModal from '../../components/legal/TermsModal';
+import PrivacyModal from '../../components/legal/PrivacyModal';
+import useFormPersistence from '../../hooks/useFormPersistence';
 
 // Validation schema
 const registerSchema = yup.object().shape({
@@ -125,6 +128,8 @@ const Register = () => {
   const [loading, setLoading] = useState(false);
   const [serverError, setServerError] = useState('');
   const [selectedRole, setSelectedRole] = useState('');
+  const [showTermsModal, setShowTermsModal] = useState(false);
+  const [showPrivacyModal, setShowPrivacyModal] = useState(false);
 
   const { 
     register, 
@@ -138,6 +143,16 @@ const Register = () => {
   });
 
   const watchPassword = watch('password');
+  const formValues = watch();
+
+  // Persist form data (exclude password fields and checkbox for security)
+  const { clearSavedData } = useFormPersistence(
+    'register-form',
+    formValues,
+    setValue,
+    ['role', 'name', 'email', 'phone'], // Only save these fields
+    500 // Debounce delay
+  );
 
   const handleRoleSelect = (role) => {
     setSelectedRole(role);
@@ -173,6 +188,9 @@ const Register = () => {
         city: 'Lahore', // Default, can add city field to form
         role: data.role
       });
+      
+      // Clear saved form data after successful registration
+      clearSavedData();
       
       // Check if email confirmation is required
       if (result.requires_email_confirmation) {
@@ -415,7 +433,22 @@ const Register = () => {
                           {...register('agreeToTerms')}
                         />
                         <label className="form-check-label" htmlFor="agreeToTerms">
-                          I agree to the <Link to="/terms" className="text-primary">Terms and Conditions</Link> and <Link to="/privacy" className="text-primary">Privacy Policy</Link>
+                          I agree to the{' '}
+                          <button 
+                            type="button" 
+                            className="btn btn-link p-0 text-primary text-decoration-none" 
+                            onClick={(e) => { e.preventDefault(); setShowTermsModal(true); }}
+                          >
+                            Terms and Conditions
+                          </button>{' '}
+                          and{' '}
+                          <button 
+                            type="button" 
+                            className="btn btn-link p-0 text-primary text-decoration-none" 
+                            onClick={(e) => { e.preventDefault(); setShowPrivacyModal(true); }}
+                          >
+                            Privacy Policy
+                          </button>
                         </label>
                       </div>
                       {errors.agreeToTerms && (
@@ -461,6 +494,10 @@ const Register = () => {
                       <Link to="/login" className="text-primary text-decoration-none fw-semibold">
                         Sign in here
                       </Link>
+
+      {/* Legal Modals */}
+      <TermsModal show={showTermsModal} onHide={() => setShowTermsModal(false)} />
+      <PrivacyModal show={showPrivacyModal} onHide={() => setShowPrivacyModal(false)} />
                     </p>
                   </div>
                 </div>

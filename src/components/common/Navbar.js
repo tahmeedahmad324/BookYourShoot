@@ -10,6 +10,7 @@ const Navbar = () => {
   const navigate = useNavigate()
   const location = useLocation()
   const [expanded, setExpanded] = useState(false)
+  const [showDeleteModal, setShowDeleteModal] = useState(false)
 
   // Hide navbar on authentication pages
   const authPages = ['/login', '/register', '/verify-otp', '/register/cnic']
@@ -109,6 +110,7 @@ const Navbar = () => {
   }
 
   return (
+    <>
     <nav className="navbar navbar-expand-lg navbar-light bg-white shadow-sm sticky-top">
       <div className="container">
         <a
@@ -209,6 +211,15 @@ const Navbar = () => {
                   </li>
                   <li><hr className="dropdown-divider" /></li>
                   <li>
+                    <button 
+                      className="dropdown-item text-danger" 
+                      onClick={() => setShowDeleteModal(true)}
+                    >
+                      🗑️ Delete Account
+                    </button>
+                  </li>
+                  <li><hr className="dropdown-divider" /></li>
+                  <li>
                     <button className="dropdown-item" onClick={handleLogout}>Logout</button>
                   </li>
                 </ul>
@@ -227,6 +238,92 @@ const Navbar = () => {
         </div>
       </div>
     </nav>
+
+    {/* Delete Account Modal */}
+    {showDeleteModal && (
+      <div className="modal show d-block" style={{ backgroundColor: "rgba(0,0,0,0.5)", zIndex: 9999 }}>
+        <div className="modal-dialog modal-dialog-centered">
+          <div className="modal-content">
+            <div className="modal-header border-danger">
+              <h5 className="modal-title fw-bold text-danger">⚠️ Delete Account</h5>
+              <button
+                type="button"
+                className="btn-close"
+                onClick={() => setShowDeleteModal(false)}
+              />
+            </div>
+            <div className="modal-body">
+              <p>Are you sure you want to delete your account? This action cannot be undone.</p>
+              <ul className="text-muted small">
+                <li>All your booking history will be deleted</li>
+                <li>Your favorites and reviews will be removed</li>
+                <li>Payment methods will be deleted</li>
+                <li>You won't be able to recover this account</li>
+              </ul>
+              <div className="form-check mt-3">
+                <input
+                  className="form-check-input"
+                  type="checkbox"
+                  id="confirmDeleteNavbar"
+                />
+                <label className="form-check-label" htmlFor="confirmDeleteNavbar">
+                  I understand and want to delete my account
+                </label>
+              </div>
+            </div>
+            <div className="modal-footer">
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => setShowDeleteModal(false)}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="btn btn-danger"
+                onClick={() => {
+                  const checkbox = document.getElementById('confirmDeleteNavbar');
+                  if (!checkbox.checked) {
+                    alert('Please confirm that you understand this action');
+                    return;
+                  }
+                  
+                  // API call to delete account
+                  fetch('http://localhost:8000/api/profile/me/delete-account', {
+                    method: 'DELETE',
+                    headers: {
+                      'Authorization': `Bearer ${localStorage.getItem('token')}`,
+                      'Content-Type': 'application/json'
+                    }
+                  })
+                  .then(response => response.json())
+                  .then(data => {
+                    if (data.success) {
+                      alert('Account deleted successfully');
+                      localStorage.removeItem('token');
+                      logout();
+                      navigate('/');
+                    } else {
+                      alert(data.detail || 'Failed to delete account');
+                    }
+                  })
+                  .catch(error => {
+                    console.error('Error:', error);
+                    alert('Error deleting account. Please try again.');
+                  });
+                  
+                  setShowDeleteModal(false);
+                }}
+              >
+                Delete My Account
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    )}
+    </>
   )
 }
 

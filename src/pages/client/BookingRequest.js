@@ -6,6 +6,8 @@ import * as yup from "yup"
 import { useAuth } from "../../context/AuthContext"
 import { photographerAPI } from "../../api/api"
 import StripeCheckout from "../../components/StripeCheckout"
+import useFormPersistence from "../../hooks/useFormPersistence"
+import TermsModal from "../../components/legal/TermsModal"
 
 const API_BASE = 'http://localhost:5000/api';
 
@@ -26,6 +28,7 @@ const BookingRequest = () => {
   const [showPayment, setShowPayment] = useState(false)
   const [bookingData, setBookingData] = useState(null)
   const [error, setError] = useState(null)
+  const [showTermsModal, setShowTermsModal] = useState(false)
 
   // Photographer services data
   const photographerServices = {
@@ -92,6 +95,16 @@ const BookingRequest = () => {
 
   const serviceType = watch("serviceType")
   const duration = watch("duration")
+  const formValues = watch()
+
+  // Persist form data (exclude sensitive data)
+  const { clearSavedData } = useFormPersistence(
+    `booking-request-${id}`,
+    formValues,
+    setValue,
+    ['clientName', 'clientEmail', 'clientPhone', 'serviceType', 'eventDate', 'eventTime', 'duration', 'location', 'specialRequests'],
+    500
+  )
 
   useEffect(() => {
     // Fetch photographer details from API
@@ -179,6 +192,9 @@ const BookingRequest = () => {
       paymentStatus: "advance_paid",
       paymentDate: new Date().toISOString()
     }
+    
+    // Clear saved form data after successful payment
+    clearSavedData()
     
     // Store in localStorage (in real app, send to API)
     const existingBookings = JSON.parse(localStorage.getItem("userBookings") || "[]")
@@ -498,7 +514,14 @@ const BookingRequest = () => {
                       {...register("agreedToTerms")}
                     />
                     <label className="form-check-label" htmlFor="terms">
-                      I agree to the booking terms and conditions, including the 50% advance payment policy
+                      I agree to the{' '}
+                      <button 
+                        type="button" 
+                        className="btn btn-link p-0 text-primary text-decoration-none" 
+                        onClick={(e) => { e.preventDefault(); setShowTermsModal(true); }}
+                      >
+                        booking terms and conditions
+                      </button>, including the 100% upfront payment policy
                     </label>
                     {errors.agreedToTerms && (
                       <div className="text-danger small mt-1">{errors.agreedToTerms.message}</div>
@@ -598,8 +621,8 @@ const BookingRequest = () => {
             </div>
           </div>
         </div>
-      </div>
-    </div>
+      </div>      
+      <TermsModal show={showTermsModal} onHide={() => setShowTermsModal(false)} />    </div>
   )
 }
 

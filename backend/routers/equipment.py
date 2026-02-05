@@ -781,6 +781,115 @@ def confirm_rental_payment(rental_id: str, current_user: dict = Depends(get_curr
         raise HTTPException(status_code=400, detail=str(e))
 
 
+class CancelRentalRequest(BaseModel):
+    reason: Optional[str] = "User cancelled"
+
+
+@router.put("/rentals/{rental_id}/cancel")
+def cancel_rental(
+    rental_id: str,
+    payload: CancelRentalRequest,
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Cancel an equipment rental with refund policy
+    
+    Refund Policy (same as booking cancellation):
+    - 15+ days before start date: 100% refund
+    - 7-14 days before: 50% refund
+    - Less than 7 days: No refund
+    """
+    try:
+        user_id = current_user.get("id") or current_user.get("sub")
+        if not user_id:
+            raise HTTPException(status_code=401, detail="Unauthorized")
+        
+        # Get rental
+        rental = supabase.table('equipment_rental').select(
+            '*, equipment!equipment_rental_equipment_id_fkey(name)'
+        ).eq('id', rental_id).limit(1).execute()
+        
+        if not rental.data:
+            raise HTTPException(status_code=404, detail="Rental not found")
+        
+        rental_data = rental.data[0]
+        
+        # Get photographer profile for owner check
+        photographer = supabase.table('photographer_profile').select('id').eq('user_id', user_id).limit(1).execute()
+        owner_id = photographer.data[0]['id'] if photographer.data else None
+        
+        # Verify user is part of this rental
+        is_renter = rental_data['renter_id'] == user_id
+        is_owner = owner_id and rental_data['owner_id'] == owner_id
+        
+        if not (is_renter or is_owner):
+            raise HTTPException(status_code=403, detail="Unauthorized to cancel this rental")
+        
+        # Check if rental can be cancelled
+        if rental_data['status'] in ['returned', 'cancelled']:
+            raise HTTPException(status_code=400, detail=f"Cannot cancel rental with status: {rental_data['status']}")
+        
+        # Calculate refund based on cancellation policy
+        refund_info = {"client_refund": 0, "owner_payment": 0, "policy": "No payment made"}
+        
+        if rental_data['payment_status'] == 'paid':
+            # Calculate days until rental start
+            start_date = datetime.strptime(rental_data['start_date'], '%Y-%m-%d')
+            now = datetime.now()
+            days_until_start = (start_date - now).days
+            
+            total_paid = rental_data['rental_price'] + rental_data['security_deposit']
+            rental_amount = rental_data['rental_price']
+            deposit = rental_data['security_deposit']
+            
+            # Always refund security deposit
+            # Apply cancellation policy to rental price only
+            if days_until_start >= 15:
+                refund_info = {
+                    "client_refund": total_paid,  # Full refund including deposit
+                    "owner_payment": 0,
+                    "policy": "Full refund - 15+ days notice"
+                }
+            elif days_until_start >= 7:
+                refund_info = {
+                    "client_refund": deposit + (rental_amount * 0.5),  # Deposit + 50% rental
+                    "owner_payment": rental_amount * 0.5,  # Owner keeps 50% rental
+                    "policy": "50% rental refund + full deposit - 7-14 days notice"
+                }
+            else:
+                refund_info = {
+                    "client_refund": deposit,  # Only deposit refunded
+                    "owner_payment": rental_amount,  # Owner keeps full rental
+                    "policy": "Deposit only - Less than 7 days notice"
+                }
+        
+        # Update rental status
+        cancellation_note = (
+            f"Cancelled by {'renter' if is_renter else 'owner'}. "
+            f"Reason: {payload.reason}. "
+            f"Refund policy: {refund_info['policy']}. "
+            f"Client refund: Rs.{refund_info['client_refund']:,.0f}, "
+            f"Owner payment: Rs.{refund_info['owner_payment']:,.0f}"
+        )
+        
+        resp = supabase.table('equipment_rental').update({
+            "status": "cancelled",
+            "notes": cancellation_note,
+            "updated_at": datetime.now().isoformat()
+        }).eq('id', rental_id).execute()
+        
+        return {
+            "success": True,
+            "data": resp.data,
+            "refund_info": refund_info,
+            "message": f"Rental cancelled. {refund_info['policy']}"
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
 # ================================
 # ADMIN RENTAL ENDPOINTS
 # ================================

@@ -1,8 +1,12 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
+import TermsModal from '../legal/TermsModal';
+import PrivacyModal from '../legal/PrivacyModal';
 
 const Footer = () => {
   const currentYear = new Date().getFullYear();
+  const [showTermsModal, setShowTermsModal] = useState(false);
+  const [showPrivacyModal, setShowPrivacyModal] = useState(false);
 
   const footerLinks = {
     company: [
@@ -21,8 +25,8 @@ const Footer = () => {
       { name: 'Help Center', href: '/help' },
       { name: 'Safety Guidelines', href: '/safety' },
       { name: 'Cancellation Policy', href: '/cancellation' },
-      { name: 'Terms of Service', href: '/terms' },
-      { name: 'Privacy Policy', href: '/privacy' }
+      { name: 'Terms of Service', action: 'terms' },
+      { name: 'Privacy Policy', action: 'privacy' }
     ],
     social: [
       { name: 'Facebook', icon: '📘', href: '#' },
@@ -103,9 +107,19 @@ const Footer = () => {
               <ul className="footer-links list-unstyled">
                 {footerLinks.support.map((link, index) => (
                   <li key={index}>
-                    <Link to={link.href} className="footer-link">
-                      {link.name}
-                    </Link>
+                    {link.action ? (
+                      <button 
+                        type="button" 
+                        className="btn btn-link p-0 text-start footer-link" 
+                        onClick={() => link.action === 'terms' ? setShowTermsModal(true) : setShowPrivacyModal(true)}
+                      >
+                        {link.name}
+                      </button>
+                    ) : (
+                      <Link to={link.href} className="footer-link">
+                        {link.name}
+                      </Link>
+                    )}
                   </li>
                 ))}
               </ul>
@@ -161,9 +175,9 @@ const Footer = () => {
             </div>
             <div className="col-md-6">
               <div className="footer-bottom-links text-md-end">
-                <a href="/terms" className="footer-bottom-link">Terms</a>
+                <button type="button" className="btn btn-link p-0 footer-bottom-link" onClick={() => setShowTermsModal(true)}>Terms</button>
                 <span className="separator">•</span>
-                <a href="/privacy" className="footer-bottom-link">Privacy</a>
+                <button type="button" className="btn btn-link p-0 footer-bottom-link" onClick={() => setShowPrivacyModal(true)}>Privacy</button>
                 <span className="separator">•</span>
                 <a href="/cookies" className="footer-bottom-link">Cookies</a>
                 <span className="separator">•</span>
@@ -203,6 +217,10 @@ const Footer = () => {
           </div>
         </div>
       </div>
+      
+      {/* Legal Modals */}
+      <TermsModal show={showTermsModal} onHide={() => setShowTermsModal(false)} />
+      <PrivacyModal show={showPrivacyModal} onHide={() => setShowPrivacyModal(false)} />
     </footer>
   );
 };

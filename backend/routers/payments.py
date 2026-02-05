@@ -10,7 +10,6 @@ from backend.services.receipt_service import receipt_service
 from backend.services.email_service import email_service
 from backend.services.escalation_service import escalation_service
 from backend.services.webhook_service import webhook_simulator
-from backend.services.tip_service import tip_service
 
 router = APIRouter(prefix="/payments", tags=["payments"])
 
@@ -21,7 +20,7 @@ class PaymentRequest(BaseModel):
     amount: float
     currency: str = "PKR"
     payment_method: Literal["jazzcash", "easypaisa", "card", "bank"]
-    payment_type: Literal["advance", "final", "full", "refund", "tip"] = "advance"
+    payment_type: Literal["advance", "final", "full", "refund"] = "advance"
     customer_phone: str
     customer_email: Optional[str] = None
     # Additional metadata for receipt/notifications
@@ -1327,75 +1326,6 @@ def simulate_full_payment_flow(payload: SimulateFullFlowRequest):
 # =============================================================================
 # TIP ENDPOINTS - Clients can tip photographers after completed sessions
 # =============================================================================
-
-class TipRequest(BaseModel):
-    booking_id: str
-    client_id: str
-    client_name: str
-    photographer_id: str
-    photographer_name: str
-    amount: float
-    message: Optional[str] = None
-    payment_method: str = "card"
-
-
-@router.get("/tips/suggestions/{booking_amount}")
-async def get_tip_suggestions(booking_amount: float):
-    """
-    Get tip suggestions based on booking amount
-    Returns preset amounts and percentage-based suggestions
-    """
-    suggestions = tip_service.get_tip_suggestions(booking_amount)
-    return {
-        "status": "success",
-        **suggestions
-    }
-
-
-@router.post("/tips/send")
-async def send_tip(tip_request: TipRequest):
-    """
-    Send a tip to photographer after completed booking
-    100% of tip goes to photographer (no platform fee)
-    """
-    result = tip_service.send_tip(
-        booking_id=tip_request.booking_id,
-        client_id=tip_request.client_id,
-        client_name=tip_request.client_name,
-        photographer_id=tip_request.photographer_id,
-        photographer_name=tip_request.photographer_name,
-        amount=tip_request.amount,
-        message=tip_request.message,
-        payment_method=tip_request.payment_method
-    )
-    
-    if result["status"] == "success":
-        # Notify photographer about the tip
-        notification_service.create_notification(
-            user_id=tip_request.photographer_id,
-            type="tip_received",
-            title="💝 You received a tip!",
-            message=f"{tip_request.client_name} tipped you PKR {tip_request.amount:,.0f}" + 
-                    (f" with message: \"{tip_request.message}\"" if tip_request.message else ""),
-            amount=tip_request.amount
-        )
-        
-        # Send email notification to photographer
-        email_service.send_custom_email(
-            to_email=f"{tip_request.photographer_id}@example.com",  # In real app, fetch from user data
-            subject=f"💝 You received a PKR {tip_request.amount:,.0f} tip!",
-            body=f"""
-            <h2>🎉 Great news, {tip_request.photographer_name}!</h2>
-            <p>{tip_request.client_name} was so happy with your service that they sent you a tip!</p>
-            <div style="background: #f8f9fa; padding: 20px; border-radius: 10px; margin: 20px 0;">
-                <h3 style="color: #28a745; margin: 0;">Tip Amount: PKR {tip_request.amount:,.0f}</h3>
-                {f'<p style="margin-top: 15px;"><strong>Message:</strong> "{tip_request.message}"</p>' if tip_request.message else ''}
-            </div>
-            <p>Keep up the great work! 📸</p>
-            """
-        )
-    
-    return result
 
 
 @router.get("/tips/booking/{booking_id}")

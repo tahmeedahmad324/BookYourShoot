@@ -171,7 +171,7 @@ def create_booking(payload: CreateBookingRequest, current_user: dict = Depends(g
         ).eq(
             'event_date', payload.event_date
         ).in_(
-            'status', ['requested', 'confirmed', 'accepted', 'paid']
+            'status', ['requested', 'confirmed', 'paid']
         ).limit(1).execute()
         
         if existing_booking.data:
@@ -180,11 +180,11 @@ def create_booking(payload: CreateBookingRequest, current_user: dict = Depends(g
                 detail="Photographer already has a booking on this date (double booking prevented)"
             )
 
-        # Calculate financial splits (50/50 model)
-        advance_amount = payload.price * 0.5 if payload.price else 0
-        remaining_amount = payload.price * 0.5 if payload.price else 0
-        platform_fee = payload.price * 0.10 if payload.price else 0
-        photographer_earning = payload.price * 0.90 if payload.price else 0
+        # Calculate financial splits (100% upfront payment, held in escrow)
+        # Client pays full amount, released to photographer after work completion
+        total_amount = payload.price if payload.price else 0
+        platform_fee = total_amount * 0.10  # 10% platform fee
+        photographer_earning = total_amount * 0.90  # 90% goes to photographer
 
         booking = {
             "client_id": user_id,
@@ -194,8 +194,8 @@ def create_booking(payload: CreateBookingRequest, current_user: dict = Depends(g
             "event_type": payload.event_type,
             "notes": payload.notes,
             "price": payload.price,
-            "advance_payment": advance_amount,
-            "remaining_payment": remaining_amount,
+            "advance_payment": total_amount,  # Full payment upfront
+            "remaining_payment": 0,  # No remaining payment
             "platform_fee": platform_fee,
             "photographer_earning": photographer_earning,
             "status": "requested"  # Initial status in workflow
@@ -301,7 +301,7 @@ def get_booking(booking_id: str, current_user: dict = Depends(get_current_user))
 
 
 class UpdateBookingStatusRequest(BaseModel):
-    status: str  # requested, confirmed, cancelled, completed, rejected, accepted, paid
+    status: str  # requested, confirmed, cancelled, completed, rejected, paid
 
 
 @router.put("/{booking_id}/status")
@@ -310,7 +310,7 @@ def update_booking_status(booking_id: str, payload: UpdateBookingStatusRequest, 
     MODULE 4: Update booking status with workflow validation
     
     Status Transition Flow:
-    REQUESTED → ACCEPTED (photographer accepts) → PAID (client pays) → COMPLETED (event done)
+    REQUESTED → CONFIRMED (photographer accepts) → PAID (client pays) → COMPLETED (event done)
     
     Can be cancelled at any time: → CANCELLED
     Can be rejected by photographer: REQUESTED → REJECTED
@@ -325,9 +325,15 @@ def update_booking_status(booking_id: str, payload: UpdateBookingStatusRequest, 
         if not user_id:
             raise HTTPException(status_code=401, detail="Unauthorized")
 
-        # Valid status transitions
-        valid_statuses = ['requested', 'accepted', 'paid', 'completed', 'cancelled', 'rejected', 'confirmed']
-        if payload.status not in valid_statuses:
+        # Valid status transitions - Use 'confirmed' consistently (not 'accepted')
+        valid_statuses = ['requested', 'confirmed', 'paid', 'completed', 'cancelled', 'rejected']
+        
+        # Map 'accepted' to 'confirmed' for backward compatibility
+        status_to_set = payload.status
+        if payload.status == 'accepted':
+            status_to_set = 'confirmed'
+        
+        if status_to_set not in valid_statuses:
             raise HTTPException(status_code=400, detail=f"Invalid status. Must be one of: {', '.join(valid_statuses)}")
 
         # Get booking to verify ownership and current status
@@ -349,50 +355,49 @@ def update_booking_status(booking_id: str, payload: UpdateBookingStatusRequest, 
         if not (is_client or is_photographer):
             raise HTTPException(status_code=403, detail="Unauthorized to update this booking")
 
-        # Workflow validation
+        # Workflow validation - using 'confirmed' consistently
         allowed_transitions = {
-            'requested': ['accepted', 'rejected', 'cancelled'],
-            'accepted': ['paid', 'cancelled'],
+            'requested': ['confirmed', 'rejected', 'cancelled'],
+            'confirmed': ['paid', 'cancelled'],
             'paid': ['completed', 'cancelled'],
             'completed': [],  # Terminal state
             'cancelled': [],  # Terminal state
             'rejected': [],   # Terminal state
-            'confirmed': ['paid', 'cancelled']  # Legacy support
         }
         
         # Check if transition is allowed
         if current_status in allowed_transitions:
-            if payload.status not in allowed_transitions[current_status] and payload.status != current_status:
+            if status_to_set not in allowed_transitions[current_status] and status_to_set != current_status:
                 raise HTTPException(
                     status_code=400,
-                    detail=f"Invalid status transition: {current_status} → {payload.status}. " +
+                    detail=f"Invalid status transition: {current_status} → {status_to_set}. " +
                            f"Allowed transitions: {', '.join(allowed_transitions[current_status]) or 'none (terminal state)'}"
                 )
         
         # Role-based permission checks
-        if payload.status == 'accepted' and not is_photographer:
-            raise HTTPException(status_code=403, detail="Only photographer can accept booking")
+        if status_to_set == 'confirmed' and not is_photographer:
+            raise HTTPException(status_code=403, detail="Only photographer can confirm booking")
         
-        if payload.status == 'rejected' and not is_photographer:
+        if status_to_set == 'rejected' and not is_photographer:
             raise HTTPException(status_code=403, detail="Only photographer can reject booking")
         
-        if payload.status == 'paid' and not is_client:
+        if status_to_set == 'paid' and not is_client:
             raise HTTPException(status_code=403, detail="Only client can mark booking as paid")
         
-        if payload.status == 'completed' and not is_photographer:
+        if status_to_set == 'completed' and not is_photographer:
             raise HTTPException(status_code=403, detail="Only photographer can mark booking as completed")
 
-        # Update status
-        resp = supabase.table('booking').update({'status': payload.status}).eq('id', booking_id).execute()
+        # Update status (use status_to_set which normalizes 'accepted' to 'confirmed')
+        resp = supabase.table('booking').update({'status': status_to_set}).eq('id', booking_id).execute()
         
         return {
             "success": True,
             "data": resp.data,
-            "message": f"Booking status updated: {current_status} → {payload.status}",
+            "message": f"Booking status updated: {current_status} → {status_to_set}",
             "workflow": {
                 "previous_status": current_status,
-                "new_status": payload.status,
-                "next_allowed_transitions": allowed_transitions.get(payload.status, [])
+                "new_status": status_to_set,
+                "next_allowed_transitions": allowed_transitions.get(status_to_set, [])
             }
         }
         
@@ -731,3 +736,84 @@ def mark_payment_complete(
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
+
+@router.delete("/{booking_id}/cancel")
+def cancel_booking(booking_id: str, current_user: dict = Depends(get_current_user)):
+    """
+    Cancel booking and process refund based on cancellation policy:
+    - 15+ days before: 100% refund
+    - 7-14 days before: 50% refund
+    - Less than 7 days: No refund
+    """
+    try:
+        from backend.services.escrow_service import escrow_service, CancellationPolicy
+        
+        user_id = None
+        if isinstance(current_user, dict):
+            user_id = current_user.get("id") or current_user.get("sub")
+        else:
+            user_id = getattr(current_user, 'id', None)
+
+        if not user_id:
+            raise HTTPException(status_code=401, detail="Unauthorized")
+        
+        # Get booking
+        booking = supabase.table('booking').select(
+            '*, photographer_profile!booking_photographer_id_fkey(user_id)'
+        ).eq('id', booking_id).limit(1).execute()
+        
+        if not booking.data:
+            raise HTTPException(status_code=404, detail="Booking not found")
+        
+        booking_data = booking.data[0]
+        
+        # Verify user is the client
+        if booking_data['client_id'] != user_id:
+            raise HTTPException(status_code=403, detail="Only booking client can cancel booking")
+        
+        # Check if booking can be cancelled
+        current_status = booking_data.get('status', '')
+        if current_status in ['cancelled', 'completed', 'rejected']:
+            raise HTTPException(
+                status_code=400, 
+                detail=f"Cannot cancel booking with status '{current_status}'"
+            )
+        
+        # Calculate refund based on policy
+        event_date = booking_data.get('event_date', '')
+        total_amount = booking_data.get('price', 0) or 0
+        advance_paid = booking_data.get('advance_paid', 0) or 0
+        
+        from datetime import datetime
+        refund_info = CancellationPolicy.calculate_refund(
+            booking_date=event_date,
+            cancellation_date=datetime.now().isoformat(),
+            total_amount=advance_paid if advance_paid > 0 else total_amount
+        )
+        
+        # Update booking status to cancelled
+        resp = supabase.table('booking').update({
+            'status': 'cancelled',
+            'cancellation_reason': 'Client cancelled',
+            'refund_amount': refund_info['client_refund'],
+            'photographer_compensation': refund_info['photographer_payment']
+        }).eq('id', booking_id).execute()
+        
+        # TODO: Process actual refund through payment gateway
+        
+        return {
+            "success": True,
+            "data": resp.data,
+            "message": "Booking cancelled successfully",
+            "refund_info": {
+                "client_refund": refund_info['client_refund'],
+                "photographer_payment": refund_info['photographer_payment'],
+                "policy": refund_info['policy'],
+                "refund_percentage": (refund_info['client_refund'] / (advance_paid if advance_paid > 0 else total_amount) * 100) if (advance_paid or total_amount) > 0 else 0
+            }
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))

@@ -17,8 +17,7 @@ import {
   Wallet,
   Shield,
   Receipt,
-  CreditCard,
-  Bell
+  CreditCard
 } from "lucide-react"
 
 const ClientDashboard = () => {
@@ -86,6 +85,14 @@ const ClientDashboard = () => {
       badge: null,
     },
     {
+      id: "equipment",
+      title: "Equipment Rental",
+      description: "Rent camera equipment for your shoot",
+      icon: Camera,
+      link: "/photographer/equipment",
+      badge: null,
+    },
+    {
       id: "album",
       title: "Album Builder",
       description: "Create beautiful photo albums from your shoots",
@@ -110,14 +117,6 @@ const ClientDashboard = () => {
       badge: null,
     },
     {
-      id: "equipment",
-      title: "Equipment Rental",
-      description: "Rent camera equipment for your shoot",
-      icon: Camera,
-      link: "/photographer/equipment",
-      badge: null,
-    },
-    {
       id: "payments",
       title: "Payment History",
       description: "View all transactions, receipts, and payment status",
@@ -125,14 +124,6 @@ const ClientDashboard = () => {
       link: "/client/payments",
       badge: stats.activeEscrows > 0 ? stats.activeEscrows : null,
       badgeColor: "warning",
-    },
-    {
-      id: "notifications",
-      title: "Notification Settings",
-      description: "Manage your email and push notification preferences",
-      icon: Bell,
-      link: "/settings/notifications",
-      badge: null,
     },
     {
       id: "profile",

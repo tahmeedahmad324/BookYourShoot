@@ -128,10 +128,10 @@ class EmailService:
                                 <strong>💵 Total Amount:</strong> PKR {amount}
                             </p>
                             <p style="margin: 0; color: #2e7d32;">
-                                <strong>💰 Deposit Paid:</strong> PKR {advance_paid} is safely held until work is completed.
+                                <strong>💰 Payment Status:</strong> Full amount paid and securely held in escrow until work is completed.
                             </p>
                             <p style="margin: 10px 0 0 0; color: #666; font-size: 14px;">
-                                <em>Remaining balance: PKR {remaining_amount} due on event day</em>
+                                <em>Payment will be released to photographer after session completion</em>
                             </p>
                         </div>
                         
@@ -159,8 +159,8 @@ class EmailService:
                 - Photographer: {photographer_name}
                 
                 Total Amount: PKR {amount}
-                Deposit Paid: PKR {advance_paid} (safely held until work is completed)
-                Remaining Balance: PKR {remaining_amount} (due on event day)
+                Payment Status: Full amount paid and held in escrow
+                Payment Release: After session completion
                 
                 View your booking at: {dashboard_url}
                 
@@ -422,18 +422,18 @@ class EmailService:
         # ==================== 50/50 Payment Flow Templates ====================
         
         EmailTemplate.ADVANCE_PAYMENT_RECEIVED: {
-            "subject": "50% Advance Payment Received - Booking #{booking_id}",
+            "subject": "Full Payment Received - Booking #{booking_id}",
             "html": """
                 <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
                     <div style="background: linear-gradient(135deg, #4CAF50 0%, #2E7D32 100%); padding: 30px; text-align: center;">
-                        <h1 style="color: white; margin: 0;">Advance Payment Received! 💵</h1>
+                        <h1 style="color: white; margin: 0;">Payment Received! 💵</h1>
                     </div>
                     <div style="padding: 30px; background: #fff;">
                         <p>Hi {client_name},</p>
-                        <p>Your 50% advance payment has been received and your booking is now confirmed!</p>
+                        <p>Your full payment has been received and securely held in escrow. Your booking is confirmed!</p>
                         
                         <div style="background: #e8f5e9; padding: 20px; border-radius: 8px; margin: 20px 0; text-align: center;">
-                            <p style="margin: 0; font-size: 14px; color: #666;">Advance Paid</p>
+                            <p style="margin: 0; font-size: 14px; color: #666;">Amount Paid (Held in Escrow)</p>
                             <p style="margin: 10px 0; font-size: 32px; font-weight: bold; color: #2e7d32;">PKR {advance_amount}</p>
                         </div>
                         
@@ -445,9 +445,9 @@ class EmailService:
                             <p><strong>Date:</strong> {date}</p>
                         </div>
                         
-                        <div style="background: #fff3e0; padding: 15px; border-radius: 8px; margin: 20px 0;">
-                            <p style="margin: 0; color: #e65100;">
-                                <strong>💡 Next Step:</strong> After your session is complete, you'll pay the remaining 50% (PKR {remaining_amount}) to release payment to the photographer.
+                        <div style="background: #e3f2fd; padding: 15px; border-radius: 8px; margin: 20px 0;">
+                            <p style="margin: 0; color: #1565c0;">
+                                <strong>💡 Next Step:</strong> After your session is complete, confirm work completion to release payment to the photographer.
                             </p>
                         </div>
                         
@@ -459,13 +459,13 @@ class EmailService:
                 </div>
             """,
             "text": """
-                Advance Payment Received!
+                Full Payment Received!
                 
                 Hi {client_name},
                 
-                Your 50% advance payment has been received and your booking is confirmed!
+                Your full payment has been received and securely held in escrow. Your booking is confirmed!
                 
-                Advance Paid: PKR {advance_amount}
+                Amount Paid (Held in Escrow): PKR {advance_amount}
                 
                 Booking Details:
                 - Booking ID: #{booking_id}
@@ -473,7 +473,7 @@ class EmailService:
                 - Photographer: {photographer_name}
                 - Date: {date}
                 
-                Next Step: After your session is complete, pay the remaining 50% (PKR {remaining_amount}) to release payment to the photographer.
+                Next Step: After your session is complete, confirm work completion to release payment to the photographer.
                 
                 View your booking at: {dashboard_url}
                 
@@ -664,7 +664,7 @@ class EmailService:
                         <p>Great news! You have a new booking.</p>
                         
                         <div style="background: #e8f5e9; padding: 20px; border-radius: 8px; margin: 20px 0; text-align: center;">
-                            <p style="margin: 0; font-size: 14px; color: #666;">Client Paid 50% Advance</p>
+                            <p style="margin: 0; font-size: 14px; color: #666;">Client Paid Full Amount</p>
                             <p style="margin: 10px 0; font-size: 32px; font-weight: bold; color: #2e7d32;">PKR {advance_amount}</p>
                             <p style="margin: 0; font-size: 14px; color: #666;">Secured in Escrow</p>
                         </div>
@@ -681,7 +681,7 @@ class EmailService:
                         
                         <div style="background: #e3f2fd; padding: 15px; border-radius: 8px;">
                             <p style="margin: 0; color: #1565c0;">
-                                <strong>💡 Payment Flow:</strong> Client pays 50% now, 50% after work. You'll receive PKR {your_earnings} (after 10% platform fee) once fully paid.
+                                <strong>💡 Payment Status:</strong> Client paid full amount upfront - securely held in escrow. You'll receive PKR {your_earnings} (after 10% platform fee) once work is completed.
                             </p>
                         </div>
                         

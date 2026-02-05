@@ -145,6 +145,10 @@ EVENT_PROMPTS = {
         "casual social event with guests mingling",
         "family gathering or reunion with multiple generations",
         "general celebration or function with decorations"
+        "concert or festival with crowd enjoying music"
+        "baby photo shoot with cute decorations"
+        "friends hanging out at casual event"
+        
     ]
 }
 
@@ -261,16 +265,43 @@ class CLIPAnalysisService:
     def __init__(self):
         """
         Initialize the CLIP model and processor.
-        Uses a smaller model (base-patch32) for faster inference on CPU.
+        Automatically uses GPU (CUDA) if available, otherwise falls back to CPU.
         """
         self.model = None
         self.processor = None
-        self.device = "cuda" if torch.cuda.is_available() else "cpu" if CLIP_AVAILABLE else None
+        
+        # Detect device with detailed diagnostics
+        if CLIP_AVAILABLE:
+            # Check CUDA availability and print diagnostics
+            cuda_available = torch.cuda.is_available()
+            print(f"\n🔍 PyTorch CUDA Detection:")
+            print(f"   - CUDA Available: {cuda_available}")
+            if cuda_available:
+                print(f"   - CUDA Version: {torch.version.cuda}")
+                print(f"   - GPU Count: {torch.cuda.device_count()}")
+                print(f"   - GPU Name: {torch.cuda.get_device_name(0)}")
+                print(f"   - GPU Capability: {torch.cuda.get_device_capability(0)}")
+            print()
+            
+            # Use CUDA if available, otherwise CPU
+            self.device = "cuda" if cuda_available else "cpu"
+        else:
+            self.device = "cpu"
+        
         self._model_loaded = False
         
         # YOLO person detector (lazy loading)
         self.person_detector = None
         self._person_detector_loaded = False
+        
+        # Print device info
+        if CLIP_AVAILABLE and self.device:
+            gpu_info = ""
+            if self.device == "cuda":
+                gpu_name = torch.cuda.get_device_name(0)
+                gpu_info = f" (GPU: {gpu_name})"
+            print(f"✅ CLIP Analysis Service initialized - Device: {self.device.upper()}{gpu_info}")
+            print("   Model will be loaded on first use (lazy loading)")
         
         # Check dependencies
         if not PIL_AVAILABLE:
@@ -280,9 +311,6 @@ class CLIPAnalysisService:
         if not CLIP_AVAILABLE:
             print("❌ CLIP Service: Transformers/PyTorch not available")
             return
-        
-        print(f"✅ CLIP Analysis Service initialized (device: {self.device})")
-        print("   Model will be loaded on first use (lazy loading)")
     
     def _load_model(self):
         """
@@ -296,7 +324,7 @@ class CLIPAnalysisService:
             return False
             
         try:
-            print("🔄 Loading CLIP model (first time only, please wait)...")
+            print(f"\n🔄 Loading CLIP model to {self.device.upper()} (first time only, please wait)...")
             
             # Use the base model for faster inference
             # For better accuracy, use: "openai/clip-vit-large-patch14"
@@ -306,11 +334,21 @@ class CLIPAnalysisService:
             self.processor = CLIPProcessor.from_pretrained(model_name)
             
             # Move to appropriate device
+            print(f"   Moving model to {self.device.upper()}...")
             self.model = self.model.to(self.device)
-            self.model.eval()  # Set to evaluation mode
+            
+            # Set to evaluation mode
+            self.model.eval()
+            
+            # Verify model is on correct device
+            if self.device == "cuda":
+                model_device = next(self.model.parameters()).device
+                print(f"✅ Model loaded on: {model_device}")
+            else:
+                print(f"✅ Model loaded on CPU")
             
             self._model_loaded = True
-            print("✅ CLIP model loaded successfully!")
+            print("✅ CLIP model ready for inference!\n")
             return True
             
         except Exception as e:

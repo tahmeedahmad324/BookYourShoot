@@ -182,9 +182,9 @@ class NotificationService:
             client_message = f"Your equipment rental payment of Rs. {amount:,.0f} has been received. The owner will contact you for pickup/delivery."
             photographer_message = f"Client paid Rs. {amount:,.0f} for equipment rental. Please arrange pickup/delivery."
         else:
-            payment_type = "50% advance" if is_advance else "remaining 50%"
-            client_message = f"Your {payment_type} payment of Rs. {amount:,.0f} for booking with {photographer_name} has been received and secured."
-            photographer_message = f"Client paid {payment_type} (Rs. {amount:,.0f}) for your services. {'Complete the work to unlock full payment.' if is_advance else 'Full payment received!'}"
+            payment_type = "full payment (held in escrow)" if is_advance else "payment release"
+            client_message = f"Your {payment_type} of Rs. {amount:,.0f} for booking with {photographer_name} has been received and secured in escrow."
+            photographer_message = f"Client paid full amount (Rs. {amount:,.0f}) for your services. {'Complete the work to unlock payment.' if is_advance else 'Payment released!'}"
         
         # Notify client
         self.send(Notification(
@@ -381,7 +381,7 @@ class NotificationService:
                 recipient_id=client_id,
                 recipient_role="client",
                 title="Booking Confirmed! ✅",
-                message=f"Your {service_type} session with {photographer_name} on {date} is confirmed. 50% advance payment has been secured.",
+                message=f"Your {service_type} session with {photographer_name} on {date} is confirmed. Full payment has been secured in escrow.",
                 booking_id=booking_id,
                 metadata={"photographer_name": photographer_name, "service_type": service_type, "date": date}
             ))
@@ -392,7 +392,7 @@ class NotificationService:
                 recipient_id=photographer_id,
                 recipient_role="photographer",
                 title="New Booking Confirmed! 🎉",
-                message=f"You have a new {service_type} booking on {date}. Client paid 50% advance - payment is secured in escrow.",
+                message=f"You have a new {service_type} booking on {date}. Client paid full amount - payment is secured in escrow.",
                 booking_id=booking_id,
                 metadata={"service_type": service_type, "date": date}
             ))
@@ -413,7 +413,7 @@ class NotificationService:
         date: str,
         is_equipment_rental: bool = False
     ):
-        """Notify when 50% advance payment is received or equipment rental payment"""
+        """Notify when full upfront payment is received or equipment rental payment"""
         if is_equipment_rental:
             # Equipment rental notification
             self.send(Notification(
@@ -438,27 +438,27 @@ class NotificationService:
                 metadata={"is_equipment_rental": True}
             ))
         else:
-            # Photography booking notification
+            # Photography booking notification - 100% upfront payment
             self.send(Notification(
                 notification_type=NotificationType.ADVANCE_PAYMENT_RECEIVED,
                 recipient_id=client_id,
                 recipient_role="client",
-                title="50% Advance Payment Received ✅",
-                message=f"Your advance payment of Rs. {advance_amount:,.0f} for {service_type} with {photographer_name} is confirmed. Remaining Rs. {remaining_amount:,.0f} due after session.",
+                title="Full Payment Received ✅",
+                message=f"Your full payment of Rs. {advance_amount:,.0f} for {service_type} with {photographer_name} is confirmed and held in escrow. Payment will be released after session completion.",
                 booking_id=booking_id,
                 amount=advance_amount,
-                metadata={"remaining_amount": remaining_amount, "photographer_name": photographer_name}
+                metadata={"photographer_name": photographer_name}
             ))
             
             self.send(Notification(
                 notification_type=NotificationType.ADVANCE_PAYMENT_RECEIVED,
                 recipient_id=photographer_id,
                 recipient_role="photographer",
-                title="New Booking - 50% Advance Received! 💵",
-                message=f"Client paid Rs. {advance_amount:,.0f} advance for {service_type} on {date}. Complete the work to receive full payment.",
+                title="New Booking - Full Payment Received! 💵",
+                message=f"Client paid full amount Rs. {advance_amount:,.0f} for {service_type} on {date}. Complete the session to receive payment.",
                 booking_id=booking_id,
                 amount=advance_amount,
-                metadata={"remaining_amount": remaining_amount, "date": date}
+                metadata={"date": date}
             ))
 
     def notify_work_completed(

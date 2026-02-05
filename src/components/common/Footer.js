@@ -1,8 +1,12 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
+import TermsModal from '../legal/TermsModal';
+import PrivacyModal from '../legal/PrivacyModal';
 
 const Footer = () => {
   const currentYear = new Date().getFullYear();
+  const [showTermsModal, setShowTermsModal] = useState(false);
+  const [showPrivacyModal, setShowPrivacyModal] = useState(false);
 
   return (
     <footer className="site-footer">
@@ -53,8 +57,8 @@ const Footer = () => {
               <ul className="footer-links">
                 <li><Link to="/help">Help Center</Link></li>
                 <li><Link to="/help/contact">Contact Us</Link></li>
-                <li><Link to="/legal/terms">Terms of Service</Link></li>
-                <li><Link to="/legal/privacy">Privacy Policy</Link></li>
+                <li><button type="button" className="btn btn-link p-0 text-start" onClick={() => setShowTermsModal(true)}>Terms of Service</button></li>
+                <li><button type="button" className="btn btn-link p-0 text-start" onClick={() => setShowPrivacyModal(true)}>Privacy Policy</button></li>
               </ul>
             </div>
 
@@ -88,15 +92,19 @@ const Footer = () => {
               © {currentYear} BookYourShoot. All rights reserved.
             </p>
             <div className="footer-bottom-links">
-              <Link to="/legal/terms">Terms</Link>
+              <button type="button" className="btn btn-link p-0" onClick={() => setShowTermsModal(true)}>Terms</button>
               <span className="separator">•</span>
-              <Link to="/legal/privacy">Privacy</Link>
+              <button type="button" className="btn btn-link p-0" onClick={() => setShowPrivacyModal(true)}>Privacy</button>
               <span className="separator">•</span>
               <Link to="/help">Support</Link>
             </div>
           </div>
         </div>
       </div>
+      
+      {/* Legal Modals */}
+      <TermsModal show={showTermsModal} onHide={() => setShowTermsModal(false)} />
+      <PrivacyModal show={showPrivacyModal} onHide={() => setShowPrivacyModal(false)} />
     </footer>
   );
 };

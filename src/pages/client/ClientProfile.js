@@ -516,29 +516,6 @@ const ClientProfile = () => {
                         Change Password
                       </button>
                     </div>
-
-                    {/* Danger Zone */}
-                    <div className="mt-4 pt-4 border-top">
-                      <h6 className="fw-bold mb-3 text-danger">⚠️ Danger Zone</h6>
-                      <div className="card border-danger bg-danger bg-opacity-10">
-                        <div className="card-body">
-                          <div className="d-flex justify-content-between align-items-center">
-                            <div>
-                              <h6 className="fw-semibold mb-1">Delete Account</h6>
-                              <p className="text-muted small mb-0">
-                                Permanently delete your account and all associated data
-                              </p>
-                            </div>
-                            <button
-                              className="btn btn-danger"
-                              onClick={() => setShowDeleteModal(true)}
-                            >
-                              Delete Account
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
                   </div>
                 )}
 
@@ -857,9 +834,36 @@ const ClientProfile = () => {
                   type="button"
                   className="btn btn-danger"
                   onClick={() => {
-                    // TODO: API call to delete account
-                    alert("Account deletion initiated")
-                    setShowDeleteModal(false)
+                    const checkbox = document.getElementById('confirmDelete');
+                    if (!checkbox.checked) {
+                      alert('Please confirm that you understand this action');
+                      return;
+                    }
+                    
+                    // API call to delete account
+                    fetch('http://localhost:8000/api/profile/me/delete-account', {
+                      method: 'DELETE',
+                      headers: {
+                        'Authorization': `Bearer ${localStorage.getItem('token')}`,
+                        'Content-Type': 'application/json'
+                      }
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                      if (data.success) {
+                        alert('Account deleted successfully');
+                        localStorage.removeItem('token');
+                        window.location.href = '/';
+                      } else {
+                        alert(data.detail || 'Failed to delete account');
+                      }
+                    })
+                    .catch(error => {
+                      console.error('Error:', error);
+                      alert('Error deleting account. Please try again.');
+                    });
+                    
+                    setShowDeleteModal(false);
                   }}
                 >
                   Delete My Account
