@@ -1,936 +1,538 @@
-import React, { useState, useRef } from 'react';
-import { Link } from 'react-router-dom';
+import React, { useState } from 'react';
+import { Container, Card, Form, Button, Alert, ProgressBar, Badge, ListGroup } from 'react-bootstrap';
+import axios from 'axios';
+import './AlbumBuilder.css';
 
-const AlbumBuilder = () => {
-  const [uploadedImages, setUploadedImages] = useState([]);
-  const [selectedImages, setSelectedImages] = useState([]);
-  const [albumTitle, setAlbumTitle] = useState('My Photography Album');
-  const [albumDescription, setAlbumDescription] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState('wedding');
-  const [isCreating, setIsCreating] = useState(false);
-  const [draggedImage, setDraggedImage] = useState(null);
-  const [createdAlbums, setCreatedAlbums] = useState([]);
-  const [showSuccess, setShowSuccess] = useState(false);
-  const [viewingAlbum, setViewingAlbum] = useState(null);
-  const fileInputRef = useRef(null);
+/**
+ * Album Builder V2 - Fresh Implementation
+ * 
+ * 3-Step Workflow:
+ * 1. Upload Reference Photos (3-5 clear face shots)
+ * 2. Upload Event Photos (60-1000 photos)
+ * 3. Build Albums (AI face matching)
+ */
+function AlbumBuilder() {
+  // Step state
+  const [currentStep, setCurrentStep] = useState(1);
+  
+  // Session state
+  const [sessionId, setSessionId] = useState(null);
+  
+  // Step 1: Reference photos
+  const [referenceFiles, setReferenceFiles] = useState([]);
+  const [personNames, setPersonNames] = useState(['', '', '']);
+  
+  // Step 2: Event photos
+  const [eventFiles, setEventFiles] = useState([]);
+  const [compressPhotos, setCompressPhotos] = useState(true);
+  
+  // Step 3: Build settings
+  const [similarityThreshold, setSimilarityThreshold] = useState(0.6);
+  
+  // Results
+  const [albums, setAlbums] = useState({});
+  
+  // UI state
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [success, setSuccess] = useState(null);
+  const [progress, setProgress] = useState(0);
 
-  // Load existing albums on mount
-  React.useEffect(() => {
-    const existingAlbums = JSON.parse(localStorage.getItem('userAlbums') || '[]');
-    setCreatedAlbums(existingAlbums);
-  }, []);
+  const API_BASE = 'http://localhost:8000/api/album-builder/v2';
 
-  const categories = [
-    { id: 'wedding', name: 'Wedding', icon: '💒', color: 'var(--primary-orange)' },
-    { id: 'portrait', name: 'Portrait', icon: '👤', color: 'var(--primary-blue)' },
-    { id: 'event', name: 'Event', icon: '🎉', color: 'var(--deep-blue)' },
-    { id: 'product', name: 'Product', icon: '📦', color: 'var(--dark-orange)' },
-    { id: 'fashion', name: 'Fashion', icon: '👗', color: '#9C27B0' },
-    { id: 'landscape', name: 'Landscape', icon: '🏞️', color: '#4CAF50' },
-    { id: 'food', name: 'Food', icon: '🍔', color: '#FF9800' },
-    { id: 'architectural', name: 'Architectural', icon: '🏛️', color: '#795548' }
-  ];
-
-  const handleFileUpload = (e) => {
+  // ============================================================================
+  // STEP 1: REFERENCE PHOTOS
+  // ============================================================================
+  
+  const handleReferenceFilesChange = (e) => {
     const files = Array.from(e.target.files);
-    const newImages = files.map((file, index) => ({
-      id: Date.now() + index,
-      file: file,
-      name: file.name,
-      size: file.size,
-      type: file.type,
-      url: URL.createObjectURL(file),
-      uploadedAt: new Date().toISOString(),
-      category: selectedCategory
-    }));
     
-    setUploadedImages(prev => [...prev, ...newImages]);
-  };
-
-  const handleDrop = (e) => {
-    e.preventDefault();
-    const files = Array.from(e.dataTransfer.files);
-    const newImages = files.map((file, index) => ({
-      id: Date.now() + index,
-      file: file,
-      name: file.name,
-      size: file.size,
-      type: file.type,
-      url: URL.createObjectURL(file),
-      uploadedAt: new Date().toISOString(),
-      category: selectedCategory
-    }));
-    
-    setUploadedImages(prev => [...prev, ...newImages]);
-  };
-
-  const handleDragOver = (e) => {
-    e.preventDefault();
-  };
-
-  const handleDragStart = (e, image) => {
-    setDraggedImage(image);
-  };
-
-  const handleDragOverImage = (e) => {
-    e.preventDefault();
-  };
-
-  const handleDropOnImage = (e, targetImage) => {
-    e.preventDefault();
-    if (draggedImage && draggedImage.id !== targetImage.id) {
-      const draggedIndex = selectedImages.findIndex(img => img.id === draggedImage.id);
-      const targetIndex = selectedImages.findIndex(img => img.id === targetImage.id);
-      
-      if (draggedIndex !== -1 && targetIndex !== -1) {
-        const newSelected = [...selectedImages];
-        const [removed] = newSelected.splice(draggedIndex, 1);
-        newSelected.splice(targetIndex, 0, removed);
-        setSelectedImages(newSelected);
-      }
-    }
-    setDraggedImage(null);
-  };
-
-  const selectImage = (image) => {
-    if (selectedImages.find(img => img.id === image.id)) {
-      setSelectedImages(prev => prev.filter(img => img.id !== image.id));
-    } else {
-      setSelectedImages(prev => [...prev, image]);
-    }
-  };
-
-  const removeImage = (imageId) => {
-    setSelectedImages(prev => prev.filter(img => img.id !== imageId));
-    setUploadedImages(prev => prev.filter(img => img.id !== imageId));
-  };
-
-  const formatFileSize = (bytes) => {
-    if (bytes === 0) return '0 Bytes';
-    const k = 1024;
-    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-  };
-
-  const createAlbum = async () => {
-    if (selectedImages.length === 0) {
-      alert('Please select at least one image for your album.');
+    if (files.length < 3) {
+      setError('Please select at least 3 reference photos');
       return;
     }
     
-    setIsCreating(true);
+    if (files.length > 5) {
+      setError('Maximum 5 reference photos allowed');
+      return;
+    }
     
-    try {
-      // Get token from different auth methods
-      let token = null;
-      
-      // Method 1: Check for mock_user (proper mock login)
-      const mockUserStr = localStorage.getItem('mock_user');
-      if (mockUserStr) {
-        const userData = JSON.parse(mockUserStr);
-        token = `mock-jwt-token-${userData.role}`;
-        console.log('Using mock account token:', token);
-      }
-      
-      // Method 2: Check for userRole (alternative login method)
-      if (!token) {
-        const userRole = localStorage.getItem('userRole');
-        if (userRole) {
-          token = `mock-jwt-token-${userRole}`;
-          console.log('Using userRole token:', token);
-        }
-      }
-      
-      // Method 3: Check for real Supabase token
-      if (!token) {
-        token = localStorage.getItem('token');
-        console.log('Using real token:', token);
-      }
-      
-      if (!token) {
-        console.error('No auth found! Keys:', Object.keys(localStorage));
-        alert('Please login first to use AI album features');
-        setIsCreating(false);
+    setReferenceFiles(files);
+    
+    // Initialize person names if needed
+    const names = [];
+    for (let i = 0; i < files.length; i++) {
+      names.push(personNames[i] || '');
+    }
+    setPersonNames(names);
+    
+    setError(null);
+  };
+  
+  const handlePersonNameChange = (index, value) => {
+    const newNames = [...personNames];
+    newNames[index] = value;
+    setPersonNames(newNames);
+  };
+  
+  const uploadReferences = async () => {
+    // Validation
+    for (let i = 0; i < referenceFiles.length; i++) {
+      if (!personNames[i] || personNames[i].trim() === '') {
+        setError(`Please enter a name for reference photo ${i + 1}`);
         return;
       }
+    }
+    
+    setLoading(true);
+    setError(null);
+    setProgress(20);
+    
+    try {
+      // Step 1: Create session
+      const token = localStorage.getItem('authToken');
       
-      console.log('✅ Token ready for API call');
+      const sessionResponse = await axios.post(
+        `${API_BASE}/create-session`,
+        {},
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
       
-      // Step 0: Clear old albums from backend before uploading new ones
-      try {
-        await fetch('http://localhost:8000/api/albums/smart/albums', {
-          method: 'DELETE',
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
-        });
-        console.log('Old albums cleared from backend');
-      } catch (err) {
-        console.log('No old albums to clear or delete failed (non-critical)');
-      }
+      const newSessionId = sessionResponse.data.session_id;
+      setSessionId(newSessionId);
+      setProgress(40);
       
-      // Step 1: Upload photos to backend
+      // Step 2: Upload references
       const formData = new FormData();
-      for (const image of selectedImages) {
-        formData.append('files', image.file);
+      formData.append('session_id', newSessionId);
+      
+      for (const file of referenceFiles) {
+        formData.append('files', file);
       }
       
-      const uploadResponse = await fetch('http://localhost:8000/api/albums/smart/upload', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`
-        },
-        body: formData
-      });
-      
-      const uploadData = await uploadResponse.json();
-      
-      if (!uploadResponse.ok) {
-        throw new Error(uploadData.detail || 'Failed to upload photos');
-      }
-      
-      console.log('Upload successful:', uploadData);
-      
-      // Step 2: Start AI processing (ResNet-50 face clustering)
-      const processResponse = await fetch('http://localhost:8000/api/albums/smart/process', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
+      await axios.post(`${API_BASE}/upload-references`, formData, {
+        headers: { 
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'multipart/form-data'
         }
       });
       
-      const processData = await processResponse.json();
+      setProgress(100);
+      setSuccess(`Uploaded ${referenceFiles.length} reference photo(s) successfully!`);
       
-      if (!processResponse.ok) {
-        throw new Error(processData.detail || 'Failed to start AI processing');
-      }
+      // Move to step 2
+      setTimeout(() => {
+        setCurrentStep(2);
+        setSuccess(null);
+        setProgress(0);
+        setLoading(false);
+      }, 1000);
       
-      console.log('Processing started:', processData);
-      
-      // Step 3: Poll for completion (increased timeout for ResNet-50)
-      let isComplete = false;
-      let attempts = 0;
-      const maxAttempts = 180; // 3 minutes timeout (64 images can take time)
-      
-      while (!isComplete && attempts < maxAttempts) {
-        await new Promise(resolve => setTimeout(resolve, 2000)); // Check every 2 seconds
-        
-        const statusResponse = await fetch('http://localhost:8000/api/albums/smart/status', {
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
-        });
-        
-        const statusData = await statusResponse.json();
-        
-        console.log(`Processing status (${attempts}/${maxAttempts}):`, statusData.data?.status);
-        
-        if (statusData.data?.status === 'completed') {
-          isComplete = true;
-          console.log('✅ AI processing completed!');
-        } else if (statusData.data?.status === 'error') {
-          throw new Error('AI processing failed: ' + (statusData.data?.message || 'Unknown error'));
-        }
-        
-        attempts++;
-      }
-      
-      if (!isComplete) {
-        throw new Error(`Processing is taking longer than expected (${maxAttempts * 2}s). The album might still be processing. Try refreshing the page in a few minutes to see if it completed.`);
-      }
-      
-      // Step 4: Get organized albums (Highlights, Person_1, Person_2, etc.)
-      const albumsResponse = await fetch('http://localhost:8000/api/albums/smart/albums', {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-      
-      const albumsData = await albumsResponse.json();
-      
-      if (albumsData.success) {
-        // Store the AI-organized albums
-        const organizedAlbums = {
-          id: Date.now(),
-          title: albumTitle,
-          description: albumDescription,
-          category: selectedCategory,
-          createdAt: new Date().toISOString(),
-          highlights: albumsData.data.highlights,
-          persons: albumsData.data.persons,
-          totalAlbums: albumsData.data.total_albums
-        };
-        
-        const existingAlbums = JSON.parse(localStorage.getItem('userAlbums') || '[]');
-        existingAlbums.push(organizedAlbums);
-        localStorage.setItem('userAlbums', JSON.stringify(existingAlbums));
-        
-        setCreatedAlbums(existingAlbums);
-        setShowSuccess(true);
-        
-        // Reset form
-        setAlbumTitle('My Photography Album');
-        setAlbumDescription('');
-        setSelectedImages([]);
-        setUploadedImages([]);
-        
-        setTimeout(() => setShowSuccess(false), 5000);
-      }
-      
-    } catch (error) {
-      console.error('Album creation error:', error);
-      alert(`Failed to create album: ${error.message}`);
-    } finally {
-      setIsCreating(false);
+    } catch (err) {
+      setError(err.response?.data?.detail || 'Failed to upload reference photos');
+      setLoading(false);
+      setProgress(0);
     }
   };
 
+  // ============================================================================
+  // STEP 2: EVENT PHOTOS
+  // ============================================================================
+  
+  const handleEventFilesChange = (e) => {
+    const files = Array.from(e.target.files);
+    
+    if (files.length > 1000) {
+      setError('Maximum 1000 event photos allowed');
+      return;
+    }
+    
+    setEventFiles(files);
+    setError(null);
+  };
+  
+  const uploadEvents = async () => {
+    if (eventFiles.length === 0) {
+      setError('Please select event photos');
+      return;
+    }
+    
+    setLoading(true);
+    setError(null);
+    setProgress(0);
+    
+    try {
+      const token = localStorage.getItem('authToken');
+      const formData = new FormData();
+      formData.append('session_id', sessionId);
+      formData.append('compress', compressPhotos);
+      
+      // Add files with progress tracking
+      for (let i = 0; i < eventFiles.length; i++) {
+        formData.append('files', eventFiles[i]);
+        setProgress(Math.round(((i + 1) / eventFiles.length) * 80));
+      }
+      
+      setProgress(90);
+      
+      await axios.post(`${API_BASE}/upload-events`, formData, {
+        headers: { 
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'multipart/form-data'
+        }
+      });
+      
+      setProgress(100);
+      setSuccess(`Uploaded ${eventFiles.length} event photo(s) successfully!`);
+      
+      // Move to step 3
+      setTimeout(() => {
+        setCurrentStep(3);
+        setSuccess(null);
+        setProgress(0);
+        setLoading(false);
+      }, 1000);
+      
+    } catch (err) {
+      setError(err.response?.data?.detail || 'Failed to upload event photos');
+      setLoading(false);
+      setProgress(0);
+    }
+  };
+
+  // ============================================================================
+  // STEP 3: BUILD ALBUMS
+  // ============================================================================
+  
+  const buildAlbums = async () => {
+    setLoading(true);
+    setError(null);
+    setProgress(0);
+    
+    try {
+      const token = localStorage.getItem('authToken');
+      
+      const formData = new FormData();
+      formData.append('session_id', sessionId);
+      formData.append('person_names', JSON.stringify(personNames.filter(n => n)));
+      formData.append('similarity_threshold', similarityThreshold);
+      
+      setProgress(20);
+      
+      const response = await axios.post(`${API_BASE}/build`, formData, {
+        headers: { 
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'multipart/form-data'
+        }
+      });
+      
+      setProgress(100);
+      setAlbums(response.data.data.albums);
+      setSuccess('Albums created successfully!');
+      setLoading(false);
+      
+    } catch (err) {
+      setError(err.response?.data?.detail || 'Failed to build albums');
+      setLoading(false);
+      setProgress(0);
+    }
+  };
+  
+  const downloadAlbum = async (personName) => {
+    try {
+      const token = localStorage.getItem('authToken');
+      
+      const response = await axios.get(
+        `${API_BASE}/download/${sessionId}/${encodeURIComponent(personName)}`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+          responseType: 'blob'
+        }
+      );
+      
+      // Create download link
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `${personName}_album.zip`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      
+    } catch (err) {
+      setError(`Failed to download album for ${personName}`);
+    }
+  };
+  
+  const startOver = () => {
+    setCurrentStep(1);
+    setSessionId(null);
+    setReferenceFiles([]);
+    setPersonNames(['', '', '']);
+    setEventFiles([]);
+    setAlbums({});
+    setError(null);
+    setSuccess(null);
+    setProgress(0);
+  };
+
+  // ============================================================================
+  // RENDER
+  // ============================================================================
+
   return (
-    <div className="album-builder py-4">
-      <div className="container">
-        {/* Album Viewer Modal */}
-        {viewingAlbum && (
-          <div className="modal show d-block" style={{ backgroundColor: 'rgba(0,0,0,0.8)' }} onClick={() => setViewingAlbum(null)}>
-            <div className="modal-dialog modal-xl modal-dialog-scrollable" onClick={(e) => e.stopPropagation()}>
-              <div className="modal-content">
-                <div className="modal-header">
-                  <div>
-                    <h4 className="modal-title fw-bold">{viewingAlbum.title}</h4>
-                    <p className="text-muted small mb-0">{viewingAlbum.description}</p>
-                  </div>
-                  <button type="button" className="btn-close" onClick={() => setViewingAlbum(null)}></button>
-                </div>
-                <div className="modal-body">
-                  {/* Highlights Album */}
-                  {viewingAlbum.highlights && viewingAlbum.highlights.count > 0 && (
-                    <div className="mb-5">
-                      <div className="d-flex justify-content-between align-items-center mb-3">
-                        <h5 className="fw-bold mb-0">✨ Highlights ({viewingAlbum.highlights.count} photos)</h5>
-                        <button 
-                          className="btn btn-sm btn-success"
-                          onClick={() => {
-                            const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
-                            const token = localStorage.getItem('token') || 
-                                        localStorage.getItem('mock_user') ? 'mock-jwt-token-client' : null;
-                            if (token) {
-                              window.open(`${API_URL}/api/albums/smart/download/highlights?token=${token}`, '_blank');
-                            }
-                          }}
-                        >
-                          📥 Download ZIP
-                        </button>
-                      </div>
-                      <div className="row g-3">
-                        {viewingAlbum.highlights.photos.map((photo, idx) => (
-                          <div key={idx} className="col-md-3 col-sm-4 col-6">
-                            <img 
-                              src={`http://localhost:8000${photo}`} 
-                              alt={`Highlight ${idx + 1}`}
-                              className="img-fluid rounded w-100"
-                              style={{ height: '200px', objectFit: 'cover', cursor: 'pointer' }}
-                              onClick={() => {
-                                // Open original quality in new tab
-                                const originalPath = photo.replace('/thumbnails/', '/organized/');
-                                window.open(`http://localhost:8000${originalPath}`, '_blank');
-                              }}
-                            />
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Groups Album */}
-                  {viewingAlbum.groups && viewingAlbum.groups.count > 0 && (
-                    <div className="mb-5">
-                      <div className="d-flex justify-content-between align-items-center mb-3">
-                        <h5 className="fw-bold mb-0">👥 Groups ({viewingAlbum.groups.count} photos)</h5>
-                        <button 
-                          className="btn btn-sm btn-success"
-                          onClick={() => {
-                            const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
-                            const token = localStorage.getItem('token') || 
-                                        localStorage.getItem('mock_user') ? 'mock-jwt-token-client' : null;
-                            if (token) {
-                              window.open(`${API_URL}/api/albums/smart/download/groups?token=${token}`, '_blank');
-                            }
-                          }}
-                        >
-                          📥 Download ZIP
-                        </button>
-                      </div>
-                      <div className="row g-3">
-                        {viewingAlbum.groups.photos.map((photo, idx) => (
-                          <div key={idx} className="col-md-3 col-sm-4 col-6">
-                            <img 
-                              src={`http://localhost:8000${photo}`} 
-                              alt={`Group ${idx + 1}`}
-                              className="img-fluid rounded w-100"
-                              style={{ height: '200px', objectFit: 'cover', cursor: 'pointer' }}
-                              onClick={() => {
-                                const originalPath = photo.replace('/thumbnails/', '/organized/');
-                                window.open(`http://localhost:8000${originalPath}`, '_blank');
-                              }}
-                            />
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Person Albums (Solo - 1 face only) */}
-                  {viewingAlbum.persons && Object.keys(viewingAlbum.persons).length > 0 && (
-                    <div>
-                      <h5 className="fw-bold mb-3">👤 Individual People - Solo Photos ({Object.keys(viewingAlbum.persons).length} persons detected)</h5>
-                      {Object.entries(viewingAlbum.persons).map(([personName, personData]) => (
-                        <div key={personName} className="mb-4">
-                          <div className="d-flex justify-content-between align-items-center mb-3">
-                            <h6 className="fw-semibold mb-0">{personName} ({personData.count} solo photos)</h6>
-                            <button 
-                              className="btn btn-sm btn-success"
-                              onClick={() => {
-                                const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
-                                const token = localStorage.getItem('token') || 
-                                            localStorage.getItem('mock_user') ? 'mock-jwt-token-client' : null;
-                                if (token) {
-                                  window.open(`${API_URL}/api/albums/smart/download/${personName}?token=${token}`, '_blank');
-                                }
-                              }}
-                            >
-                              📥 Download ZIP
-                            </button>
-                          </div>
-                          <div className="row g-3">
-                            {personData.photos.map((photo, idx) => (
-                              <div key={idx} className="col-md-3 col-sm-4 col-6">
-                                <img 
-                                  src={`http://localhost:8000${photo}`} 
-                                  alt={`${personName} ${idx + 1}`}
-                                  className="img-fluid rounded w-100"
-                                  style={{ height: '200px', objectFit: 'cover', cursor: 'pointer' }}
-                                  onClick={() => {
-                                    const originalPath = photo.replace('/thumbnails/', '/organized/');
-                                    window.open(`http://localhost:8000${originalPath}`, '_blank');
-                                  }}
-                                />
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Success Banner */}
-        {showSuccess && (
-          <div className="alert alert-success alert-dismissible fade show" role="alert">
-            <h5 className="alert-heading">🎉 Album Created Successfully!</h5>
-            <p className="mb-0">Your album has been created. Scroll down to view all your albums.</p>
-            <button type="button" className="btn-close" onClick={() => setShowSuccess(false)}></button>
-          </div>
-        )}
-
-        {/* Check Existing Albums Banner */}
-        <div className="alert alert-info alert-dismissible fade show" role="alert">
-          <strong>💡 Tip:</strong> If you previously created albums and they're not showing, click here to load them:
-          <button 
-            className="btn btn-sm btn-primary ms-2"
-            onClick={async () => {
-              try {
-                const userRole = localStorage.getItem('userRole');
-                const token = userRole ? `mock-jwt-token-${userRole}` : null;
-                if (!token) { alert('Please login first'); return; }
-                
-                const response = await fetch('http://localhost:8000/api/albums/smart/albums', {
-                  headers: { 'Authorization': `Bearer ${token}` }
-                });
-                const data = await response.json();
-                
-                if (data.success && data.data) {
-                  const backendAlbum = {
-                    id: Date.now(),
-                    title: 'My Smart Album',
-                    description: 'AI-organized photos',
-                    category: selectedCategory,
-                    createdAt: new Date().toISOString(),
-                    highlights: data.data.highlights,
-                    persons: data.data.persons,
-                    totalAlbums: data.data.total_albums
-                  };
-                  
-                  const existingAlbums = JSON.parse(localStorage.getItem('userAlbums') || '[]');
-                  existingAlbums.push(backendAlbum);
-                  localStorage.setItem('userAlbums', JSON.stringify(existingAlbums));
-                  setCreatedAlbums(existingAlbums);
-                  alert('✅ Albums loaded successfully!');
-                } else {
-                  alert('No albums found');
-                }
-              } catch (error) {
-                alert('Error: ' + error.message);
-              }
-            }}
-          >
-            Load My Albums
-          </button>
-          <button type="button" className="btn-close" onClick={(e) => e.target.closest('.alert').remove()}></button>
+    <Container className="album-builder-container mt-5">
+      <h2 className="text-center mb-4">📸 Smart Album Builder</h2>
+      
+      {/* Progress Steps */}
+      <div className="steps-progress mb-4">
+        <div className="d-flex justify-content-between mb-2">
+          <Badge bg={currentStep >= 1 ? 'primary' : 'secondary'}>
+            Step 1: Reference Photos
+          </Badge>
+          <Badge bg={currentStep >= 2 ? 'primary' : 'secondary'}>
+            Step 2: Event Photos
+          </Badge>
+          <Badge bg={currentStep >= 3 ? 'primary' : 'secondary'}>
+            Step 3: Build Albums
+          </Badge>
         </div>
+        <ProgressBar 
+          now={(currentStep / 3) * 100} 
+          variant="primary"
+        />
+      </div>
 
-        {/* Header */}
-        <div className="gradient-header rounded-3 p-4 mb-4">
-          <div className="row align-items-center">
-            <div className="col-md-8">
-              <h1 className="fw-bold mb-2">🎨 Smart Album Builder</h1>
-              <p className="mb-0">Upload, organize, and create beautiful photo albums for your special memories</p>
-            </div>
-            <div className="col-md-4 text-md-end">
-              <div className="text-white mb-2">
-                <div className="small opacity-75">Album Progress</div>
-                <div className="h5 fw-bold">{selectedImages.length} Photos Selected</div>
-              </div>
-            </div>
-          </div>
-        </div>
+      {/* Alerts */}
+      {error && <Alert variant="danger" onClose={() => setError(null)} dismissible>{error}</Alert>}
+      {success && <Alert variant="success" onClose={() => setSuccess(null)} dismissible>{success}</Alert>}
 
-        <div className="row">
-          {/* Left Sidebar - Upload & Settings */}
-          <div className="col-lg-3">
-            {/* Album Settings */}
-            <div className="card border-0 shadow-sm mb-4">
-              <div className="card-header bg-white border-0 pt-4 pb-3">
-                <h5 className="fw-bold mb-0">Album Settings</h5>
-              </div>
-              <div className="card-body">
-                <div className="mb-3">
-                  <label className="form-label fw-semibold">Album Title *</label>
-                  <input
-                    type="text"
-                    className="form-control"
-                    value={albumTitle}
-                    onChange={(e) => setAlbumTitle(e.target.value)}
-                    placeholder="My Amazing Album"
-                  />
-                </div>
-                
-                <div className="mb-3">
-                  <label className="form-label fw-semibold">Category *</label>
-                  <select 
-                    className="form-select"
-                    value={selectedCategory}
-                    onChange={(e) => setSelectedCategory(e.target.value)}
-                  >
-                    {categories.map(category => (
-                      <option key={category.id} value={category.id}>
-                        {category.icon} {category.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                
-                <div className="mb-3">
-                  <label className="form-label fw-semibold">Description</label>
-                  <textarea
-                    className="form-control"
-                    rows="3"
-                    value={albumDescription}
-                    onChange={(e) => setAlbumDescription(e.target.value)}
-                    placeholder="Describe your album..."
-                  />
-                </div>
-              </div>
-            </div>
+      {/* ========== STEP 1: REFERENCE PHOTOS ========== */}
+      {currentStep === 1 && (
+        <Card className="mb-4">
+          <Card.Body>
+            <Card.Title>Step 1: Upload Reference Photos</Card.Title>
+            <Card.Text className="text-muted">
+              Upload 3-5 clear photos of people you want to find in the event photos.
+              Each photo should contain only ONE person's face.
+            </Card.Text>
 
-            {/* Upload Area */}
-            <div className="card border-0 shadow-sm mb-4">
-              <div className="card-header bg-white border-0 pt-4 pb-3">
-                <h5 className="fw-bold mb-0">Upload Photos</h5>
-              </div>
-              <div className="card-body">
-                <div 
-                  className="upload-zone"
-                  onDrop={handleDrop}
-                  onDragOver={handleDragOver}
-                  onClick={() => fileInputRef.current?.click()}
-                >
-                  <div className="text-center">
-                    <div className="mb-3" style={{ fontSize: '3rem' }}>📤</div>
-                    <h6 className="fw-semibold mb-2">Drag & Drop Photos Here</h6>
-                    <p className="text-muted small mb-3">or click to browse files</p>
-                    <button className="btn btn-primary btn-sm">
-                      Choose Files
-                    </button>
-                    <input
-                      ref={fileInputRef}
-                      type="file"
-                      multiple
-                      accept="image/*"
-                      onChange={handleFileUpload}
-                      className="d-none"
+            <Form.Group className="mb-3">
+              <Form.Label>Select Reference Photos (3-5)</Form.Label>
+              <Form.Control
+                type="file"
+                accept="image/*"
+                multiple
+                onChange={handleReferenceFilesChange}
+                disabled={loading}
+              />
+              <Form.Text className="text-muted">
+                JPG, PNG - Clear face shots only
+              </Form.Text>
+            </Form.Group>
+
+            {referenceFiles.length > 0 && (
+              <div className="reference-names">
+                <h6>Enter Person Names:</h6>
+                {referenceFiles.map((file, index) => (
+                  <Form.Group key={index} className="mb-2">
+                    <Form.Label>{file.name}</Form.Label>
+                    <Form.Control
+                      type="text"
+                      placeholder={`Person ${index + 1} name`}
+                      value={personNames[index] || ''}
+                      onChange={(e) => handlePersonNameChange(index, e.target.value)}
+                      disabled={loading}
                     />
-                  </div>
-                </div>
-                
-                {uploadedImages.length > 0 && (
-                  <div className="mt-3 text-center">
-                    <div className="alert alert-success py-2 mb-0">
-                      <strong>{uploadedImages.length}</strong> photos uploaded
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Create Album Button - Sticky */}
-            <div className="position-sticky" style={{ bottom: '20px', zIndex: 1000 }}>
-              <button 
-                className="btn btn-primary w-100 btn-lg shadow-lg"
-                onClick={createAlbum}
-                disabled={isCreating || selectedImages.length === 0}
-              >
-                {isCreating ? (
-                  <>
-                    <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
-                    AI Processing (ResNet-50)...
-                    <div className="small mt-1">This may take 2-3 minutes for {selectedImages.length} photos</div>
-                  </>
-                ) : (
-                  <>
-                    🤖 Create AI Albums ({selectedImages.length})
-                  </>
-                )}
-              </button>
-              {selectedImages.length > 0 && !isCreating && (
-                <div className="alert alert-info mt-2 small mb-0">
-                  <strong>🧠 ResNet-50 will:</strong><br/>
-                  • Detect faces in photos<br/>
-                  • Group by individual people<br/>
-                  • Select best highlights
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Main Content - Album Preview */}
-          <div className="col-lg-9">
-            {/* Album Preview */}
-            <div className="card border-0 shadow-sm">
-              <div className="card-header bg-white border-0 pt-4 pb-3">
-                <div className="d-flex justify-content-between align-items-center">
-                  <h5 className="fw-bold mb-0">Album Preview</h5>
-                  <div className="d-flex gap-2">
-                    <span className="badge bg-primary">
-                      {categories.find(c => c.id === selectedCategory)?.icon} {categories.find(c => c.id === selectedCategory)?.name}
-                    </span>
-                    {selectedImages.length > 0 && (
-                      <span className="badge bg-success">
-                        {selectedImages.length} photos
-                      </span>
-                    )}
-                  </div>
-                </div>
-              </div>
-              <div className="card-body p-4">
-                {uploadedImages.length === 0 ? (
-                  <div className="text-center py-5">
-                    <div className="mb-4" style={{ fontSize: '4rem' }}>🖼️</div>
-                    <h4 className="fw-bold mb-3">No Photos Uploaded</h4>
-                    <p className="text-muted mb-4">Upload photos to start building your album</p>
-                    <button 
-                      className="btn btn-primary"
-                      onClick={() => fileInputRef.current?.click()}
-                    >
-                      Upload Photos
-                    </button>
-                  </div>
-                ) : (
-                  <div>
-                    {/* Selection Controls */}
-                    <div className="d-flex justify-content-between align-items-center mb-3">
-                      <div>
-                        <h5 className="fw-bold mb-0">Select photos for your album</h5>
-                        <p className="text-muted small mb-0">Click images to select/deselect • {selectedImages.length} selected</p>
-                      </div>
-                      <button 
-                        className="btn btn-outline-primary"
-                        onClick={() => {
-                          if (selectedImages.length === uploadedImages.length) {
-                            setSelectedImages([]);
-                          } else {
-                            setSelectedImages([...uploadedImages]);
-                          }
-                        }}
-                      >
-                        {selectedImages.length === uploadedImages.length ? 'Deselect All' : 'Select All'}
-                      </button>
-                    </div>
-                    
-                    {/* Image Selection Grid */}
-                    <div className="row g-3">
-                      {uploadedImages.map((image, index) => (
-                        <div 
-                          key={image.id}
-                          className="col-md-3 col-sm-4 col-6"
-                          onClick={() => selectImage(image)}
-                          style={{ cursor: 'pointer' }}
-                        >
-                          <div className="position-relative">
-                            <img 
-                              src={image.url}
-                              alt={image.name}
-                              className="img-fluid rounded w-100"
-                              style={{ 
-                                height: '200px', 
-                                objectFit: 'cover',
-                                border: selectedImages.find(img => img.id === image.id) 
-                                  ? '4px solid var(--primary-blue)' 
-                                  : '2px solid #e0e0e0',
-                                transition: 'all 0.2s ease'
-                              }}
-                            />
-                            {/* Selection Indicator */}
-                            {selectedImages.find(img => img.id === image.id) && (
-                              <div className="position-absolute top-0 end-0 m-2">
-                                <div className="bg-primary text-white rounded-circle d-flex align-items-center justify-content-center" 
-                                     style={{ width: '32px', height: '32px', fontWeight: 'bold' }}>
-                                  ✓
-                                </div>
-                              </div>
-                            )}
-                            {/* Delete Button */}
-                            <div className="position-absolute top-0 start-0 m-2">
-                              <button 
-                                className="btn btn-sm btn-danger"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  removeImage(image.id);
-                                }}
-                                style={{ borderRadius: '50%', width: '32px', height: '32px', padding: '0' }}
-                              >
-                                ✕
-                              </button>
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                    
-                    {/* Album Stats */}
-                    <div className="mt-4 p-3 bg-light rounded">
-                      <div className="row text-center">
-                        <div className="col-4">
-                          <div className="fw-bold text-primary">{selectedImages.length}</div>
-                          <div className="small text-muted">Photos</div>
-                        </div>
-                        <div className="col-4">
-                          <div className="fw-bold text-primary">
-                            {selectedImages.reduce((sum, img) => sum + img.size, 0) > 0 ? 
-                              formatFileSize(selectedImages.reduce((sum, img) => sum + img.size, 0)) : 
-                              '0 KB'
-                            }
-                          </div>
-                          <div className="small text-muted">Total Size</div>
-                        </div>
-                        <div className="col-4">
-                          <div className="fw-bold text-primary">{categories.find(c => c.id === selectedCategory)?.name}</div>
-                          <div className="small text-muted">Category</div>
-                        </div>
-                      </div>
-                    </div>
-                    
-                    <div className="mt-3">
-                      <small className="text-muted">
-                        <strong>💡 Tip:</strong> Drag and drop photos to reorder them in your album.
-                      </small>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Quick Templates */}
-            {selectedImages.length > 0 && (
-              <div className="card border-0 shadow-sm mt-4">
-                <div className="card-header bg-white border-0 pt-4 pb-3">
-                  <h6 className="fw-bold mb-0">Quick Album Templates</h6>
-                </div>
-                <div className="card-body">
-                  <div className="row g-2">
-                    <div className="col-md-6">
-                      <button className="btn btn-outline-primary w-100 btn-sm">
-                        🎓 Graduation Album
-                      </button>
-                    </div>
-                    <div className="col-md-6">
-                      <button className="btn btn-outline-primary w-100 btn-sm">
-                        💑 Wedding Album
-                      </button>
-                    </div>
-                    <div className="col-md-6">
-                      <button className="btn btn-outline-primary w-100 btn-sm">
-                        👨‍👩‍👧‍👦 Family Album
-                      </button>
-                    </div>
-                    <div className="col-md-6">
-                      <button className="btn btn-outline-primary w-100 btn-sm">
-                        🏃‍♀️ Sports Album
-                      </button>
-                    </div>
-                    <div className="col-md-6">
-                      <button className="btn btn-outline-primary w-100 btn-sm">
-                        🎂 Birthday Album
-                      </button>
-                    </div>
-                    <div className="col-md-6">
-                      <button className="btn btn-outline-primary w-100 btn-sm">
-                        🏕️ Travel Album
-                      </button>
-                    </div>
-                  </div>
-                  <div className="alert alert-info small mt-3">
-                    <strong>💡 Pro Tip:</strong> Apply templates to automatically arrange and style your photos for different occasions.
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* My Albums Section */}
-        {createdAlbums.length > 0 && (
-          <div className="row mt-5">
-            <div className="col-12">
-              <div className="d-flex justify-content-between align-items-center mb-4">
-                <h3 className="fw-bold">📚 My Albums ({createdAlbums.length})</h3>
-                <button 
-                  className="btn btn-outline-danger btn-sm"
-                  onClick={async () => {
-                    if (window.confirm('Are you sure you want to delete all albums?')) {
-                      // Clear from localStorage
-                      localStorage.removeItem('userAlbums');
-                      setCreatedAlbums([]);
-                      
-                      // Clear from backend
-                      try {
-                        const token = localStorage.getItem('token') || 
-                                    (localStorage.getItem('userRole') ? `mock-jwt-token-${localStorage.getItem('userRole')}` : null) ||
-                                    (localStorage.getItem('mock_user') ? `mock-jwt-token-client` : null);
-                        
-                        if (token) {
-                          await fetch('http://localhost:8000/api/albums/smart/albums', {
-                            method: 'DELETE',
-                            headers: {
-                              'Authorization': `Bearer ${token}`
-                            }
-                          });
-                          console.log('Albums deleted from backend');
-                        }
-                      } catch (err) {
-                        console.error('Failed to delete from backend:', err);
-                      }
-                    }
-                  }}
-                >
-                  Clear All
-                </button>
-              </div>
-
-              <div className="row g-4">
-                {createdAlbums.map((album) => (
-                  <div key={album.id} className="col-md-4 col-sm-6">
-                    <div className="card border-0 shadow-sm h-100">
-                      {/* Album Cover */}
-                      <div className="position-relative" style={{ height: '200px', overflow: 'hidden', background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' }}>
-                        <div className="w-100 h-100 d-flex flex-column align-items-center justify-content-center text-white p-3">
-                          <div style={{ fontSize: '3rem' }}>🎨</div>
-                          <h6 className="fw-bold mt-2">{album.totalAlbums} AI-Organized Albums</h6>
-                          <p className="small mb-0">
-                            {album.highlights?.count || 0} Highlights • {album.groups?.count || 0} Groups • {Object.keys(album.persons || {}).length} Solo
-                          </p>
-                        </div>
-                        <div className="position-absolute top-0 end-0 m-2">
-                          <span className="badge bg-dark bg-opacity-75">
-                            {categories.find(c => c.id === album.category)?.icon} {categories.find(c => c.id === album.category)?.name}
-                          </span>
-                        </div>
-                      </div>
-
-                      {/* Album Info */}
-                      <div className="card-body">
-                        <h5 className="fw-bold mb-2">{album.title}</h5>
-                        <p className="text-muted small mb-3">
-                          {album.description || 'AI-organized by ResNet-50 face recognition'}
-                        </p>
-                        
-                        <div className="alert alert-info py-2 small mb-3">
-                          <strong>🤖 AI Processing Complete:</strong><br/>
-                          ✨ {album.highlights?.count || 0} best photos (Highlights)<br/>
-                          👥 {album.groups?.count || 0} group photos (2+ faces)<br/>
-                          👤 {Object.keys(album.persons || {}).length} solo person albums (1 face each)
-                        </div>
-
-                        <div className="d-flex justify-content-between align-items-center mb-3">
-                          <div className="small text-muted">
-                            Created {new Date(album.createdAt).toLocaleDateString()}
-                          </div>
-                        </div>
-
-                        <div className="mt-3">
-                          <button 
-                            className="btn btn-sm btn-primary w-100 mb-2"
-                            onClick={() => setViewingAlbum(album)}
-                          >
-                            📂 View All Albums
-                          </button>
-                          <button 
-                            className="btn btn-sm btn-outline-danger w-100"
-                            onClick={async () => {
-                              if (window.confirm(`Delete "${album.title}"?`)) {
-                                // Clear from localStorage
-                                const updatedAlbums = createdAlbums.filter(a => a.id !== album.id);
-                                localStorage.setItem('userAlbums', JSON.stringify(updatedAlbums));
-                                setCreatedAlbums(updatedAlbums);
-                                
-                                // Clear from backend
-                                try {
-                                  const token = localStorage.getItem('token') || 
-                                              (localStorage.getItem('userRole') ? `mock-jwt-token-${localStorage.getItem('userRole')}` : null) ||
-                                              (localStorage.getItem('mock_user') ? `mock-jwt-token-client` : null);
-                                  
-                                  if (token) {
-                                    await fetch('http://localhost:8000/api/albums/smart/albums', {
-                                      method: 'DELETE',
-                                      headers: {
-                                        'Authorization': `Bearer ${token}`
-                                      }
-                                    });
-                                  }
-                                } catch (err) {
-                                  console.error('Failed to delete from backend:', err);
-                                }
-                              }
-                            }}
-                          >
-                            Delete
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
+                  </Form.Group>
                 ))}
               </div>
+            )}
+
+            {loading && <ProgressBar now={progress} className="mb-3" />}
+
+            <Button
+              variant="primary"
+              onClick={uploadReferences}
+              disabled={loading || referenceFiles.length < 3}
+              className="w-100"
+            >
+              {loading ? 'Uploading...' : 'Next: Upload Event Photos →'}
+            </Button>
+          </Card.Body>
+        </Card>
+      )}
+
+      {/* ========== STEP 2: EVENT PHOTOS ========== */}
+      {currentStep === 2 && (
+        <Card className="mb-4">
+          <Card.Body>
+            <Card.Title>Step 2: Upload Event Photos</Card.Title>
+            <Card.Text className="text-muted">
+              Upload all photos from the event (60-1000 photos typically).
+              The system will compress them to ~1MB each for faster processing.
+            </Card.Text>
+
+            <Form.Group className="mb-3">
+              <Form.Label>Select Event Photos</Form.Label>
+              <Form.Control
+                type="file"
+                accept="image/*"
+                multiple
+                onChange={handleEventFilesChange}
+                disabled={loading}
+              />
+              <Form.Text className="text-muted">
+                JPG, PNG - Up to 1000 photos
+              </Form.Text>
+            </Form.Group>
+
+            {eventFiles.length > 0 && (
+              <Alert variant="info">
+                Selected: <strong>{eventFiles.length}</strong> photos
+                ({(eventFiles.reduce((sum, f) => sum + f.size, 0) / (1024 * 1024)).toFixed(2)} MB)
+              </Alert>
+            )}
+
+            <Form.Group className="mb-3">
+              <Form.Check
+                type="checkbox"
+                label="Compress photos to ~1MB (recommended)"
+                checked={compressPhotos}
+                onChange={(e) => setCompressPhotos(e.target.checked)}
+                disabled={loading}
+              />
+            </Form.Group>
+
+            {loading && <ProgressBar now={progress} className="mb-3" />}
+
+            <div className="d-flex gap-2">
+              <Button
+                variant="secondary"
+                onClick={() => setCurrentStep(1)}
+                disabled={loading}
+              >
+                ← Back
+              </Button>
+              <Button
+                variant="primary"
+                onClick={uploadEvents}
+                disabled={loading || eventFiles.length === 0}
+                className="flex-grow-1"
+              >
+                {loading ? 'Uploading...' : 'Next: Build Albums →'}
+              </Button>
             </div>
-          </div>
-        )}
-      </div>
-    </div>
+          </Card.Body>
+        </Card>
+      )}
+
+      {/* ========== STEP 3: BUILD ALBUMS ========== */}
+      {currentStep === 3 && Object.keys(albums).length === 0 && (
+        <Card className="mb-4">
+          <Card.Body>
+            <Card.Title>Step 3: Build Albums</Card.Title>
+            <Card.Text className="text-muted">
+              Ready to create personalized albums using AI face recognition!
+            </Card.Text>
+
+            <div className="mb-4">
+              <h6>Reference Photos:</h6>
+              <ListGroup>
+                {personNames.filter(n => n).map((name, index) => (
+                  <ListGroup.Item key={index}>
+                    {index + 1}. {name}
+                  </ListGroup.Item>
+                ))}
+              </ListGroup>
+            </div>
+
+            <Form.Group className="mb-3">
+              <Form.Label>
+                Similarity Threshold: <strong>{similarityThreshold.toFixed(2)}</strong>
+              </Form.Label>
+              <Form.Range
+                min={0.55}
+                max={0.70}
+                step={0.01}
+                value={similarityThreshold}
+                onChange={(e) => setSimilarityThreshold(parseFloat(e.target.value))}
+                disabled={loading}
+              />
+              <Form.Text className="text-muted">
+                Lower = More matches (less strict), Higher = Fewer matches (more strict)
+              </Form.Text>
+            </Form.Group>
+
+            {loading && (
+              <>
+                <ProgressBar now={progress} className="mb-3" />
+                <p className="text-center text-muted">
+                  Processing... This may take 1-2 minutes for 60 photos
+                </p>
+              </>
+            )}
+
+            <div className="d-flex gap-2">
+              <Button
+                variant="secondary"
+                onClick={() => setCurrentStep(2)}
+                disabled={loading}
+              >
+                ← Back
+              </Button>
+              <Button
+                variant="success"
+                onClick={buildAlbums}
+                disabled={loading}
+                className="flex-grow-1"
+              >
+                {loading ? 'Building Albums...' : '✨ Create Albums'}
+              </Button>
+            </div>
+          </Card.Body>
+        </Card>
+      )}
+
+      {/* ========== RESULTS ========== */}
+      {Object.keys(albums).length > 0 && (
+        <Card className="mb-4">
+          <Card.Body>
+            <Card.Title>✅ Albums Created Successfully!</Card.Title>
+
+            <ListGroup className="mb-3">
+              {Object.entries(albums).map(([personName, count]) => (
+                <ListGroup.Item 
+                  key={personName}
+                  className="d-flex justify-content-between align-items-center"
+                >
+                  <div>
+                    <strong>{personName}</strong>
+                    <Badge bg="info" className="ms-2">{count} photos</Badge>
+                  </div>
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    onClick={() => downloadAlbum(personName)}
+                  >
+                    Download ZIP
+                  </Button>
+                </ListGroup.Item>
+              ))}
+            </ListGroup>
+
+            <Button
+              variant="secondary"
+              onClick={startOver}
+              className="w-100"
+            >
+              Create Another Album
+            </Button>
+          </Card.Body>
+        </Card>
+      )}
+    </Container>
   );
-};
+}
 
 export default AlbumBuilder;

@@ -1,0 +1,22 @@
+# Album Builder Fresh Implementation Dependencies
+# Install with: pip install -r backend/requirements-album-builder-fresh.txt
+
+# Core image processing (should already be installed)
+opencv-python>=4.10.0
+Pillow>=10.2.0  
+numpy>=2.0.0
+
+# Face recognition engine
+insightface>=0.7.3
+onnxruntime>=1.16.0
+
+# OPTIONAL: GPU acceleration (uncomment if you have NVIDIA GPU)
+# onnxruntime-gpu>=1.16.0
+
+# Development/testing  
+pytest>=7.4.0
+
+# Note: These should already be installed from main requirements.txt:
+# - fastapi>=0.104.1
+# - uvicorn[standard]>=0.24.0
+# - python-dotenv>=1.0.0

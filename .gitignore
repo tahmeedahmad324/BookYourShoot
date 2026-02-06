@@ -19,5 +19,47 @@ backend/storage/reels/uploads/
 backend/storage/reels/
 !backend/storage/reels/.gitkeep
 !backend/storage/reels/.gitignore
-backend/storage
+backend/storage/
+backend/backend/storage/
+
+# Album Builder temp files
+album_session_*/
+**/album_session_*/
+processed/
+references/
+events/
+
+# Image uploads and test files (exclude from entire repo except public/)
+*.jpg
+*.jpeg
+*.png
+*.gif
+*.bmp
+*.webp
+*.tiff
+*.svg
+*.HEIC
+*.heic
+*.raw
+*.RAW
+# But allow public folder images (UI assets)
+!public/**/*.jpg
+!public/**/*.jpeg
+!public/**/*.png
+!public/**/*.gif
+!public/**/*.svg
+!public/**/*.webp
+# Allow build folder images
+!build/**/*.jpg
+!build/**/*.png
+!build/**/*.svg
+
+# Temporary and test images
+uploads/
+test_images/
+temp_images/
+sample_images/
+**/temp/
+**/tmp/
+
 .env.example

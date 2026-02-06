@@ -1,8 +1,0 @@
-# Ignore all video files
-*.mp4
-*.mov
-*.avi
-
-# But keep the directory structure
-!.gitkeep
-!.gitignore
