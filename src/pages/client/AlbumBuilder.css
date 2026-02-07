@@ -1,0 +1,129 @@
+/* Album Builder CSS */
+
+.album-builder-container {
+  background: linear-gradient(120deg, #f8f9fa 0%, #e9ecef 100%);
+  min-height: 100vh;
+}
+
+.album-builder-container .card {
+  border: none;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  border-radius: 12px;
+}
+
+.album-builder-container .card-header {
+  border-radius: 12px 12px 0 0 !important;
+  font-weight: 600;
+}
+
+.album-builder-container .btn-primary {
+  background: linear-gradient(45deg, #007bff, #0056b3);
+  border: none;
+  border-radius: 8px;
+  padding: 10px 20px;
+  transition: all 0.3s ease;
+}
+
+.album-builder-container .btn-primary:hover {
+  background: linear-gradient(45deg, #0056b3, #003d82);
+  transform: translateY(-1px);
+}
+
+.album-builder-container .btn-success {
+  background: linear-gradient(45deg, #28a745, #1e7e34);
+  border: none;
+  border-radius: 8px;
+}
+
+.album-builder-container .progress {
+  height: 12px;
+  border-radius: 6px;
+}
+
+.album-builder-container .alert {
+  border: none;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.album-builder-container .form-control {
+  border-radius: 6px;
+  border: 1px solid #dee2e6;
+  transition: border-color 0.3s ease;
+}
+
+.album-builder-container .form-control:focus {
+  border-color: #007bff;
+  box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+}
+
+.album-builder-container .badge {
+  font-size: 0.75em;
+  border-radius: 4px;
+}
+
+.album-builder-container .list-group-item {
+  border: 1px solid #dee2e6;
+  border-radius: 6px !important;
+  margin-bottom: 2px;
+}
+
+.album-builder-container .spinner-border-sm {
+  width: 1rem;
+  height: 1rem;
+}
+
+/* Step indicators */
+.step-indicator {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 2rem;
+}
+
+.step-indicator .step {
+  position: relative;
+  padding: 10px 20px;
+  background: #f8f9fa;
+  border-radius: 20px;
+  margin: 0 10px;
+  color: #6c757d;
+  transition: all 0.3s ease;
+}
+
+.step-indicator .step.active {
+  background: #007bff;
+  color: white;
+}
+
+.step-indicator .step.completed {
+  background: #28a745;
+  color: white;
+}
+
+/* Animation classes */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.album-builder-container .card {
+  animation: fadeIn 0.5s ease-out;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .album-builder-container .container-fluid {
+    padding: 10px;
+  }
+  
+  .step-indicator {
+    flex-direction: column;
+    align-items: center;
+  }
+  
+  .step-indicator .step {
+    margin: 5px 0;
+    width: 200px;
+    text-align: center;
+  }
+}

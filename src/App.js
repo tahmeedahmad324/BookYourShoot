@@ -34,7 +34,7 @@ import BookingSuccess from "./pages/client/BookingSuccess"
 import ClientBookings from "./pages/client/ClientBookings"
 import ClientChat from "./pages/client/ClientChat"
 import ReviewSubmission from "./pages/client/ReviewSubmission"
-import AlbumBuilder from "./pages/client/AlbumBuilder"
+import AlbumBuilderFresh from "./pages/client/AlbumBuilderFresh"
 import ReelGenerator from "./pages/client/ReelGenerator"
 import MusicDiscoveryUI from "./pages/client/MusicDiscoveryUI"
 import PaymentTestPage from "./pages/PaymentTestPage"
@@ -201,7 +201,7 @@ function App() {
                 path="/client/album-builder"
                 element={
                   <ProtectedRoute allowedRoles={["client"]}>
-                    <AlbumBuilder />
+                    <AlbumBuilderFresh />
                   </ProtectedRoute>
                 }
               />

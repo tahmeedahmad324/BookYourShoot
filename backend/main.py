@@ -41,6 +41,7 @@ from backend.routers import (
     payments,
     payouts,
     albums,
+    album_builder,  # Fresh Album Builder Implementation
     notifications,
     jobs,
     settings,
@@ -121,6 +122,7 @@ app.include_router(reels.router, prefix="/api")
 app.include_router(payments.router, prefix="/api")
 app.include_router(payouts.router, prefix="/api")
 app.include_router(albums.router, prefix="/api")
+app.include_router(album_builder.router, prefix="/api")  # Fresh Album Builder
 app.include_router(notifications.router, prefix="/api")
 app.include_router(jobs.router, prefix="/api")
 app.include_router(settings.router, prefix="/api")
@@ -152,6 +154,7 @@ def root():
             "payments": "/api/payments",
             "payouts": "/api/payouts",
             "albums": "/api/albums",
+            "album-builder": "/api/album-builder",
             "notifications": "/api/notifications",
             "jobs": "/api/jobs",
             "settings": "/api/settings",
