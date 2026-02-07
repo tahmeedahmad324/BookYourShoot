@@ -60,22 +60,60 @@ def get_current_user(authorization: Optional[str] = Header(None)):
 
         # Fetch user role and profile from our database
         try:
-            db_user_resp = supabase.table("users").select("*").eq("id", user_id).single().execute()
-            db_user = db_user_resp.data if db_user_resp.data else None
+            db_user_resp = supabase.table("users").select("*").eq("id", user_id).limit(1).execute()
+            db_user = db_user_resp.data[0] if db_user_resp.data and len(db_user_resp.data) > 0 else None
             
             if not db_user:
                 # User authenticated with Supabase but not in our database
-                raise HTTPException(status_code=403, detail="User profile not found. Please complete registration.")
+                # Automatically create the user record to fix this state (Self-Healing)
+                print(f"⚠️  User {user_id} exists in Supabase but missing in DB. Auto-creating user record.")
+                
+                new_user_role = 'client'  # Default role
+                
+                try:
+                    # Insert new user into our database
+                    # Use provided metadata or defaults - safely access user_metadata
+                    display_name = None
+                    if hasattr(supabase_user, 'user_metadata') and supabase_user.user_metadata:
+                        display_name = supabase_user.user_metadata.get('full_name')
+                    if not display_name:
+                         display_name = user_email.split('@')[0] if user_email else 'User'
+                         
+                    new_user_data = {
+                        "id": user_id,
+                        "email": user_email,
+                        "full_name": display_name,
+                        "role": new_user_role
+                    }
+                    
+                    supabase.table("users").insert(new_user_data).execute()
+                    print(f"✅ Auto-created user record for {user_email}")
+                    
+                    # Return the new user object
+                    return {
+                        'id': user_id,
+                        'email': user_email,
+                        'role': new_user_role,
+                        'full_name': new_user_data['full_name'],
+                        'phone': None,
+                        'city': None
+                    }
+                    
+                except Exception as create_error:
+                    print(f"❌ Failed to auto-create user: {str(create_error)}")
+                    # If auto-creation fails, we have to deny access
+                    raise HTTPException(status_code=403, detail="User profile not found and auto-creation failed. Please contact support.")
             
-            # Return combined user object with role from database
+            # User exists in database - return their data
             return {
-                'id': user_id,
-                'email': user_email,
+                'id': db_user.get('id'),
+                'email': db_user.get('email'),
                 'role': db_user.get('role', 'client'),
                 'full_name': db_user.get('full_name'),
                 'phone': db_user.get('phone'),
                 'city': db_user.get('city')
             }
+
         except HTTPException:
             raise
         except Exception as db_error:

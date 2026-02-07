@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 
-const API_BASE = 'http://localhost:5000/api';
+const API_BASE = process.env.REACT_APP_API_URL || 'http://localhost:8000';
 
 /**
  * NotificationDropdown Component
@@ -35,9 +35,9 @@ const NotificationDropdown = ({ userId }) => {
 
   const loadNotifications = async () => {
     if (!userId) return;
-    
+
     try {
-      const res = await fetch(`${API_BASE}/payments/notifications/${userId}`);
+      const res = await fetch(`${API_BASE}/api/payments/notifications/${userId}`);
       const data = await res.json();
       if (data.status === 'success') {
         setNotifications(data.notifications || []);
@@ -50,7 +50,7 @@ const NotificationDropdown = ({ userId }) => {
 
   const markAsRead = async (notificationId) => {
     try {
-      await fetch(`${API_BASE}/payments/notifications/${notificationId}/read`, {
+      await fetch(`${API_BASE}/api/payments/notifications/${notificationId}/read`, {
         method: 'POST'
       });
       loadNotifications();
@@ -62,7 +62,7 @@ const NotificationDropdown = ({ userId }) => {
   const markAllAsRead = async () => {
     if (!userId || unreadCount === 0) return;
     try {
-      await fetch(`${API_BASE}/payments/notifications/${userId}/read-all`, {
+      await fetch(`${API_BASE}/api/payments/notifications/${userId}/read-all`, {
         method: 'POST'
       });
       loadNotifications();
@@ -128,7 +128,7 @@ const NotificationDropdown = ({ userId }) => {
       </button>
 
       {isOpen && (
-        <div 
+        <div
           className="dropdown-menu show shadow-lg"
           style={{
             position: 'absolute',
@@ -176,8 +176,8 @@ const NotificationDropdown = ({ userId }) => {
                         <small className="text-muted">{formatTime(notif.created_at)}</small>
                       </div>
                       <p className="mb-0 small text-muted" style={{ lineHeight: 1.3 }}>
-                        {notif.message.length > 80 
-                          ? notif.message.substring(0, 80) + '...' 
+                        {notif.message.length > 80
+                          ? notif.message.substring(0, 80) + '...'
                           : notif.message}
                       </p>
                       {notif.amount && (

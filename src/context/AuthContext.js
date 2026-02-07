@@ -17,44 +17,63 @@ export const AuthProvider = ({ children }) => {
   const [session, setSession] = useState(null);
 
   // Fetch user profile from our database
-  const fetchUserProfile = async (userId) => {
+  // sessionParam is optional - if provided, use it directly instead of calling getSession()
+  const fetchUserProfile = async (userId, sessionParam = null) => {
+    console.log('[AuthContext] fetchUserProfile called for userId:', userId);
     try {
       const API_BASE = process.env.REACT_APP_API_URL || "http://localhost:8000";
-      
-      // Get auth token for authenticated request
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session?.access_token) {
-        console.warn('No session token available');
+
+      // Use provided session or get it from Supabase
+      let accessToken;
+      if (sessionParam?.access_token) {
+        console.log('[AuthContext] Using provided session');
+        accessToken = sessionParam.access_token;
+      } else {
+        // Get auth token for authenticated request - only if session not provided
+        console.log('[AuthContext] Getting session from Supabase...');
+        const { data: { session } } = await supabase.auth.getSession();
+        console.log('[AuthContext] Session received:', session ? 'yes' : 'no');
+        accessToken = session?.access_token;
+      }
+
+      if (!accessToken) {
+        console.warn('[AuthContext] No session token available');
         return null;
       }
-      
+
       // Use /me endpoint which requires authentication
+      console.log('[AuthContext] Fetching profile from:', `${API_BASE}/api/profile/me`);
       const response = await fetch(`${API_BASE}/api/profile/me`, {
         headers: {
-          'Authorization': `Bearer ${session.access_token}`
+          'Authorization': `Bearer ${accessToken}`
         }
       });
-      
+      console.log('[AuthContext] Profile fetch response status:', response.status);
+
       if (!response.ok) {
-        console.warn('Failed to fetch user profile from backend');
+        console.warn('[AuthContext] Failed to fetch user profile from backend');
         return null;
       }
-      
+
       const data = await response.json();
+      console.log('[AuthContext] Profile data received:', data);
       // Return user data from response (structure: {success: true, data: {user: {...}, photographer_profile: {...}}})
       return data.data?.user || null;
     } catch (error) {
-      console.error('Error fetching user profile:', error);
+      console.error('[AuthContext] Error fetching user profile:', error);
       return null;
     }
   };
 
   useEffect(() => {
+    console.log('[AuthContext] useEffect initializing...');
+
     // Check for mock user first
     const mockUserData = localStorage.getItem('mock_user');
     if (mockUserData) {
       try {
         const mockUser = JSON.parse(mockUserData);
+        console.log('[AuthContext] Found mock_user in localStorage:', mockUser);
         setUser(mockUser);
         setLoading(false);
         return;
@@ -62,14 +81,15 @@ export const AuthProvider = ({ children }) => {
         localStorage.removeItem('mock_user');
       }
     }
-    
+
     // Check for alternative auth storage (userRole, userId, userName)
     const userRole = localStorage.getItem('userRole');
     const userId = localStorage.getItem('userId');
     const userName = localStorage.getItem('userName');
-    
+
     if (userRole && userId) {
       // Reconstruct user from alternative storage
+      console.log('[AuthContext] Found userRole/userId in localStorage');
       setUser({
         id: userId,
         email: `${userRole}@test.com`,
@@ -80,14 +100,28 @@ export const AuthProvider = ({ children }) => {
       setLoading(false);
       return;
     }
-    
+
+    // Check for real user stored in sessionStorage (from login)
+    const realUserData = sessionStorage.getItem('real_user');
+    if (realUserData) {
+      try {
+        const realUser = JSON.parse(realUserData);
+        console.log('[AuthContext] Found real_user in sessionStorage:', realUser);
+        setUser(realUser);
+        setLoading(false);
+        // Don't return - still set up Supabase listener for session updates
+      } catch (e) {
+        sessionStorage.removeItem('real_user');
+      }
+    }
+
     // Get initial session
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
-      
+
       if (session?.user) {
         // Fetch user profile with role from our database
-        fetchUserProfile(session.user.id).then(profile => {
+        fetchUserProfile(session.user.id, session).then(profile => {
           // Only set user if profile exists (registration completed)
           if (profile && profile.role) {
             setUser({
@@ -110,10 +144,10 @@ export const AuthProvider = ({ children }) => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       console.log('Auth state changed:', event);
       setSession(session);
-      
+
       if (session?.user) {
         // Fetch complete user profile from our database
-        const profile = await fetchUserProfile(session.user.id);
+        const profile = await fetchUserProfile(session.user.id, session);
         // Only set user if profile exists (registration completed)
         if (profile && profile.role) {
           setUser({
@@ -128,7 +162,7 @@ export const AuthProvider = ({ children }) => {
       } else {
         setUser(null);
       }
-      
+
       setLoading(false);
     });
 
@@ -142,9 +176,12 @@ export const AuthProvider = ({ children }) => {
   };
 
   const login = async (userData) => {
+    console.log('[AuthContext] login() called with:', userData);
+
     // Handle both real Supabase sessions and mock accounts
     if (userData.is_mock) {
       // Mock account - set user directly
+      console.log('[AuthContext] Mock account detected, setting user');
       setUser(userData);
       // Store in BOTH formats for compatibility
       localStorage.setItem('mock_user', JSON.stringify(userData));
@@ -152,8 +189,11 @@ export const AuthProvider = ({ children }) => {
       localStorage.setItem('userId', userData.id);
       localStorage.setItem('userName', userData.full_name || userData.name || 'User');
     } else {
-      // Real Supabase session - onAuthStateChange will handle it
+      // Real Supabase session - set user and persist in sessionStorage
+      console.log('[AuthContext] Real account, setting user and storing in sessionStorage');
       setUser(userData);
+      // Store real user data temporarily to prevent loss during navigation
+      sessionStorage.setItem('real_user', JSON.stringify(userData));
     }
   };
 
@@ -167,12 +207,12 @@ export const AuthProvider = ({ children }) => {
         setUser(null);
         return;
       }
-      
+
       // Real Supabase logout
       await supabase.auth.signOut();
       setUser(null);
       setSession(null);
-      
+
       // Clear any legacy storage (backwards compatibility)
       localStorage.removeItem('user');
       localStorage.removeItem('token');

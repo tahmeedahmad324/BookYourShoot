@@ -5,6 +5,7 @@ import { yupResolver } from '@hookform/resolvers/yup';
 import * as yup from 'yup';
 import { useAuth } from '../../context/AuthContext';
 import { loginWithPassword } from '../../api/auth';
+import api from '../../services/api';
 
 // Validation schema - Password login
 const loginSchema = yup.object().shape({
@@ -29,26 +30,56 @@ const Login = () => {
   });
 
   const onSubmit = async (data) => {
+    console.log('[Login] onSubmit called with:', { email: data.email, role: data.role });
     setLoading(true);
     setServerError('');
 
     try {
       // Login with email and password (handles both mock and real accounts)
+      console.log('[Login] Calling loginWithPassword...');
       const response = await loginWithPassword(data.email, data.password);
-      
+      console.log('[Login] loginWithPassword response:', response);
+
       // If mock account, manually call login to set user
       if (response.is_mock) {
+        console.log('[Login] Mock account detected, calling login()');
         await login(response.user);
+        console.log('[Login] Navigating to:', `/${response.user.role}/dashboard`);
+        navigate(`/${response.user.role}/dashboard`);
+      } else {
+        // Real accounts: Supabase session is now set
+        // Fetch user profile from our API to get the actual role from DB
+        console.log('[Login] Real account, fetching profile from /api/profile/me...');
+        try {
+          const profileRes = await api.get('/api/profile/me');
+          console.log('[Login] Profile response:', profileRes.data);
+          const userData = profileRes.data?.data?.user;
+
+          if (userData) {
+            console.log('[Login] User data found:', userData);
+            // Set user in AuthContext BEFORE navigating
+            // This ensures ProtectedRoute sees isAuthenticated = true
+            await login(userData);
+            console.log('[Login] login() called, now navigating to:', `/${userData.role || 'client'}/dashboard`);
+            navigate(`/${userData.role || 'client'}/dashboard`);
+            console.log('[Login] navigate() called');
+          } else {
+            console.log('[Login] No user data in response, navigating to /client/dashboard');
+            navigate('/client/dashboard');
+          }
+        } catch (profileErr) {
+          console.error('[Login] Failed to fetch user profile after login:', profileErr);
+          // Fallback: navigate to client dashboard if profile fetch fails
+          console.log('[Login] Fallback: navigating to /client/dashboard');
+          navigate('/client/dashboard');
+        }
       }
-      // Real accounts are handled by Supabase onAuthStateChange in AuthContext
-      
-      // Navigate to dashboard based on role
-      const role = response.is_mock ? response.user.role : data.role;
-      navigate(`/${role}/dashboard`);
     } catch (error) {
+      console.error('[Login] Login error:', error);
       setServerError(error.message || 'Invalid email or password. Please try again.');
     } finally {
       setLoading(false);
+      console.log('[Login] onSubmit finished');
     }
   };
 
@@ -91,8 +122,8 @@ const Login = () => {
                             value={role}
                             {...register('role')}
                           />
-                          <label 
-                            className="form-check-label text-capitalize" 
+                          <label
+                            className="form-check-label text-capitalize"
                             htmlFor={`role-${role}`}
                           >
                             {role}
@@ -171,8 +202,8 @@ const Login = () => {
                   </div>
 
                   {/* Submit Button */}
-                  <button 
-                    type="submit" 
+                  <button
+                    type="submit"
                     className="btn btn-primary w-100 py-3 mb-3"
                     disabled={loading}
                   >
@@ -191,8 +222,8 @@ const Login = () => {
                 <div className="text-center mt-4">
                   <p className="mb-0">
                     Don't have an account?{' '}
-                    <Link 
-                      to="/register" 
+                    <Link
+                      to="/register"
                       className="text-primary text-decoration-none fw-semibold"
                       onClick={() => window.scrollTo(0, 0)}
                     >
