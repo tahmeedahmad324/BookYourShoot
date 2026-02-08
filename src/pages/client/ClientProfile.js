@@ -7,17 +7,32 @@ import { useAuth } from "../../context/AuthContext"
 const ClientProfile = () => {
   const { user } = useAuth()
   const fileInputRef = useRef(null)
-  
-  // Profile state
+
+  // Profile state - initialize from AuthContext user data
   const [profile, setProfile] = useState({
-    fullName: user?.name || "John Doe",
-    email: user?.email || "john@example.com",
-    phone: "+92-300-1234567",
-    city: "Lahore",
-    bio: "Photography enthusiast looking for talented photographers for family events and special occasions.",
-    profileImage: null,
-    memberSince: "November 2024",
+    fullName: user?.full_name || user?.name || "Not set",
+    email: user?.email || "Not set",
+    phone: user?.phone || "Not set",
+    city: user?.city || "Not set",
+    bio: user?.bio || "No bio added yet.",
+    profileImage: user?.profile_picture_url || null,
+    memberSince: user?.created_at ? new Date(user.created_at).toLocaleDateString('en-US', { month: 'long', year: 'numeric' }) : "Recently joined",
   })
+
+  // Update profile when user data changes
+  useEffect(() => {
+    if (user) {
+      setProfile({
+        fullName: user.full_name || user.name || "Not set",
+        email: user.email || "Not set",
+        phone: user.phone || "Not set",
+        city: user.city || "Not set",
+        bio: user.bio || "No bio added yet.",
+        profileImage: user.profile_picture_url || null,
+        memberSince: user.created_at ? new Date(user.created_at).toLocaleDateString('en-US', { month: 'long', year: 'numeric' }) : "Recently joined",
+      })
+    }
+  }, [user])
 
   // Edit mode states
   const [isEditing, setIsEditing] = useState(false)
@@ -127,15 +142,15 @@ const ClientProfile = () => {
   const calculateCompleteness = () => {
     let completed = 0
     const fields = [
-      profile.fullName,
-      profile.email,
-      profile.phone,
-      profile.city,
-      profile.bio,
+      profile.fullName && profile.fullName !== "Not set",
+      profile.email && profile.email !== "Not set",
+      profile.phone && profile.phone !== "Not set",
+      profile.city && profile.city !== "Not set",
+      profile.bio && profile.bio !== "No bio added yet.",
       profile.profileImage,
     ]
     fields.forEach((field) => {
-      if (field && field.length > 0) completed++
+      if (field) completed++
     })
     return Math.round((completed / fields.length) * 100)
   }
@@ -174,17 +189,17 @@ const ClientProfile = () => {
   // Handle password change
   const handlePasswordChange = () => {
     setPasswordError("")
-    
+
     if (passwordData.newPassword.length < 8) {
       setPasswordError("Password must be at least 8 characters long")
       return
     }
-    
+
     if (passwordData.newPassword !== passwordData.confirmPassword) {
       setPasswordError("Passwords do not match")
       return
     }
-    
+
     // TODO: API call to change password
     setShowPasswordModal(false)
     setPasswordData({ currentPassword: "", newPassword: "", confirmPassword: "" })
@@ -420,7 +435,7 @@ const ClientProfile = () => {
                 {activeTab === "personal" && (
                   <div className="fade-in">
                     <h5 className="fw-bold mb-4">Personal Information</h5>
-                    
+
                     <div className="row g-3">
                       <div className="col-md-6">
                         <label className="form-label fw-semibold">Full Name</label>
@@ -437,7 +452,7 @@ const ClientProfile = () => {
                           <p className="form-control-plaintext">{profile.fullName}</p>
                         )}
                       </div>
-                      
+
                       <div className="col-md-6">
                         <label className="form-label fw-semibold">Email Address</label>
                         <p className="form-control-plaintext">
@@ -445,7 +460,7 @@ const ClientProfile = () => {
                           <span className="badge bg-success ms-2">Verified</span>
                         </p>
                       </div>
-                      
+
                       <div className="col-md-6">
                         <label className="form-label fw-semibold">Phone Number</label>
                         {isEditing ? (
@@ -461,7 +476,7 @@ const ClientProfile = () => {
                           <p className="form-control-plaintext">{profile.phone}</p>
                         )}
                       </div>
-                      
+
                       <div className="col-md-6">
                         <label className="form-label fw-semibold">City</label>
                         {isEditing ? (
@@ -485,7 +500,7 @@ const ClientProfile = () => {
                           <p className="form-control-plaintext">{profile.city}</p>
                         )}
                       </div>
-                      
+
                       <div className="col-12">
                         <label className="form-label fw-semibold">Bio</label>
                         {isEditing ? (
@@ -528,7 +543,7 @@ const ClientProfile = () => {
                         View All Bookings
                       </Link>
                     </div>
-                    
+
                     {bookingHistory.length > 0 ? (
                       <div className="table-responsive">
                         <table className="table table-hover">
@@ -592,7 +607,7 @@ const ClientProfile = () => {
                           <div className="card bg-light border-0">
                             <div className="card-body">
                               <h6 className="fw-semibold mb-3">Email Notifications</h6>
-                              
+
                               <div className="form-check form-switch mb-2">
                                 <input
                                   className="form-check-input"
@@ -605,7 +620,7 @@ const ClientProfile = () => {
                                   Booking updates and confirmations
                                 </label>
                               </div>
-                              
+
                               <div className="form-check form-switch mb-2">
                                 <input
                                   className="form-check-input"
@@ -618,7 +633,7 @@ const ClientProfile = () => {
                                   Promotions and offers
                                 </label>
                               </div>
-                              
+
                               <div className="form-check form-switch">
                                 <input
                                   className="form-check-input"
@@ -643,7 +658,7 @@ const ClientProfile = () => {
                 {activeTab === "favorites" && (
                   <div className="fade-in">
                     <h5 className="fw-bold mb-4">Favorite Photographers</h5>
-                    
+
                     {favorites.length > 0 ? (
                       <div className="row g-3">
                         {favorites.map((photographer) => (
@@ -839,7 +854,7 @@ const ClientProfile = () => {
                       alert('Please confirm that you understand this action');
                       return;
                     }
-                    
+
                     // API call to delete account
                     fetch('http://localhost:8000/api/profile/me/delete-account', {
                       method: 'DELETE',
@@ -848,21 +863,21 @@ const ClientProfile = () => {
                         'Content-Type': 'application/json'
                       }
                     })
-                    .then(response => response.json())
-                    .then(data => {
-                      if (data.success) {
-                        alert('Account deleted successfully');
-                        localStorage.removeItem('token');
-                        window.location.href = '/';
-                      } else {
-                        alert(data.detail || 'Failed to delete account');
-                      }
-                    })
-                    .catch(error => {
-                      console.error('Error:', error);
-                      alert('Error deleting account. Please try again.');
-                    });
-                    
+                      .then(response => response.json())
+                      .then(data => {
+                        if (data.success) {
+                          alert('Account deleted successfully');
+                          localStorage.removeItem('token');
+                          window.location.href = '/';
+                        } else {
+                          alert(data.detail || 'Failed to delete account');
+                        }
+                      })
+                      .catch(error => {
+                        console.error('Error:', error);
+                        alert('Error deleting account. Please try again.');
+                      });
+
                     setShowDeleteModal(false);
                   }}
                 >
