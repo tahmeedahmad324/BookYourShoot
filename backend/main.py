@@ -16,11 +16,14 @@ project_root = str(Path(__file__).resolve().parent.parent)
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
-from fastapi import FastAPI, Request, status
+from fastapi import FastAPI, Request, status, WebSocket, WebSocketDisconnect, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
+from datetime import datetime
+import logging
+import json
 
 # Import routers via package-qualified names
 from backend.routers import (
@@ -29,7 +32,8 @@ from backend.routers import (
     booking, 
     cnic, 
     reviews, 
-    chat, 
+    chat,
+    chat_two_phase,  # Two-Phase Chat System (INQUIRY/CONFIRMED)
     equipment, 
     music, 
     admin, 
@@ -49,9 +53,48 @@ from backend.routers import (
     ai_detection
 )
 from backend.services.payment_service import payment_service, StripeGateway
+from backend.services.chat_websocket_manager import connection_manager
+from backend.auth import get_current_user
 from pathlib import Path
+import json
 
-app = FastAPI(title="BookYourShoot API", version="1.0.0")
+logger = logging.getLogger(__name__)
+
+# OpenAPI configuration for Swagger UI auth
+app = FastAPI(
+    title="BookYourShoot API",
+    version="1.0.0",
+    swagger_ui_parameters={
+        "persistAuthorization": True
+    }
+)
+
+# Add security scheme for Bearer token authentication
+from fastapi.openapi.utils import get_openapi
+
+def custom_openapi():
+    if app.openapi_schema:
+        return app.openapi_schema
+    openapi_schema = get_openapi(
+        title="BookYourShoot API",
+        version="1.0.0",
+        description="BookYourShoot Photography Platform API",
+        routes=app.routes,
+    )
+    openapi_schema["components"]["securitySchemes"] = {
+        "BearerAuth": {
+            "type": "http",
+            "scheme": "bearer",
+            "bearerFormat": "JWT",
+            "description": "Enter: mock-jwt-token-client (or mock-jwt-token-photographer, mock-jwt-token-admin) for testing"
+        }
+    }
+    # Apply security globally
+    openapi_schema["security"] = [{"BearerAuth": []}]
+    app.openapi_schema = openapi_schema
+    return app.openapi_schema
+
+app.openapi = custom_openapi
 
 # Mount static files for album images (Module 6: Smart Album Builder)
 # Use absolute path to avoid issues when running from different directories
@@ -111,6 +154,7 @@ app.include_router(booking.router, prefix="/api")
 app.include_router(cnic.router, prefix="/api")
 app.include_router(reviews.router, prefix="/api")
 app.include_router(chat.router, prefix="/api")
+app.include_router(chat_two_phase.router, prefix="/api")  # Two-Phase Chat Features
 app.include_router(equipment.router, prefix="/api")
 app.include_router(music.router, prefix="/api")
 app.include_router(admin.router, prefix="/api")
@@ -129,6 +173,231 @@ app.include_router(settings.router, prefix="/api")
 app.include_router(chatbot.router, prefix="/api")
 app.include_router(ai_detection.router, prefix="/api")  # AI Event & Mood Detection
 
+
+# ============================================
+# WebSocket Endpoint for Real-Time Chat
+# ============================================
+
+@app.websocket("/ws/chat")
+async def websocket_chat_endpoint(
+    websocket: WebSocket,
+    token: str = Query(..., description="JWT token for authentication")
+):
+    """
+    WebSocket endpoint for real-time chat
+    URL: ws://localhost:8000/ws/chat?token=<jwt_token>
+    
+    Events handled:
+    - join_conversation
+    - leave_conversation
+    - send_message
+    - typing
+    - message_read
+    """
+    user_id = None
+    
+    try:
+        # Authenticate user from token
+        from backend.supabase_client import supabase
+        from backend.config import DEV_MODE
+        
+        # Mock token support for development
+        if DEV_MODE and token.startswith('mock-jwt-token'):
+            parts = token.split('-')
+            role = parts[-1] if len(parts) > 3 else 'client'
+            user_id = f'dev-user-{role}-ws'
+            logger.info(f"⚠️  DEV MODE: WebSocket using mock token for {user_id}")
+        else:
+            # Real token validation
+            try:
+                if hasattr(supabase.auth, 'get_user'):
+                    user_resp = supabase.auth.get_user(token)
+                    supabase_user = getattr(user_resp, 'user', None) or user_resp
+                else:
+                    user_resp = supabase.auth.api.get_user(token)
+                    supabase_user = getattr(user_resp, 'user', None) or user_resp
+                
+                user_id = supabase_user.id if hasattr(supabase_user, 'id') else supabase_user.get('id')
+                
+                if not user_id:
+                    await websocket.close(code=1008, reason="Invalid token")
+                    return
+            except Exception as auth_error:
+                logger.error(f"WebSocket auth error: {auth_error}")
+                await websocket.close(code=1008, reason="Authentication failed")
+                return
+        
+        # Connect user
+        await connection_manager.connect(websocket, user_id)
+        logger.info(f"✅ WebSocket connected: {user_id}")
+        
+        # Main message loop
+        while True:
+            try:
+                data = await websocket.receive_text()
+                message = json.loads(data)
+                event_type = message.get('type')
+                
+                if event_type == 'join_conversation':
+                    conversation_id = message.get('conversation_id')
+                    connection_manager.join_conversation(user_id, conversation_id)
+                    
+                    # Broadcast presence
+                    await connection_manager.broadcast_to_conversation(
+                        conversation_id,
+                        {
+                            "type": "user_joined",
+                            "user_id": user_id,
+                            "timestamp": str(datetime.utcnow())
+                        }
+                    )
+                
+                elif event_type == 'leave_conversation':
+                    conversation_id = message.get('conversation_id')
+                    connection_manager.leave_conversation(user_id, conversation_id)
+                
+                elif event_type == 'send_message':
+                    # Persist message to database
+                    conversation_id = message.get('conversation_id')
+                    content = message.get('content')
+                    content_type = message.get('content_type', 'text')
+                    temp_id = message.get('temp_id')
+                    
+                    # ======================================
+                    # TWO-PHASE VALIDATION
+                    # ======================================
+                    from backend.routers.chat_two_phase import validate_conversation_features
+                    
+                    # Determine feature type
+                    feature_type = 'media' if content_type == 'image' else \
+                                   'file' if content_type in ['audio', 'file'] else 'text'
+                    
+                    # Validate conversation features
+                    try:
+                        validation = validate_conversation_features(
+                            conversation_id,
+                            user_id,
+                            feature_type
+                        )
+                        
+                        if not validation['allowed']:
+                            # Send error back to sender
+                            await websocket.send_json({
+                                "type": "error",
+                                "code": "FEATURE_RESTRICTED",
+                                "message": validation['reason'],
+                                "temp_id": temp_id,
+                                "conversation_type": validation['conversation'].get('conversation_type'),
+                                "suggestion": "create_booking"
+                            })
+                            logger.warning(f"Message blocked: {validation['reason']}")
+                            continue  # Skip to next message
+                    
+                    except Exception as validation_error:
+                        logger.error(f"Validation error: {validation_error}")
+                        await websocket.send_json({
+                            "type": "error",
+                            "code": "VALIDATION_ERROR",
+                            "message": "Could not validate message",
+                            "temp_id": temp_id
+                        })
+                        continue  # Skip to next message
+                    
+                    # ======================================
+                    # END TWO-PHASE VALIDATION
+                    # ======================================
+                    
+                    # Save to database
+                    msg_data = {
+                        "conversation_id": conversation_id,
+                        "sender_id": user_id,
+                        "content": content,
+                        "content_type": content_type,
+                        "status": "SENT"
+                    }
+                    
+                    msg_resp = supabase.table('messages').insert(msg_data).execute()
+                    saved_message = msg_resp.data[0] if msg_resp.data else None
+                    
+                    if saved_message:
+                        # Get updated conversation info (for inquiry limits)
+                        conv_info = supabase.table('conversations')\
+                            .select('conversation_type, inquiry_message_limit, inquiry_messages_sent')\
+                            .eq('id', conversation_id)\
+                            .execute()
+                        
+                        conv_data = conv_info.data[0] if conv_info.data else {}
+                        
+                        # Calculate remaining messages for inquiry
+                        inquiry_status = None
+                        if conv_data.get('conversation_type') == 'INQUIRY':
+                            limit = conv_data.get('inquiry_message_limit', 15)
+                            sent = conv_data.get('inquiry_messages_sent', 0)
+                            remaining = max(0, limit - sent)
+                            
+                            inquiry_status = {
+                                "messages_remaining": remaining,
+                                "is_at_limit": remaining == 0,
+                                "warning_level": "critical" if remaining <= 3 else "low" if remaining <= 5 else None
+                            }
+                        
+                        # Broadcast to conversation with updated inquiry status
+                        await connection_manager.broadcast_to_conversation(
+                            conversation_id,
+                            {
+                                "type": "message",
+                                "data": saved_message,
+                                "temp_id": temp_id,
+                                "inquiry_status": inquiry_status  # Include limit info
+                            }
+                        )
+                
+                elif event_type == 'typing':
+                    conversation_id = message.get('conversation_id')
+                    is_typing = message.get('is_typing', True)
+                    await connection_manager.set_typing_indicator(conversation_id, user_id, is_typing)
+                
+                elif event_type == 'message_read':
+                    message_id = message.get('message_id')
+                    conversation_id = message.get('conversation_id')
+                    
+                    # Update database
+                    supabase.table('messages')\
+                        .update({'status': 'READ', 'read_at': datetime.utcnow().isoformat()})\
+                        .eq('id', message_id)\
+                        .execute()
+                    
+                    # Broadcast read status
+                    await connection_manager.broadcast_to_conversation(
+                        conversation_id,
+                        {
+                            "type": "message_status",
+                            "message_id": message_id,
+                            "status": "READ"
+                        },
+                        exclude_user=user_id
+                    )
+            
+            except WebSocketDisconnect:
+                break
+            except json.JSONDecodeError:
+                logger.error(f"Invalid JSON from {user_id}")
+            except Exception as msg_error:
+                logger.error(f"Error processing message from {user_id}: {msg_error}")
+    
+    except Exception as e:
+        logger.error(f"WebSocket error for {user_id}: {e}")
+    
+    finally:
+        # Disconnect user
+        if user_id:
+            await connection_manager.disconnect(websocket, user_id)
+            logger.info(f"🔴 WebSocket disconnected: {user_id}")
+
+
+# ============================================
+# Regular HTTP Routes
+# ============================================
 
 @app.get("/")
 def root():
@@ -165,6 +434,16 @@ def root():
 
 if __name__ == "__main__":
     import uvicorn
-    # Run server via import string to enable reload when running this script
-    # From project root run: `python -m uvicorn backend.main:app --reload --host 127.0.0.1 --port 5000`
-    uvicorn.run("backend.main:app", host="127.0.0.1", port=5000, reload=True)
+    # Get port from environment variable (default: 8000)
+    port = int(os.getenv("BACKEND_PORT", "8000"))
+    host = os.getenv("BACKEND_HOST", "127.0.0.1")
+    
+    print(f"\n🚀 Starting BookYourShoot Backend Server")
+    print(f"   Host: {host}")
+    print(f"   Port: {port}")
+    print(f"   API URL: http://{host}:{port}")
+    print(f"   Swagger Docs: http://{host}:{port}/docs")
+    print(f"   WebSocket: ws://{host}:{port}/ws/chat")
+    print(f"\n   Press CTRL+C to quit\n")
+    
+    uvicorn.run("backend.main:app", host=host, port=port, reload=True)

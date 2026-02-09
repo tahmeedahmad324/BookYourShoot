@@ -117,6 +117,15 @@ const ClientDashboard = () => {
       badge: null,
     },
     {
+      id: "messages",
+      title: "Messages",
+      description: "Chat with photographers and manage conversations",
+      icon: MessageSquare,
+      link: "/client/messages",
+      badge: null,
+      badgeColor: "info",
+    },
+    {
       id: "payments",
       title: "Payment History",
       description: "View all transactions, receipts, and payment status",

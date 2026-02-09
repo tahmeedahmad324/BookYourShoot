@@ -123,6 +123,15 @@ const PhotographerDashboard = () => {
       badgeColor: "secondary",
     },
     {
+      id: "messages",
+      title: "Messages",
+      description: "Chat with clients and respond to inquiries",
+      icon: MessageSquare,
+      link: "/photographer/messages",
+      badge: null,
+      badgeColor: "info",
+    },
+    {
       id: "reviews",
       title: "Reviews & Ratings",
       description: "Manage client reviews and your ratings",

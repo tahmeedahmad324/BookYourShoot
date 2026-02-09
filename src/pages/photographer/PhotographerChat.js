@@ -3,7 +3,7 @@ import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import axios from 'axios';
 
-const ClientChat = () => {
+const PhotographerChat = () => {
   const { id } = useParams(); // conversation ID
   const { getToken } = useAuth();
   const navigate = useNavigate();
@@ -19,6 +19,7 @@ const ClientChat = () => {
   // Fetch conversation and messages
   useEffect(() => {
     loadConversationAndMessages();
+    // eslint-disable-next-line
   }, [id]);
 
   useEffect(() => {
@@ -138,7 +139,7 @@ const ClientChat = () => {
         <div className="text-center">
           <h4 className="fw-bold mb-3">{error || 'Conversation Not Found'}</h4>
           <p className="text-muted mb-3">The conversation you're looking for doesn't exist.</p>
-          <Link to="/client/messages" className="btn btn-primary">
+          <Link to="/photographer/messages" className="btn btn-primary">
             Back to Messages
           </Link>
         </div>
@@ -153,7 +154,7 @@ const ClientChat = () => {
     <div className="container py-4" style={{ maxWidth: '900px' }}>
       {/* Header */}
       <div className="mb-3">
-        <Link to="/client/messages" className="btn btn-link text-decoration-none">
+        <Link to="/photographer/messages" className="btn btn-link text-decoration-none">
           ← Back to Messages
         </Link>
       </div>
@@ -166,7 +167,7 @@ const ClientChat = () => {
         borderRadius: '10px 10px 0 0'
       }}>
         <h5 className="mb-0">
-          {otherUser.name || 'Photographer'}
+          {otherUser.name || 'Client'}
         </h5>
         <small className="text-white-50">
           {conversation.conversation_type} • {conversation.inquiry_messages_sent || 0}/{conversation.inquiry_message_limit || 15} messages
@@ -267,4 +268,4 @@ const ClientChat = () => {
   );
 };
 
-export default ClientChat;
+export default PhotographerChat;

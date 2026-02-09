@@ -29,6 +29,10 @@ processed/
 references/
 events/
 
+# Supabase CLI cache
+supabase/.temp/
+
+
 # Image uploads and test files (exclude from entire repo except public/)
 *.jpg
 *.jpeg

@@ -30,10 +30,39 @@ def get_current_user(authorization: Optional[str] = Header(None)):
         # Extract user info from mock token format: mock-jwt-token-{role}
         parts = token.split('-')
         role = parts[-1] if len(parts) > 3 else 'client'
-        print(f"⚠️  DEV MODE: Using mock token for role '{role}'")
+        
+        # Use consistent UUIDs for mock users (valid UUID format)
+        # These match the actual test users in the database
+        mock_user_ids = {
+            'client': '257f9b67-99fa-44ce-ae67-6229c36380b5',  # Test Client
+            'photographer': '21bf398a-e012-4c4d-9b55-caeac7ec6dc7',  # Test Photographer
+            'admin': '5fb7a96b-3dd0-4d44-9631-c07a256292ee'  # Test Admin
+        }
+        
+        user_id = mock_user_ids.get(role, '00000000-0000-0000-0000-000000000001')
+        
+        # In DEV_MODE, ensure mock user exists in database
+        try:
+            existing_user = supabase.table('users').select('*').eq('id', user_id).execute()
+            if not existing_user.data:
+                # Create mock user in database
+                mock_user = {
+                    'id': user_id,
+                    'email': f'mock.{role}@test.com',
+                    'full_name': f'Mock {role.capitalize()}',
+                    'role': role,
+                    'city': 'Lahore'
+                }
+                supabase.table('users').insert(mock_user).execute()
+                print(f"✅ Created mock {role} user in database: {user_id}")
+        except Exception as e:
+            # If insertion fails (e.g., user already exists), that's fine
+            print(f"⚠️  Mock user creation note: {e}")
+        
+        print(f"⚠️  DEV MODE: Using mock token for role '{role}' (UUID: {user_id})")
         return {
-            'id': 'dev-user-123',
-            'email': f'{role}@test.com',
+            'id': user_id,
+            'email': f'mock.{role}@test.com',
             'role': role
         }
 
