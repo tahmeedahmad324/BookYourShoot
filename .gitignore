@@ -67,3 +67,30 @@ sample_images/
 **/tmp/
 
 .env.example
+
+# Chat development/test files
+check_*.py
+test_*.py
+debug_*.py
+insert_mock_data.py
+mock-*.sql
+CHAT_*.md
+FIX_*.md
+INSERT_*.md
+ENV_*.md
+PORT_*.md
+SWAGGER_*.md
+CHAT_MODULE.doc
+
+# Chat draft implementations (not yet integrated)
+backend/WEBSOCKET_UPDATE_TWO_PHASE.py
+backend/routers/chat_two_phase.py
+backend/services/chat_websocket_manager.py
+src/components/chat/
+src/config.js
+src/hooks/useWebSocket.js
+src/pages/client/ClientChatReal.js
+src/pages/test/
+
+# Supabase migrations (tracked separately if needed)
+supabase/migrations/
