@@ -534,6 +534,14 @@ const AIChatbotV2 = () => {
     ];
   };
 
+  // Hide AI chatbot on chat/messages pages to avoid overlap with send button
+  const isChatPage = location.pathname.includes('/chat') || location.pathname.includes('/messages');
+  
+  // Don't render anything on chat pages
+  if (isChatPage) {
+    return null;
+  }
+  
   return (
     <>
       {/* Floating Chat Button */}

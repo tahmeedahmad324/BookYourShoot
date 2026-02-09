@@ -121,7 +121,7 @@ const ClientDashboard = () => {
       title: "Messages",
       description: "Chat with photographers and manage conversations",
       icon: MessageSquare,
-      link: "/client/messages",
+      link: "/client/chat",
       badge: null,
       badgeColor: "info",
     },

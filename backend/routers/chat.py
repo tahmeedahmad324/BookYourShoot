@@ -30,6 +30,7 @@ class SendMessageRequest(BaseModel):
     attachment_path: Optional[str] = None
     attachment_filename: Optional[str] = None
     attachment_size: Optional[int] = None
+    attachment_urls: Optional[str] = None  # JSON string of uploaded file URLs
 
 
 class InitAttachmentRequest(BaseModel):
@@ -353,6 +354,7 @@ def send_message_rest(
             "attachment_path": payload.attachment_path,
             "attachment_filename": payload.attachment_filename,
             "attachment_size": payload.attachment_size,
+            "attachment_urls": payload.attachment_urls,
             "status": "SENT"
         }
         

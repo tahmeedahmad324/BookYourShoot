@@ -127,7 +127,7 @@ const PhotographerDashboard = () => {
       title: "Messages",
       description: "Chat with clients and respond to inquiries",
       icon: MessageSquare,
-      link: "/photographer/messages",
+      link: "/photographer/chat",
       badge: null,
       badgeColor: "info",
     },

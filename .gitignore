@@ -85,12 +85,13 @@ CHAT_MODULE.doc
 # Chat draft implementations (not yet integrated)
 backend/WEBSOCKET_UPDATE_TWO_PHASE.py
 backend/routers/chat_two_phase.py
-backend/services/chat_websocket_manager.py
-src/components/chat/
+# backend/services/chat_websocket_manager.py - REMOVED (now production code)
+# src/components/chat/ - REMOVED (now production code)
 src/config.js
 src/hooks/useWebSocket.js
 src/pages/client/ClientChatReal.js
 src/pages/test/
 
-# Supabase migrations (tracked separately if needed)
-supabase/migrations/
+# Supabase migrations (allow add_attachment_urls migration)
+supabase/migrations/*
+!supabase/migrations/add_attachment_urls_to_messages.sql

@@ -205,8 +205,15 @@ async def websocket_chat_endpoint(
         if DEV_MODE and token.startswith('mock-jwt-token'):
             parts = token.split('-')
             role = parts[-1] if len(parts) > 3 else 'client'
-            user_id = f'dev-user-{role}-ws'
-            logger.info(f"⚠️  DEV MODE: WebSocket using mock token for {user_id}")
+            
+            # Use consistent UUIDs for mock users (same as auth.py)
+            mock_user_ids = {
+                'client': '257f9b67-99fa-44ce-ae67-6229c36380b5',
+                'photographer': '21bf398a-e012-4c4d-9b55-caeac7ec6dc7',
+                'admin': '5fb7a96b-3dd0-4d44-9631-c07a256292ee'
+            }
+            user_id = mock_user_ids.get(role, '257f9b67-99fa-44ce-ae67-6229c36380b5')
+            logger.info(f"⚠️  DEV MODE: WebSocket using mock {role} user: {user_id}")
         else:
             # Real token validation
             try:
@@ -238,7 +245,26 @@ async def websocket_chat_endpoint(
                 message = json.loads(data)
                 event_type = message.get('type')
                 
-                if event_type == 'join_conversation':
+                # Handle join_conversations (plural) - join all user's conversations
+                if event_type == 'join_conversations':
+                    # Fetch all conversations user is part of
+                    conv_resp = supabase.table('conversation_participants')\
+                        .select('conversation_id')\
+                        .eq('user_id', user_id)\
+                        .execute()
+                    
+                    if conv_resp.data:
+                        for conv in conv_resp.data:
+                            connection_manager.join_conversation(user_id, conv['conversation_id'])
+                        logger.info(f"User {user_id} joined {len(conv_resp.data)} conversations")
+                    
+                    # Send confirmation
+                    await websocket.send_json({
+                        "type": "joined_conversations",
+                        "count": len(conv_resp.data) if conv_resp.data else 0
+                    })
+                
+                elif event_type == 'join_conversation':
                     conversation_id = message.get('conversation_id')
                     connection_manager.join_conversation(user_id, conversation_id)
                     
@@ -316,6 +342,11 @@ async def websocket_chat_endpoint(
                         "status": "SENT"
                     }
                     
+                    # Include attachment_urls if provided
+                    attachment_urls = message.get('attachment_urls')
+                    if attachment_urls:
+                        msg_data['attachment_urls'] = attachment_urls
+                    
                     msg_resp = supabase.table('messages').insert(msg_data).execute()
                     saved_message = msg_resp.data[0] if msg_resp.data else None
                     
@@ -345,8 +376,9 @@ async def websocket_chat_endpoint(
                         await connection_manager.broadcast_to_conversation(
                             conversation_id,
                             {
-                                "type": "message",
-                                "data": saved_message,
+                                "type": "new_message",
+                                "message": saved_message,
+                                "conversation_id": conversation_id,
                                 "temp_id": temp_id,
                                 "inquiry_status": inquiry_status  # Include limit info
                             }

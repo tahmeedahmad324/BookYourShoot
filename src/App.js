@@ -187,6 +187,14 @@ function App() {
                 }
               />
               <Route
+                path="/client/chat"
+                element={
+                  <ProtectedRoute allowedRoles={["client"]}>
+                    <ClientChat />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
                 path="/client/chat/:id"
                 element={
                   <ProtectedRoute allowedRoles={["client"]}>
@@ -285,6 +293,14 @@ function App() {
                 element={
                   <ProtectedRoute allowedRoles={["photographer"]}>
                     <PhotographerMessages />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/photographer/chat"
+                element={
+                  <ProtectedRoute allowedRoles={["photographer"]}>
+                    <PhotographerChat />
                   </ProtectedRoute>
                 }
               />
