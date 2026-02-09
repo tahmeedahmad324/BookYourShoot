@@ -16,7 +16,7 @@ const registerSchema = yup.object().shape({
     .min(2, 'Name must be at least 2 characters')
     .max(50, 'Name must be less than 50 characters')
     .matches(/^[A-Za-z\s]+$/, 'Name can only contain alphabets and spaces')
-    .test('valid-name-structure', 'Please enter a valid full name (e.g., John Doe)', function(value) {
+    .test('valid-name-structure', 'Please enter a valid full name (e.g., John Doe)', function (value) {
       if (!value) return false;
       const trimmed = value.trim();
       // Must contain at least one space (first and last name)
@@ -55,11 +55,11 @@ const registerSchema = yup.object().shape({
       /^[a-zA-Z0-9][a-zA-Z0-9._%-]*[a-zA-Z0-9]@[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?)*\.[a-zA-Z]{2,}$/,
       'Invalid email format. Please use a valid email address'
     )
-    .test('no-consecutive-dots', 'Email cannot contain consecutive dots', function(value) {
+    .test('no-consecutive-dots', 'Email cannot contain consecutive dots', function (value) {
       if (!value) return true;
       return !value.includes('..');
     })
-    .test('valid-domain', 'Email domain must be valid (e.g., gmail.com, not xyz.xyz.com)', function(value) {
+    .test('valid-domain', 'Email domain must be valid (e.g., gmail.com, not xyz.xyz.com)', function (value) {
       if (!value) return true;
       const domain = value.split('@')[1];
       if (!domain) return false;
@@ -78,7 +78,7 @@ const registerSchema = yup.object().shape({
     .required('Email is required'),
   phone: yup.string()
     .required('Phone number is required')
-    .test('phone-format', 'Please enter a valid Pakistani phone number', function(value) {
+    .test('phone-format', 'Please enter a valid Pakistani phone number', function (value) {
       if (!value) return false;
       // Remove all spaces, hyphens, and parentheses
       const cleaned = value.replace(/[\s\-()]/g, '');
@@ -86,6 +86,9 @@ const registerSchema = yup.object().shape({
       const phoneRegex = /^(\+92|92|0)?3[0-9]{9}$/;
       return phoneRegex.test(cleaned);
     }),
+  city: yup.string()
+    .required('Please select your city')
+    .oneOf(['Lahore', 'Karachi', 'Islamabad', 'Rawalpindi', 'Faisalabad', 'Multan', 'Peshawar', 'Quetta', 'Sialkot', 'Gujranwala', 'Other'], 'Please select a valid city'),
   password: yup.string()
     .min(8, 'Password must be at least 8 characters')
     .matches(/[a-z]/, 'Password must contain at least one lowercase letter')
@@ -105,7 +108,7 @@ const normalizePhone = (phone) => {
   if (!phone) return '';
   const cleaned = phone.replace(/[\s\-()]/g, '');
   let normalized = cleaned;
-  
+
   // Add +92 if not present
   if (normalized.startsWith('0')) {
     normalized = '92' + normalized.slice(1);
@@ -113,13 +116,13 @@ const normalizePhone = (phone) => {
   if (!normalized.startsWith('+')) {
     normalized = '+' + normalized;
   }
-  
+
   // Format as +92-300-1234567
   if (normalized.startsWith('+92')) {
     const rest = normalized.slice(3);
     normalized = `+92-${rest.slice(0, 3)}-${rest.slice(3)}`;
   }
-  
+
   return normalized;
 };
 
@@ -131,9 +134,9 @@ const Register = () => {
   const [showTermsModal, setShowTermsModal] = useState(false);
   const [showPrivacyModal, setShowPrivacyModal] = useState(false);
 
-  const { 
-    register, 
-    handleSubmit, 
+  const {
+    register,
+    handleSubmit,
     formState: { errors },
     watch,
     setValue,
@@ -150,7 +153,7 @@ const Register = () => {
     'register-form',
     formValues,
     setValue,
-    ['role', 'name', 'email', 'phone'], // Only save these fields
+    ['role', 'name', 'email', 'phone', 'city'], // Only save these fields
     500 // Debounce delay
   );
 
@@ -167,31 +170,31 @@ const Register = () => {
     try {
       // Normalize phone number
       const normalizedPhone = normalizePhone(data.phone);
-      
+
       // Check if email is already registered
       const API_BASE = process.env.REACT_APP_API_URL || "http://localhost:8000";
       const checkResponse = await fetch(`${API_BASE}/api/auth/check-email?email=${encodeURIComponent(data.email)}`);
       const checkData = await checkResponse.json();
-      
+
       if (checkData.exists) {
         setServerError('This email is already registered. Please login instead.');
         setLoading(false);
         return;
       }
-      
+
       // Register with email and password
       const result = await registerWithPassword({
         email: data.email.toLowerCase(),
         password: data.password,
         full_name: data.name,
         phone: normalizedPhone,
-        city: 'Lahore', // Default, can add city field to form
+        city: data.city,
         role: data.role
       });
-      
+
       // Clear saved form data after successful registration
       clearSavedData();
-      
+
       // Check if email confirmation is required
       if (result.requires_email_confirmation) {
         // Store registration data temporarily for OTP verification
@@ -200,14 +203,14 @@ const Register = () => {
           role: data.role,
           full_name: data.name
         }));
-        
+
         // Navigate to OTP verification page
-        navigate('/verify-otp', { 
-          state: { 
+        navigate('/verify-otp', {
+          state: {
             email: data.email,
             role: data.role,
             message: 'Please check your email for the verification code'
-          } 
+          }
         });
       } else {
         // Email auto-confirmed (development mode) - navigate to appropriate page
@@ -248,36 +251,36 @@ const Register = () => {
             <div className="text-center mb-5">
               <h2 className="fw-bold mb-3" style={{ fontSize: '2.5rem' }}>Join BookYourShoot</h2>
               <p className="text-muted" style={{ fontSize: '1.1rem' }}>Choose your role and start your photography journey</p>
-              
+
               <div className="row g-4 mt-3 justify-content-center">
                 {Object.entries(roleDescriptions).map(([role, desc]) => {
                   const isSelected = selectedRole === role;
                   const borderCol = isSelected ? 'var(--primary-purple)' : 'var(--soft-gray)';
 
                   return (
-                  <div className="col-md-4" key={role}>
-                    <div 
-                      className={`card h-100 ${isSelected ? 'border-primary shadow-sm' : ''}`}
-                      style={{ 
-                        cursor: 'pointer',
-                        borderWidth: isSelected ? '3px' : '1px',
-                        borderColor: borderCol,
-                        borderRadius: '12px',
-                        transition: 'all 0.3s ease',
-                        transform: isSelected ? 'scale(1.05)' : 'scale(1)',
-                        backgroundColor: isSelected ? 'rgba(34, 94, 161, 0.05)' : 'white'
-                      }}
-                      onClick={() => handleRoleSelect(role)}
-                    >
-                      <div className="card-body text-center p-4">
-                        <div className="mb-3" style={{ fontSize: '3rem' }}>
-                          {desc.icon}
+                    <div className="col-md-4" key={role}>
+                      <div
+                        className={`card h-100 ${isSelected ? 'border-primary shadow-sm' : ''}`}
+                        style={{
+                          cursor: 'pointer',
+                          borderWidth: isSelected ? '3px' : '1px',
+                          borderColor: borderCol,
+                          borderRadius: '12px',
+                          transition: 'all 0.3s ease',
+                          transform: isSelected ? 'scale(1.05)' : 'scale(1)',
+                          backgroundColor: isSelected ? 'rgba(34, 94, 161, 0.05)' : 'white'
+                        }}
+                        onClick={() => handleRoleSelect(role)}
+                      >
+                        <div className="card-body text-center p-4">
+                          <div className="mb-3" style={{ fontSize: '3rem' }}>
+                            {desc.icon}
+                          </div>
+                          <h5 className="fw-bold mb-2">{desc.title}</h5>
+                          <p className="text-muted mb-0" style={{ fontSize: '0.95rem' }}>{desc.description}</p>
                         </div>
-                        <h5 className="fw-bold mb-2">{desc.title}</h5>
-                        <p className="text-muted mb-0" style={{ fontSize: '0.95rem' }}>{desc.description}</p>
                       </div>
                     </div>
-                  </div>
                   );
                 })}
               </div>
@@ -367,6 +370,36 @@ const Register = () => {
                         )}
                       </div>
 
+                      {/* City */}
+                      <div className="col-md-6 mb-3">
+                        <label htmlFor="city" className="form-label fw-semibold">
+                          City *
+                        </label>
+                        <select
+                          className={`form-select ${errors.city ? 'is-invalid' : ''}`}
+                          id="city"
+                          {...register('city')}
+                        >
+                          <option value="">Select your city</option>
+                          <option value="Lahore">Lahore</option>
+                          <option value="Karachi">Karachi</option>
+                          <option value="Islamabad">Islamabad</option>
+                          <option value="Rawalpindi">Rawalpindi</option>
+                          <option value="Faisalabad">Faisalabad</option>
+                          <option value="Multan">Multan</option>
+                          <option value="Peshawar">Peshawar</option>
+                          <option value="Quetta">Quetta</option>
+                          <option value="Sialkot">Sialkot</option>
+                          <option value="Gujranwala">Gujranwala</option>
+                          <option value="Other">Other</option>
+                        </select>
+                        {errors.city && (
+                          <div className="text-danger small mt-1">{errors.city.message}</div>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="row">
                       {/* Password */}
                       <div className="col-md-6 mb-3">
                         <label htmlFor="password" className="form-label fw-semibold">
@@ -410,13 +443,12 @@ const Register = () => {
                       <div className="mb-3">
                         <small className="text-muted">Password strength:</small>
                         <div className="progress" style={{ height: '4px' }}>
-                          <div 
-                            className={`progress-bar ${
-                              watchPassword.length < 6 ? 'bg-danger' : 
+                          <div
+                            className={`progress-bar ${watchPassword.length < 6 ? 'bg-danger' :
                               watchPassword.length < 10 ? 'bg-warning' : 'bg-success'
-                            }`}
-                            style={{ 
-                              width: `${Math.min(watchPassword.length * 10, 100)}%` 
+                              }`}
+                            style={{
+                              width: `${Math.min(watchPassword.length * 10, 100)}%`
                             }}
                           ></div>
                         </div>
@@ -434,17 +466,17 @@ const Register = () => {
                         />
                         <label className="form-check-label" htmlFor="agreeToTerms">
                           I agree to the{' '}
-                          <button 
-                            type="button" 
-                            className="btn btn-link p-0 text-primary text-decoration-none" 
+                          <button
+                            type="button"
+                            className="btn btn-link p-0 text-primary text-decoration-none"
                             onClick={(e) => { e.preventDefault(); setShowTermsModal(true); }}
                           >
                             Terms and Conditions
                           </button>{' '}
                           and{' '}
-                          <button 
-                            type="button" 
-                            className="btn btn-link p-0 text-primary text-decoration-none" 
+                          <button
+                            type="button"
+                            className="btn btn-link p-0 text-primary text-decoration-none"
                             onClick={(e) => { e.preventDefault(); setShowPrivacyModal(true); }}
                           >
                             Privacy Policy
@@ -457,8 +489,8 @@ const Register = () => {
                     </div>
 
                     {/* Submit Button */}
-                    <button 
-                      type="submit" 
+                    <button
+                      type="submit"
                       className="btn btn-primary w-100 py-3 mb-3"
                       disabled={loading}
                     >
@@ -495,9 +527,9 @@ const Register = () => {
                         Sign in here
                       </Link>
 
-      {/* Legal Modals */}
-      <TermsModal show={showTermsModal} onHide={() => setShowTermsModal(false)} />
-      <PrivacyModal show={showPrivacyModal} onHide={() => setShowPrivacyModal(false)} />
+                      {/* Legal Modals */}
+                      <TermsModal show={showTermsModal} onHide={() => setShowTermsModal(false)} />
+                      <PrivacyModal show={showPrivacyModal} onHide={() => setShowPrivacyModal(false)} />
                     </p>
                   </div>
                 </div>
