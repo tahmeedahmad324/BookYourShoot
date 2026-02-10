@@ -309,30 +309,20 @@ def send_message_rest(
         if participant_check.data[0].get('is_banned'):
             raise HTTPException(status_code=403, detail="You are banned from this conversation")
         
-        # **NEW: Two-phase validation**
-        from backend.routers.chat_two_phase import validate_conversation_features
+        # Simple validation: INQUIRY conversations only allow text
+        conv_check = supabase.table('conversations')\
+            .select('conversation_type')\
+            .eq('id', payload.conversation_id)\
+            .execute()
         
-        # Determine feature type being used
-        feature_type = 'text'
-        if payload.content_type in ['image', 'video']:
-            feature_type = 'media'
-        elif payload.content_type in ['file', 'document', 'pdf']:
-            feature_type = 'file'
-        elif payload.content_type == 'audio':
-            feature_type = 'voice'
-        
-        # Validate if feature is allowed
-        validation = validate_conversation_features(
-            conversation_id=payload.conversation_id,
-            user_id=user_id,
-            feature=feature_type
-        )
-        
-        if not validation["allowed"]:
-            raise HTTPException(
-                status_code=403, 
-                detail=validation["reason"]
-            )
+        if conv_check.data:
+            conv_type = conv_check.data[0].get('conversation_type')
+            # Block file uploads in INQUIRY conversations
+            if conv_type == 'INQUIRY' and payload.content_type in ['image', 'video', 'file', 'audio', 'document', 'pdf']:
+                raise HTTPException(
+                    status_code=403, 
+                    detail="File uploads not allowed in inquiry conversations. Book the photographer to unlock all features."
+                )
         
         # Validate file size limits
         if payload.attachment_size:

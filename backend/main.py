@@ -33,7 +33,6 @@ from backend.routers import (
     cnic, 
     reviews, 
     chat,
-    chat_two_phase,  # Two-Phase Chat System (INQUIRY/CONFIRMED)
     equipment, 
     music, 
     admin, 
@@ -154,7 +153,6 @@ app.include_router(booking.router, prefix="/api")
 app.include_router(cnic.router, prefix="/api")
 app.include_router(reviews.router, prefix="/api")
 app.include_router(chat.router, prefix="/api")
-app.include_router(chat_two_phase.router, prefix="/api")  # Two-Phase Chat Features
 app.include_router(equipment.router, prefix="/api")
 app.include_router(music.router, prefix="/api")
 app.include_router(admin.router, prefix="/api")
@@ -258,6 +256,9 @@ async def websocket_chat_endpoint(
                             connection_manager.join_conversation(user_id, conv['conversation_id'])
                         logger.info(f"User {user_id} joined {len(conv_resp.data)} conversations")
                     
+                    # NOW broadcast presence after joining conversations
+                    await connection_manager.broadcast_presence_update(user_id, "online")
+                    
                     # Send confirmation
                     await websocket.send_json({
                         "type": "joined_conversations",
@@ -289,49 +290,25 @@ async def websocket_chat_endpoint(
                     content_type = message.get('content_type', 'text')
                     temp_id = message.get('temp_id')
                     
-                    # ======================================
-                    # TWO-PHASE VALIDATION
-                    # ======================================
-                    from backend.routers.chat_two_phase import validate_conversation_features
+                    # Simple validation: INQUIRY conversations only allow text
+                    conv_check = supabase.table('conversations')\
+                        .select('conversation_type')\
+                        .eq('id', conversation_id)\
+                        .execute()
                     
-                    # Determine feature type
-                    feature_type = 'media' if content_type == 'image' else \
-                                   'file' if content_type in ['audio', 'file'] else 'text'
-                    
-                    # Validate conversation features
-                    try:
-                        validation = validate_conversation_features(
-                            conversation_id,
-                            user_id,
-                            feature_type
-                        )
-                        
-                        if not validation['allowed']:
-                            # Send error back to sender
+                    if conv_check.data:
+                        conv_type = conv_check.data[0].get('conversation_type')
+                        # Block file uploads in INQUIRY conversations
+                        if conv_type == 'INQUIRY' and content_type in ['image', 'file', 'audio']:
                             await websocket.send_json({
                                 "type": "error",
                                 "code": "FEATURE_RESTRICTED",
-                                "message": validation['reason'],
+                                "message": "File uploads not allowed in inquiry conversations. Book the photographer to unlock all features.",
                                 "temp_id": temp_id,
-                                "conversation_type": validation['conversation'].get('conversation_type'),
-                                "suggestion": "create_booking"
+                                "conversation_type": conv_type
                             })
-                            logger.warning(f"Message blocked: {validation['reason']}")
+                            logger.warning(f"File upload blocked in INQUIRY conversation {conversation_id}")
                             continue  # Skip to next message
-                    
-                    except Exception as validation_error:
-                        logger.error(f"Validation error: {validation_error}")
-                        await websocket.send_json({
-                            "type": "error",
-                            "code": "VALIDATION_ERROR",
-                            "message": "Could not validate message",
-                            "temp_id": temp_id
-                        })
-                        continue  # Skip to next message
-                    
-                    # ======================================
-                    # END TWO-PHASE VALIDATION
-                    # ======================================
                     
                     # Save to database
                     msg_data = {
