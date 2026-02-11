@@ -9,7 +9,7 @@ import StripeCheckout from "../../components/StripeCheckout"
 import useFormPersistence from "../../hooks/useFormPersistence"
 import TermsModal from "../../components/legal/TermsModal"
 
-const API_BASE = 'http://localhost:5000/api';
+const API_BASE = 'http://localhost:8000/api';
 
 const BookingRequest = () => {
   const { id } = useParams()
@@ -112,9 +112,9 @@ const BookingRequest = () => {
       try {
         setLoading(true)
         setError(null)
-        
+
         const response = await photographerAPI.getById(id)
-        
+
         if (response.success && response.data) {
           setPhotographer(response.data)
         } else {
@@ -127,7 +127,7 @@ const BookingRequest = () => {
         setLoading(false)
       }
     }
-    
+
     if (id) {
       fetchPhotographer()
     }
@@ -172,11 +172,11 @@ const BookingRequest = () => {
 
       // Store booking data temporarily
       setBookingData(newBookingData)
-      
+
       // Show payment screen and scroll to top
       setShowPayment(true)
       window.scrollTo({ top: 0, behavior: 'smooth' })
-      
+
     } catch (error) {
       console.error("Booking error:", error)
     } finally {
@@ -192,10 +192,10 @@ const BookingRequest = () => {
       paymentStatus: "advance_paid",
       paymentDate: new Date().toISOString()
     }
-    
+
     // Clear saved form data after successful payment
     clearSavedData()
-    
+
     // Store in localStorage (in real app, send to API)
     const existingBookings = JSON.parse(localStorage.getItem("userBookings") || "[]")
     existingBookings.push(confirmedBooking)
@@ -515,9 +515,9 @@ const BookingRequest = () => {
                     />
                     <label className="form-check-label" htmlFor="terms">
                       I agree to the{' '}
-                      <button 
-                        type="button" 
-                        className="btn btn-link p-0 text-primary text-decoration-none" 
+                      <button
+                        type="button"
+                        className="btn btn-link p-0 text-primary text-decoration-none"
                         onClick={(e) => { e.preventDefault(); setShowTermsModal(true); }}
                       >
                         booking terms and conditions
@@ -579,7 +579,7 @@ const BookingRequest = () => {
                 {/* Payment Summary */}
                 <div className="mb-3">
                   <p className="small text-muted mb-2">Payment Plan:</p>
-                  
+
                   {/* Standard 50/50 Payment */}
                   <div className="border rounded-3 p-3 mb-2 border-primary bg-primary bg-opacity-10">
                     <div className="d-flex align-items-start">
@@ -621,7 +621,7 @@ const BookingRequest = () => {
             </div>
           </div>
         </div>
-      </div>      
+      </div>
       <TermsModal show={showTermsModal} onHide={() => setShowTermsModal(false)} />    </div>
   )
 }

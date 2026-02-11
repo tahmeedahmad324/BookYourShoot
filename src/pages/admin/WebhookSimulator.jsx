@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { 
-    Play, RefreshCw, Eye, CheckCircle, XCircle, 
+import {
+    Play, RefreshCw, Eye, CheckCircle, XCircle,
     Code, Zap, Send, FileText, Clock, X
 } from 'lucide-react';
 import '../../styles/global.css';
@@ -14,7 +14,7 @@ const WebhookSimulator = () => {
     const [success, setSuccess] = useState(null);
     const [selectedEvent, setSelectedEvent] = useState(null);
     const [showModal, setShowModal] = useState(false);
-    
+
     const [formData, setFormData] = useState({
         event_type: 'checkout.session.completed',
         booking_id: `BK-${Date.now().toString().slice(-6)}`,
@@ -35,7 +35,7 @@ const WebhookSimulator = () => {
     const fetchEvents = async () => {
         setLoading(true);
         try {
-            const res = await fetch('http://localhost:5000/api/payments/webhooks/events');
+            const res = await fetch('http://localhost:8000/api/payments/webhooks/events');
             const data = await res.json();
             if (data.success) setEvents(data.events);
         } catch (err) {
@@ -47,7 +47,7 @@ const WebhookSimulator = () => {
 
     const fetchSupportedEvents = async () => {
         try {
-            const res = await fetch('http://localhost:5000/api/payments/webhooks/supported-events');
+            const res = await fetch('http://localhost:8000/api/payments/webhooks/supported-events');
             const data = await res.json();
             if (data.success) setSupportedEvents(data.events);
         } catch (err) {
@@ -67,16 +67,16 @@ const WebhookSimulator = () => {
         setSimulating(true);
         setError(null);
         setSuccess(null);
-        
+
         try {
-            const res = await fetch('http://localhost:5000/api/payments/webhooks/simulate', {
+            const res = await fetch('http://localhost:8000/api/payments/webhooks/simulate', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(formData)
             });
-            
+
             const data = await res.json();
-            
+
             if (data.success) {
                 setSuccess(`Webhook '${formData.event_type}' simulated successfully!`);
                 fetchEvents();
@@ -98,16 +98,16 @@ const WebhookSimulator = () => {
         setSimulating(true);
         setError(null);
         setSuccess(null);
-        
+
         try {
-            const res = await fetch('http://localhost:5000/api/payments/webhooks/simulate-full-flow', {
+            const res = await fetch('http://localhost:8000/api/payments/webhooks/simulate-full-flow', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(formData)
             });
-            
+
             const data = await res.json();
-            
+
             if (data.success) {
                 setSuccess(
                     <div>
@@ -136,7 +136,7 @@ const WebhookSimulator = () => {
 
     const viewEventDetails = async (eventId) => {
         try {
-            const res = await fetch(`http://localhost:5000/api/payments/webhooks/events/${eventId}`);
+            const res = await fetch(`http://localhost:8000/api/payments/webhooks/events/${eventId}`);
             const data = await res.json();
             if (data.success) {
                 setSelectedEvent(data.event);
@@ -170,8 +170,8 @@ const WebhookSimulator = () => {
                     </h2>
                     <p style={{ color: '#6c757d', marginTop: '4px' }}>Test payment flows by simulating webhook events</p>
                 </div>
-                <button 
-                    onClick={fetchEvents} 
+                <button
+                    onClick={fetchEvents}
                     disabled={loading}
                     style={{
                         display: 'flex', alignItems: 'center', gap: '8px',
@@ -260,7 +260,7 @@ const WebhookSimulator = () => {
                                 }}>
                                 {simulating ? <><RefreshCw size={16} className="spin" /> Simulating...</> : <><Play size={16} /> Simulate Event</>}
                             </button>
-                            
+
                             <button onClick={simulateFullFlow} disabled={simulating}
                                 style={{
                                     width: '100%', padding: '10px',
@@ -300,7 +300,7 @@ const WebhookSimulator = () => {
                         <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><Clock size={18} /> Recent Webhook Events</span>
                         <span style={{ background: '#6c757d', color: '#fff', padding: '2px 8px', borderRadius: '12px', fontSize: '12px' }}>{events.length} events</span>
                     </div>
-                    
+
                     {events.length === 0 ? (
                         <div style={{ textAlign: 'center', padding: '48px', color: '#6c757d' }}>
                             <Zap size={48} style={{ opacity: 0.5, marginBottom: '12px' }} />
@@ -322,7 +322,7 @@ const WebhookSimulator = () => {
                                 {events.map(event => (
                                     <tr key={event.id} style={{ borderBottom: '1px solid #eee' }}>
                                         <td style={{ padding: '10px 12px' }}>
-                                            <span style={{ 
+                                            <span style={{
                                                 background: getEventBadgeColor(event.type), color: '#fff',
                                                 padding: '2px 8px', borderRadius: '4px', fontSize: '11px', fontFamily: 'monospace'
                                             }}>{event.type}</span>
@@ -351,7 +351,7 @@ const WebhookSimulator = () => {
                                             )}
                                         </td>
                                         <td style={{ padding: '10px 12px' }}>
-                                            <button onClick={() => viewEventDetails(event.id)} 
+                                            <button onClick={() => viewEventDetails(event.id)}
                                                 style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#007bff' }}>
                                                 <Eye size={16} />
                                             </button>
@@ -383,7 +383,7 @@ const WebhookSimulator = () => {
                                 <div><strong>Source:</strong> <span style={{ background: getSourceColor(selectedEvent.source), color: '#fff', padding: '2px 6px', borderRadius: '4px', fontSize: '12px' }}>{selectedEvent.source}</span></div>
                                 <div><strong>Created:</strong> {new Date(selectedEvent.created_at).toLocaleString()}</div>
                             </div>
-                            
+
                             <h4>Payload</h4>
                             <pre style={{ background: '#1e1e1e', color: '#d4d4d4', padding: '12px', borderRadius: '6px', overflow: 'auto', maxHeight: '200px', fontSize: '12px' }}>
                                 {JSON.stringify(selectedEvent.payload, null, 2)}
@@ -392,7 +392,7 @@ const WebhookSimulator = () => {
                             {selectedEvent.result && (
                                 <>
                                     <h4>Processing Result</h4>
-                                    <pre style={{ 
+                                    <pre style={{
                                         background: selectedEvent.result.success ? '#d4edda' : '#f8d7da',
                                         padding: '12px', borderRadius: '6px', overflow: 'auto', maxHeight: '150px', fontSize: '12px'
                                     }}>

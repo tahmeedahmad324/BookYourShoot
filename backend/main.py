@@ -33,7 +33,6 @@ from backend.routers import (
     cnic, 
     reviews, 
     chat,
-    chat_two_phase,  # Two-Phase Chat System (INQUIRY/CONFIRMED)
     equipment, 
     music, 
     admin, 
@@ -154,7 +153,6 @@ app.include_router(booking.router, prefix="/api")
 app.include_router(cnic.router, prefix="/api")
 app.include_router(reviews.router, prefix="/api")
 app.include_router(chat.router, prefix="/api")
-app.include_router(chat_two_phase.router, prefix="/api")  # Two-Phase Chat Features
 app.include_router(equipment.router, prefix="/api")
 app.include_router(music.router, prefix="/api")
 app.include_router(admin.router, prefix="/api")
@@ -290,45 +288,17 @@ async def websocket_chat_endpoint(
                     temp_id = message.get('temp_id')
                     
                     # ======================================
-                    # TWO-PHASE VALIDATION
-                    # ======================================
-                    from backend.routers.chat_two_phase import validate_conversation_features
-                    
-                    # Determine feature type
-                    feature_type = 'media' if content_type == 'image' else \
-                                   'file' if content_type in ['audio', 'file'] else 'text'
-                    
-                    # Validate conversation features
-                    try:
-                        validation = validate_conversation_features(
-                            conversation_id,
-                            user_id,
-                            feature_type
-                        )
-                        
-                        if not validation['allowed']:
-                            # Send error back to sender
-                            await websocket.send_json({
-                                "type": "error",
-                                "code": "FEATURE_RESTRICTED",
-                                "message": validation['reason'],
-                                "temp_id": temp_id,
-                                "conversation_type": validation['conversation'].get('conversation_type'),
-                                "suggestion": "create_booking"
-                            })
-                            logger.warning(f"Message blocked: {validation['reason']}")
-                            continue  # Skip to next message
-                    
-                    except Exception as validation_error:
-                        logger.error(f"Validation error: {validation_error}")
+                    # Simple content type validation
+                    allowed_content_types = ['text', 'image', 'video', 'audio', 'file', 'document', 'pdf']
+                    if content_type not in allowed_content_types:
                         await websocket.send_json({
                             "type": "error",
-                            "code": "VALIDATION_ERROR",
-                            "message": "Could not validate message",
+                            "code": "INVALID_CONTENT_TYPE",
+                            "message": f"Invalid content type. Allowed: {', '.join(allowed_content_types)}",
                             "temp_id": temp_id
                         })
-                        continue  # Skip to next message
-                    
+                        logger.warning(f"Invalid content type: {content_type}")
+                        continue
                     # ======================================
                     # END TWO-PHASE VALIDATION
                     # ======================================

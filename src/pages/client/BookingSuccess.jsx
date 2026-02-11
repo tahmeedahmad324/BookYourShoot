@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useSearchParams, Link, useNavigate } from 'react-router-dom';
 
-const API_BASE = 'http://localhost:5000/api';
+const API_BASE = 'http://localhost:8000/api';
 
 export default function BookingSuccess() {
   const [searchParams] = useSearchParams();
@@ -17,7 +17,7 @@ export default function BookingSuccess() {
   useEffect(() => {
     if (sessionId) {
       console.log('BookingSuccess: sessionId =', sessionId);
-      
+
       // Check if this is an equipment rental
       const pendingRental = localStorage.getItem('pending_rental');
       if (pendingRental) {
@@ -27,13 +27,13 @@ export default function BookingSuccess() {
 
       // Verify payment with backend
       console.log('BookingSuccess: Calling /status API...');
-      fetch(`http://localhost:5000/api/payments/status/${sessionId}`)
+      fetch(`http://localhost:8000/api/payments/status/${sessionId}`)
         .then(res => res.json())
         .then(async (data) => {
           console.log('BookingSuccess: Payment status =', data);
           setPaymentStatus(data);
           setVerifying(false);
-          
+
           if (data.status === 'success') {
             // Handle equipment rental
             if (pendingRental) {
@@ -42,25 +42,25 @@ export default function BookingSuccess() {
               rental.paymentStatus = 'paid';
               rental.transactionId = sessionId;
               setBookingId(rental.id);
-              
+
               // Save to bookings
               const existingBookings = JSON.parse(localStorage.getItem('equipmentRentals') || '[]');
               existingBookings.push(rental);
               localStorage.setItem('equipmentRentals', JSON.stringify(existingBookings));
               localStorage.removeItem('pending_rental');
-              
+
               console.log('Equipment rental confirmed:', rental.id);
-              
+
               // Send equipment rental confirmation email and notifications
               try {
                 // Get auth user email from localStorage OR sessionStorage
                 const authUser = JSON.parse(localStorage.getItem('user') || sessionStorage.getItem('user') || '{}');
                 const emailAddress = rental.clientEmail || authUser.email;
                 const notificationUserId = authUser.email || rental.clientEmail;
-                
+
                 console.log('BookingSuccess: Sending equipment rental email...');
                 console.log('BookingSuccess: Rental details:', rental);
-                
+
                 const emailResponse = await fetch(`${API_BASE}/payments/send-equipment-rental-email`, {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },
@@ -89,22 +89,22 @@ export default function BookingSuccess() {
               // Handle photographer booking
               const pendingBookingId = localStorage.getItem('pending_booking');
               const pendingBookingData = localStorage.getItem('pending_booking_data');
-              
+
               console.log('BookingSuccess: pendingBookingId =', pendingBookingId);
               console.log('BookingSuccess: pendingBookingData =', pendingBookingData ? 'exists' : 'null');
               console.log('BookingSuccess: Payment status data =', data);
-              
+
               // Get booking ID from localStorage OR from Stripe metadata
               const bookingIdToUse = pendingBookingId || data.metadata?.booking_id;
-              
+
               if (bookingIdToUse) {
                 setBookingId(bookingIdToUse);
                 console.log('Booking confirmed:', bookingIdToUse);
-                
+
                 // Clear localStorage to prevent duplicate calls
                 localStorage.removeItem('pending_booking');
                 localStorage.removeItem('pending_booking_data');
-                
+
                 // Get booking info from localStorage OR from Stripe metadata
                 let bookingInfo = null;
                 if (pendingBookingData) {
@@ -128,7 +128,7 @@ export default function BookingSuccess() {
                     advancePayment: advancePayment
                   };
                 }
-                
+
                 // Send confirmation email if we have booking data
                 if (bookingInfo) {
                   try {
@@ -138,12 +138,12 @@ export default function BookingSuccess() {
                     const emailAddress = bookingInfo.clientEmail || authUser.email;
                     // Use auth email for notifications (to match NotificationDropdown query)
                     const notificationUserId = authUser.email || bookingInfo.clientEmail;
-                    
+
                     console.log('BookingSuccess: Auth user from storage:', authUser);
                     console.log('BookingSuccess: Sending email with:', bookingInfo);
                     console.log('BookingSuccess: Email address:', emailAddress);
                     console.log('BookingSuccess: Notification user ID:', notificationUserId);
-                    
+
                     const emailResponse = await fetch(`${API_BASE}/payments/send-booking-email`, {
                       method: 'POST',
                       headers: { 'Content-Type': 'application/json' },
@@ -187,12 +187,12 @@ export default function BookingSuccess() {
 
   const handleDownloadReceipt = async () => {
     if (!bookingId && !sessionId) return;
-    
+
     setDownloadingReceipt(true);
     try {
       const id = bookingId || sessionId;
       const response = await fetch(`${API_BASE}/payments/receipts/${id}/pdf`);
-      
+
       if (response.ok) {
         const blob = await response.blob();
         const url = window.URL.createObjectURL(blob);
@@ -216,7 +216,7 @@ export default function BookingSuccess() {
 
   const handleViewReceipt = async () => {
     if (!bookingId && !sessionId) return;
-    
+
     const id = bookingId || sessionId;
     // Open receipt in new tab (HTML version)
     window.open(`${API_BASE}/payments/receipts/${id}/html`, '_blank');
@@ -237,25 +237,25 @@ export default function BookingSuccess() {
   }
 
   return (
-    <div className="min-vh-100 d-flex align-items-center justify-content-center py-5" 
-         style={{ background: 'linear-gradient(135deg, #1A73E8 0%, #1557B0 100%)' }}>
+    <div className="min-vh-100 d-flex align-items-center justify-content-center py-5"
+      style={{ background: 'linear-gradient(135deg, #1A73E8 0%, #1557B0 100%)' }}>
       <div className="container">
         <div className="row justify-content-center">
           <div className="col-lg-6">
             <div className="card border-0 shadow-lg" style={{ borderRadius: '20px' }}>
               <div className="card-body p-5 text-center">
                 <div className="mb-4">
-                  <div className="success-checkmark mx-auto mb-4" 
-                       style={{ 
-                         width: '80px', 
-                         height: '80px', 
-                         borderRadius: '50%',
-                         background: '#4CAF50',
-                         display: 'flex',
-                         alignItems: 'center',
-                         justifyContent: 'center',
-                         margin: '0 auto'
-                       }}>
+                  <div className="success-checkmark mx-auto mb-4"
+                    style={{
+                      width: '80px',
+                      height: '80px',
+                      borderRadius: '50%',
+                      background: '#4CAF50',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      margin: '0 auto'
+                    }}>
                     <svg width="50" height="50" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3">
                       <polyline points="20 6 9 17 4 12"></polyline>
                     </svg>
@@ -264,7 +264,7 @@ export default function BookingSuccess() {
 
                 <h2 className="fw-bold mb-3">Payment Successful!</h2>
                 <p className="text-muted mb-4">
-                  {isEquipmentRental 
+                  {isEquipmentRental
                     ? `Your equipment rental is confirmed. The owner will contact you soon.`
                     : `Your booking is confirmed! The photographer has been notified.`
                   }
@@ -364,16 +364,16 @@ export default function BookingSuccess() {
                       )}
                     </button>
                   </div>
-                  
-                  <Link 
-                    to="/client/bookings" 
+
+                  <Link
+                    to="/client/bookings"
                     className="btn btn-primary btn-lg"
                     onClick={() => window.scrollTo(0, 0)}
                   >
                     View My Bookings
                   </Link>
-                  <Link 
-                    to="/client/dashboard" 
+                  <Link
+                    to="/client/dashboard"
                     className="btn btn-outline-secondary"
                     onClick={() => window.scrollTo(0, 0)}
                   >

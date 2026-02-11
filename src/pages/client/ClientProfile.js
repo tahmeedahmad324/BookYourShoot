@@ -424,6 +424,14 @@ const ClientProfile = () => {
                       ❤️ Favorites
                     </button>
                   </li>
+                  <li className="nav-item">
+                    <button
+                      className={`nav-link py-3 ${activeTab === "settings" ? "active fw-bold" : ""}`}
+                      onClick={() => setActiveTab("settings")}
+                    >
+                      ⚙️ Account Settings
+                    </button>
+                  </li>
                 </ul>
               </div>
             </div>
@@ -724,6 +732,63 @@ const ClientProfile = () => {
                         </Link>
                       </div>
                     )}
+                  </div>
+                )}
+
+                {/* Account Settings Tab */}
+                {activeTab === "settings" && (
+                  <div className="fade-in">
+                    <h5 className="fw-bold mb-4">Account Settings</h5>
+
+                    {/* Change Password Section */}
+                    <div className="card mb-4">
+                      <div className="card-body">
+                        <h6 className="fw-bold mb-3">🔒 Change Password</h6>
+                        <p className="text-muted small mb-3">
+                          Update your password to keep your account secure
+                        </p>
+                        <button
+                          className="btn btn-primary"
+                          onClick={() => setShowPasswordModal(true)}
+                        >
+                          Change Password
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Forgot Password Section */}
+                    <div className="card mb-4">
+                      <div className="card-body">
+                        <h6 className="fw-bold mb-3">🔑 Forgot Password?</h6>
+                        <p className="text-muted small mb-3">
+                          If you've forgotten your password, we'll send you a reset link via email
+                        </p>
+                        <button
+                          className="btn btn-outline-primary"
+                          onClick={() => {
+                            alert("Password reset link sent to " + profile.email);
+                          }}
+                        >
+                          Send Password Reset Link
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Delete Account Section */}
+                    <div className="card border-danger">
+                      <div className="card-body">
+                        <h6 className="fw-bold text-danger mb-3">⚠️ Delete Account</h6>
+                        <p className="text-muted small mb-3">
+                          Once you delete your account, there is no going back. Please be certain.
+                        </p>
+                        <button
+                          className="btn btn-danger"
+                          onClick={() => setShowDeleteModal(true)}
+                        >
+                          Delete My Account
+                        </button>
+                      </div>
+                    </div>
                   </div>
                 )}
               </div>

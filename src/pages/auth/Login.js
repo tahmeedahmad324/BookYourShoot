@@ -1,11 +1,12 @@
-import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { yupResolver } from '@hookform/resolvers/yup';
 import * as yup from 'yup';
 import { useAuth } from '../../context/AuthContext';
 import { loginWithPassword } from '../../api/auth';
 import api from '../../services/api';
+import { supabase } from '../../supabaseClient';
 
 // Validation schema - Password login
 const loginSchema = yup.object().shape({
@@ -20,14 +21,26 @@ const loginSchema = yup.object().shape({
 
 const Login = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { login } = useAuth();
   const [loading, setLoading] = useState(false);
   const [serverError, setServerError] = useState('');
+  const [successMessage, setSuccessMessage] = useState('');
   const [showPassword, setShowPassword] = useState(false);
 
-  const { register, handleSubmit, formState: { errors } } = useForm({
+  const { register, handleSubmit, formState: { errors }, setValue } = useForm({
     resolver: yupResolver(loginSchema)
   });
+
+  // Check for success message from registration flow
+  useEffect(() => {
+    if (location.state?.message) {
+      setSuccessMessage(location.state.message);
+    }
+    if (location.state?.email) {
+      setValue('email', location.state.email);
+    }
+  }, [location.state, setValue]);
 
   const onSubmit = async (data) => {
     console.log('[Login] onSubmit called with:', { email: data.email, role: data.role });
@@ -43,6 +56,12 @@ const Login = () => {
       // If mock account, manually call login to set user
       if (response.is_mock) {
         console.log('[Login] Mock account detected, calling login()');
+        // Validate selected role matches the account's actual role
+        if (response.user.role && response.user.role !== data.role) {
+          setServerError(`This account is registered as a ${response.user.role}. Please select the correct role.`);
+          setLoading(false);
+          return;
+        }
         await login(response.user);
         console.log('[Login] Navigating to:', `/${response.user.role}/dashboard`);
         navigate(`/${response.user.role}/dashboard`);
@@ -57,6 +76,30 @@ const Login = () => {
 
           if (userData) {
             console.log('[Login] User data found:', userData);
+            // Validate selected role matches the account's actual role
+            if (userData.role && userData.role !== data.role) {
+              console.warn('[Login] Role mismatch! Selected:', data.role, 'Actual:', userData.role);
+              setServerError(`This account is registered as a ${userData.role}. Please select the correct role.`);
+              await supabase.auth.signOut();
+              setLoading(false);
+              return;
+            }
+
+            // Check if photographer needs CNIC verification
+            if (userData.role === 'photographer' && !userData.cnic_verified) {
+              console.warn('[Login] Photographer CNIC not verified, redirecting to CNIC upload');
+              // DON'T sign out — CNIC upload API requires authentication
+              // Redirect directly to CNIC upload page
+              navigate('/register/cnic', {
+                state: {
+                  message: 'Please complete CNIC verification to access your photographer account.',
+                  fromLogin: true
+                }
+              });
+              setLoading(false);
+              return;
+            }
+
             // Set user in AuthContext BEFORE navigating
             // This ensures ProtectedRoute sees isAuthenticated = true
             await login(userData);
@@ -64,14 +107,14 @@ const Login = () => {
             navigate(`/${userData.role || 'client'}/dashboard`);
             console.log('[Login] navigate() called');
           } else {
-            console.log('[Login] No user data in response, navigating to /client/dashboard');
-            navigate('/client/dashboard');
+            console.log('[Login] No user data in response');
+            setServerError('Unable to verify your account role. Please try again.');
+            await supabase.auth.signOut();
           }
         } catch (profileErr) {
           console.error('[Login] Failed to fetch user profile after login:', profileErr);
-          // Fallback: navigate to client dashboard if profile fetch fails
-          console.log('[Login] Fallback: navigating to /client/dashboard');
-          navigate('/client/dashboard');
+          setServerError('Unable to verify your account. Please try again.');
+          await supabase.auth.signOut();
         }
       }
     } catch (error) {
@@ -98,6 +141,13 @@ const Login = () => {
                   <h2 className="fw-bold">Welcome Back</h2>
                   <p className="text-muted">Sign in to your BookYourShoot account</p>
                 </div>
+
+                {/* Success Message */}
+                {successMessage && (
+                  <div className="alert alert-success" role="alert">
+                    ✓ {successMessage}
+                  </div>
+                )}
 
                 {/* Server Error */}
                 {serverError && (

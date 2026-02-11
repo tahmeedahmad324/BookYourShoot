@@ -4,7 +4,7 @@ import { useAuth } from '../../context/AuthContext';
 import EscrowStatus from '../../components/EscrowStatus';
 import StripeCheckout from '../../components/StripeCheckout';
 
-const API_BASE = 'http://localhost:5000/api';
+const API_BASE = 'http://localhost:8000/api';
 
 const ClientBookings = () => {
   const { user } = useAuth();
@@ -15,11 +15,11 @@ const ClientBookings = () => {
   const [filter, setFilter] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [viewMode, setViewMode] = useState('all'); // 'all', 'bookings', 'rentals'
-  
+
   // Payment Modal State
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [selectedRentalForPayment, setSelectedRentalForPayment] = useState(null);
-  
+
   // Dispute Modal State
   const [showDisputeModal, setShowDisputeModal] = useState(false);
   const [selectedRentalForDispute, setSelectedRentalForDispute] = useState(null);
@@ -138,7 +138,7 @@ const ClientBookings = () => {
       // Fetch photography bookings
       const userBookings = mockBookings.filter(booking => booking.clientId === user?.id || true);
       setBookings(userBookings);
-      
+
       // Fetch equipment rentals from API
       try {
         const response = await fetch(`${API_BASE}/equipment/rentals/my`, {
@@ -147,7 +147,7 @@ const ClientBookings = () => {
             'Content-Type': 'application/json'
           }
         });
-        
+
         if (response.ok) {
           const data = await response.json();
           if (data.success && data.data) {
@@ -177,7 +177,7 @@ const ClientBookings = () => {
         } else {
           // Fallback to localStorage if API fails
           let savedRentals = JSON.parse(localStorage.getItem('equipmentRentals') || '[]');
-          
+
           // Deduplicate rentals by ID (keep the first occurrence)
           const seenIds = new Set();
           savedRentals = savedRentals.filter(r => {
@@ -185,10 +185,10 @@ const ClientBookings = () => {
             seenIds.add(r.id);
             return true;
           });
-          
+
           // Save deduplicated list back to localStorage
           localStorage.setItem('equipmentRentals', JSON.stringify(savedRentals));
-          
+
           // Add mock approved rental for testing payment flow
           const mockApprovedRental = {
             id: 'MOCK-APPROVED-001',
@@ -210,20 +210,20 @@ const ClientBookings = () => {
             createdAt: '2024-11-22T10:30:00',
             notes: 'Approved by owner. Please proceed with payment to confirm your rental.'
           };
-          
+
           // Check if mock rental already exists
           const hasMockRental = savedRentals.some(r => r.id === mockApprovedRental.id);
           if (!hasMockRental) {
             savedRentals.unshift(mockApprovedRental); // Add to beginning
           }
-          
+
           setEquipmentRentals(savedRentals);
         }
       } catch (apiError) {
         console.error('Error fetching rentals from API:', apiError);
         // Fallback to localStorage
         let savedRentals = JSON.parse(localStorage.getItem('equipmentRentals') || '[]');
-        
+
         // Deduplicate rentals by ID (keep the first occurrence)
         const seenIds = new Set();
         savedRentals = savedRentals.filter(r => {
@@ -231,10 +231,10 @@ const ClientBookings = () => {
           seenIds.add(r.id);
           return true;
         });
-        
+
         // Save deduplicated list back to localStorage
         localStorage.setItem('equipmentRentals', JSON.stringify(savedRentals));
-        
+
         // Add mock approved rental for testing payment flow
         const mockApprovedRental = {
           id: 'MOCK-APPROVED-001',
@@ -256,13 +256,13 @@ const ClientBookings = () => {
           createdAt: '2024-11-22T10:30:00',
           notes: 'Approved by owner. Please proceed with payment to confirm your rental.'
         };
-        
+
         // Check if mock rental already exists
         const hasMockRental = savedRentals.some(r => r.id === mockApprovedRental.id);
         if (!hasMockRental) {
           savedRentals.unshift(mockApprovedRental); // Add to beginning
         }
-        
+
         setEquipmentRentals(savedRentals);
       }
     } finally {
@@ -296,7 +296,7 @@ const ClientBookings = () => {
       active: { color: 'primary', icon: '📦', text: 'Active Rental' },
       returned: { color: 'success', icon: '✅', text: 'Returned' }
     };
-    
+
     const config = statusConfig[status] || statusConfig.pending;
     return (
       <span className={`badge bg-${config.color} d-inline-flex align-items-center`}>
@@ -308,26 +308,26 @@ const ClientBookings = () => {
 
   const getPaymentStatusBadge = (booking) => {
     const { paidAmount, totalAmount, remainingAmount, status } = booking;
-    
+
     if (status === 'cancelled') {
       return <span className="badge bg-secondary">Payment Cancelled</span>;
     }
-    
+
     if (paidAmount === 0) {
       return <span className="badge bg-danger">💰 Payment Due</span>;
     }
-    
+
     if (remainingAmount > 0 && paidAmount > 0) {
       if (status === 'completed' || status === 'work_completed') {
         return <span className="badge bg-warning text-dark">⏳ Final Payment Due</span>;
       }
       return <span className="badge bg-info">✓ 50% Advance Paid</span>;
     }
-    
+
     if (remainingAmount === 0) {
       return <span className="badge bg-success">✓ Fully Paid</span>;
     }
-    
+
     return null;
   };
 
@@ -343,7 +343,7 @@ const ClientBookings = () => {
         ? { ...r, status: 'active', paymentStatus: 'paid' }
         : r
     ));
-    
+
     // Also update localStorage
     const savedRentals = JSON.parse(localStorage.getItem('equipmentRentals') || '[]');
     const updatedRentals = savedRentals.map(r =>
@@ -352,7 +352,7 @@ const ClientBookings = () => {
         : r
     );
     localStorage.setItem('equipmentRentals', JSON.stringify(updatedRentals));
-    
+
     setShowPaymentModal(false);
     setSelectedRentalForPayment(null);
     alert('Payment successful! The equipment owner will contact you for pickup/delivery.');
@@ -384,7 +384,7 @@ const ClientBookings = () => {
         },
         body: JSON.stringify(disputeForm)
       });
-      
+
       if (response.ok) {
         alert('Dispute submitted successfully. Our team will review and respond within 24-48 hours.');
         setShowDisputeModal(false);
@@ -408,8 +408,8 @@ const ClientBookings = () => {
   const filteredBookings = bookings.filter(booking => {
     const matchesFilter = filter === 'all' || booking.status === filter;
     const matchesSearch = booking.photographerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         booking.serviceType.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         booking.location.toLowerCase().includes(searchTerm.toLowerCase());
+      booking.serviceType.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      booking.location.toLowerCase().includes(searchTerm.toLowerCase());
     return matchesFilter && matchesSearch;
   });
 
@@ -445,12 +445,12 @@ const ClientBookings = () => {
   const handleCancel = (bookingId) => {
     const booking = bookings.find(b => b.id === bookingId);
     if (!booking) return;
-    
+
     // Calculate days until booking
     const eventDate = new Date(booking.date);
     const today = new Date();
     const daysUntil = Math.ceil((eventDate - today) / (1000 * 60 * 60 * 24));
-    
+
     // Determine refund policy
     let refundMessage = '';
     if (daysUntil >= 15) {
@@ -460,7 +460,7 @@ const ClientBookings = () => {
     } else {
       refundMessage = 'No refund will be issued (less than 7 days notice).';
     }
-    
+
     if (window.confirm(`Are you sure you want to cancel this booking?\n\nRefund Policy: ${refundMessage}\n\nDays until event: ${daysUntil}`)) {
       // Call API to cancel booking
       fetch(`http://localhost:8000/api/bookings/${bookingId}/cancel`, {
@@ -470,29 +470,29 @@ const ClientBookings = () => {
           'Content-Type': 'application/json'
         }
       })
-      .then(response => response.json())
-      .then(data => {
-        if (data.success) {
-          alert(`Booking cancelled successfully.\n\n${data.refund_info.policy}\nRefund Amount: Rs. ${data.refund_info.client_refund.toLocaleString()}`);
-          setBookings(prev => prev.map(booking => 
-            booking.id === bookingId 
+        .then(response => response.json())
+        .then(data => {
+          if (data.success) {
+            alert(`Booking cancelled successfully.\n\n${data.refund_info.policy}\nRefund Amount: Rs. ${data.refund_info.client_refund.toLocaleString()}`);
+            setBookings(prev => prev.map(booking =>
+              booking.id === bookingId
+                ? { ...booking, status: 'cancelled' }
+                : booking
+            ));
+          } else {
+            alert(data.detail || 'Failed to cancel booking');
+          }
+        })
+        .catch(error => {
+          console.error('Error:', error);
+          // Fallback to local update
+          setBookings(prev => prev.map(booking =>
+            booking.id === bookingId
               ? { ...booking, status: 'cancelled' }
               : booking
           ));
-        } else {
-          alert(data.detail || 'Failed to cancel booking');
-        }
-      })
-      .catch(error => {
-        console.error('Error:', error);
-        // Fallback to local update
-        setBookings(prev => prev.map(booking => 
-          booking.id === bookingId 
-            ? { ...booking, status: 'cancelled' }
-            : booking
-        ));
-        alert('Booking cancelled (local only - API unavailable)');
-      });
+          alert('Booking cancelled (local only - API unavailable)');
+        });
     }
   };
 
@@ -500,8 +500,8 @@ const ClientBookings = () => {
     const percentage = (paid / total) * 100;
     return (
       <div className="progress" style={{ height: '6px' }}>
-        <div 
-          className="progress-bar bg-primary" 
+        <div
+          className="progress-bar bg-primary"
           style={{ width: `${percentage}%` }}
         />
       </div>
@@ -608,11 +608,11 @@ const ClientBookings = () => {
                 </button>
               </div>
             </div>
-            
+
             <div className="row align-items-center">
               <div className="col-md-4">
                 <label className="form-label fw-semibold">Filter by Status</label>
-                <select 
+                <select
                   className="form-select"
                   value={filter}
                   onChange={(e) => setFilter(e.target.value)}
@@ -645,7 +645,7 @@ const ClientBookings = () => {
               <div className="text-muted mb-3" style={{ fontSize: '3rem' }}>📅</div>
               <h4 className="fw-bold mb-3">No Bookings Found</h4>
               <p className="text-muted mb-4">
-                {searchTerm || filter !== 'all' 
+                {searchTerm || filter !== 'all'
                   ? 'Try adjusting your filters or search terms'
                   : 'You haven\'t made any bookings yet'
                 }
@@ -664,139 +664,139 @@ const ClientBookings = () => {
                   <h4 className="fw-bold mb-3 mt-4">📸 Photographer Bookings</h4>
                 )}
                 {filteredBookings.map((booking) => (
-              <div key={booking.id} className="card border-0 shadow-sm">
-                <div className="card-body">
-                  <div className="row align-items-start">
-                    {/* Photographer Info */}
-                    <div className="col-md-3">
-                      <div className="d-flex align-items-center mb-3">
-                        <div className="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center me-3" 
-                             style={{ width: '50px', height: '50px', fontSize: '1.5rem' }}>
-                          {booking.photographerImage}
+                  <div key={booking.id} className="card border-0 shadow-sm">
+                    <div className="card-body">
+                      <div className="row align-items-start">
+                        {/* Photographer Info */}
+                        <div className="col-md-3">
+                          <div className="d-flex align-items-center mb-3">
+                            <div className="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center me-3"
+                              style={{ width: '50px', height: '50px', fontSize: '1.5rem' }}>
+                              {booking.photographerImage}
+                            </div>
+                            <div>
+                              <h6 className="fw-bold mb-1">{booking.photographerName}</h6>
+                              <div className="text-muted small">{booking.serviceType}</div>
+                            </div>
+                          </div>
                         </div>
-                        <div>
-                          <h6 className="fw-bold mb-1">{booking.photographerName}</h6>
-                          <div className="text-muted small">{booking.serviceType}</div>
-                        </div>
-                      </div>
-                    </div>
 
-                    {/* Booking Details */}
-                    <div className="col-md-4">
-                      <div className="mb-2">
-                        <span className="text-muted small">Date & Time:</span>
-                        <div className="fw-semibold">
-                          📅 {new Date(booking.date).toLocaleDateString()} at {booking.time}
+                        {/* Booking Details */}
+                        <div className="col-md-4">
+                          <div className="mb-2">
+                            <span className="text-muted small">Date & Time:</span>
+                            <div className="fw-semibold">
+                              📅 {new Date(booking.date).toLocaleDateString()} at {booking.time}
+                            </div>
+                          </div>
+                          <div className="mb-2">
+                            <span className="text-muted small">Duration:</span>
+                            <div className="fw-semibold">⏱️ {booking.duration}</div>
+                          </div>
+                          <div>
+                            <span className="text-muted small">Location:</span>
+                            <div className="fw-semibold">📍 {booking.location}</div>
+                          </div>
+                        </div>
+
+                        {/* Payment Info */}
+                        <div className="col-md-2">
+                          <div className="mb-2">
+                            <span className="text-muted small">Total Amount:</span>
+                            <div className="fw-bold text-primary">Rs. {booking.totalAmount.toLocaleString()}</div>
+                          </div>
+                          <div className="mb-2">
+                            <span className="text-muted small">Paid:</span>
+                            <div className="fw-semibold">Rs. {booking.paidAmount.toLocaleString()}</div>
+                          </div>
+                          {booking.remainingAmount > 0 && (
+                            <div className="mb-2">
+                              <span className="text-muted small">Remaining:</span>
+                              <div className="fw-semibold text-warning">Rs. {booking.remainingAmount.toLocaleString()}</div>
+                            </div>
+                          )}
+                          {getPaymentProgress(booking.paidAmount, booking.totalAmount)}
+                        </div>
+
+                        {/* Actions */}
+                        <div className="col-md-3 text-end">
+                          <div className="mb-2">
+                            {getStatusBadge(booking.status)}
+                          </div>
+                          <div className="d-flex flex-column gap-1">
+                            {/* Pay button - show for pending bookings that haven't been paid */}
+                            {booking.status === 'pending' && booking.paidAmount === 0 && (
+                              <button
+                                className="btn btn-primary btn-sm"
+                                onClick={() => handlePayRemaining(booking.id)}
+                              >
+                                💰 Pay Now (Rs. {booking.totalAmount.toLocaleString()})
+                              </button>
+                            )}
+                            {(booking.status === 'completed' || booking.status === 'work_completed') && (
+                              <>
+                                <button
+                                  className="btn btn-primary btn-sm"
+                                  onClick={() => handleViewGallery(booking.id)}
+                                >
+                                  🎨 View Gallery ({booking.imagesDelivered}/{booking.totalImages})
+                                </button>
+                                <button
+                                  className="btn btn-outline-primary btn-sm"
+                                  onClick={() => handleLeaveReview(booking.photographerId)}
+                                >
+                                  ⭐ Leave Review
+                                </button>
+                              </>
+                            )}
+                            {/* Cancel button for pending bookings only */}
+                            {booking.status === 'pending' && (
+                              <button
+                                className="btn btn-outline-danger btn-sm"
+                                onClick={() => handleCancel(booking.id)}
+                              >
+                                ❌ Cancel Booking
+                              </button>
+                            )}
+                          </div>
                         </div>
                       </div>
-                      <div className="mb-2">
-                        <span className="text-muted small">Duration:</span>
-                        <div className="fw-semibold">⏱️ {booking.duration}</div>
-                      </div>
-                      <div>
-                        <span className="text-muted small">Location:</span>
-                        <div className="fw-semibold">📍 {booking.location}</div>
-                      </div>
-                    </div>
 
-                    {/* Payment Info */}
-                    <div className="col-md-2">
-                      <div className="mb-2">
-                        <span className="text-muted small">Total Amount:</span>
-                        <div className="fw-bold text-primary">Rs. {booking.totalAmount.toLocaleString()}</div>
-                      </div>
-                      <div className="mb-2">
-                        <span className="text-muted small">Paid:</span>
-                        <div className="fw-semibold">Rs. {booking.paidAmount.toLocaleString()}</div>
-                      </div>
-                      {booking.remainingAmount > 0 && (
-                        <div className="mb-2">
-                          <span className="text-muted small">Remaining:</span>
-                          <div className="fw-semibold text-warning">Rs. {booking.remainingAmount.toLocaleString()}</div>
+                      {/* Special Requests */}
+                      {booking.specialRequests && (
+                        <div className="mt-3 pt-3 border-top">
+                          <small className="text-muted">Special Requests:</small>
+                          <div className="text-muted small mt-1">{booking.specialRequests}</div>
                         </div>
                       )}
-                      {getPaymentProgress(booking.paidAmount, booking.totalAmount)}
-                    </div>
 
-                    {/* Actions */}
-                    <div className="col-md-3 text-end">
-                      <div className="mb-2">
-                        {getStatusBadge(booking.status)}
-                      </div>
-                      <div className="d-flex flex-column gap-1">
-                        {/* Pay button - show for pending bookings that haven't been paid */}
-                        {booking.status === 'pending' && booking.paidAmount === 0 && (
-                          <button 
-                            className="btn btn-primary btn-sm"
-                            onClick={() => handlePayRemaining(booking.id)}
-                          >
-                            💰 Pay Now (Rs. {booking.totalAmount.toLocaleString()})
-                          </button>
-                        )}
-                        {(booking.status === 'completed' || booking.status === 'work_completed') && (
-                          <>
-                            <button 
-                              className="btn btn-primary btn-sm"
-                              onClick={() => handleViewGallery(booking.id)}
-                            >
-                              🎨 View Gallery ({booking.imagesDelivered}/{booking.totalImages})
-                            </button>
-                            <button 
-                              className="btn btn-outline-primary btn-sm"
-                              onClick={() => handleLeaveReview(booking.photographerId)}
-                            >
-                              ⭐ Leave Review
-                            </button>
-                          </>
-                        )}
-                        {/* Cancel button for pending bookings only */}
-                        {booking.status === 'pending' && (
-                          <button 
-                            className="btn btn-outline-danger btn-sm"
-                            onClick={() => handleCancel(booking.id)}
-                          >
-                            ❌ Cancel Booking
-                          </button>
-                        )}
-                      </div>
+                      {/* Escrow Status - Show payment escrow info */}
+                      {booking.paidAmount > 0 && (
+                        <div className="mt-3">
+                          <EscrowStatus
+                            booking={{
+                              ...booking,
+                              transactionId: booking.transactionId || `txn_${booking.id}`,
+                              escrowStatus: booking.escrowStatus || 'held',
+                              paymentDate: booking.createdAt
+                            }}
+                            userRole="client"
+                            onRelease={(bookingId) => {
+                              console.log('Payment released for booking:', bookingId);
+                              // Refresh bookings list
+                              window.location.reload();
+                            }}
+                            onRefund={(bookingId, result) => {
+                              console.log('Refund processed for booking:', bookingId, result);
+                              // Refresh bookings list
+                              window.location.reload();
+                            }}
+                          />
+                        </div>
+                      )}
                     </div>
                   </div>
-
-                  {/* Special Requests */}
-                  {booking.specialRequests && (
-                    <div className="mt-3 pt-3 border-top">
-                      <small className="text-muted">Special Requests:</small>
-                      <div className="text-muted small mt-1">{booking.specialRequests}</div>
-                    </div>
-                  )}
-
-                  {/* Escrow Status - Show payment escrow info */}
-                  {booking.paidAmount > 0 && (
-                    <div className="mt-3">
-                      <EscrowStatus
-                        booking={{
-                          ...booking,
-                          transactionId: booking.transactionId || `txn_${booking.id}`,
-                          escrowStatus: booking.escrowStatus || 'held',
-                          paymentDate: booking.createdAt
-                        }}
-                        userRole="client"
-                        onRelease={(bookingId) => {
-                          console.log('Payment released for booking:', bookingId);
-                          // Refresh bookings list
-                          window.location.reload();
-                        }}
-                        onRefund={(bookingId, result) => {
-                          console.log('Refund processed for booking:', bookingId, result);
-                          // Refresh bookings list
-                          window.location.reload();
-                        }}
-                      />
-                    </div>
-                  )}
-                </div>
-              </div>
-            ))}
+                ))}
               </>
             )}
 
@@ -813,8 +813,8 @@ const ClientBookings = () => {
                         {/* Equipment Info */}
                         <div className="col-md-3">
                           <div className="d-flex align-items-center mb-3">
-                            <div className="rounded-circle bg-info text-white d-flex align-items-center justify-content-center me-3" 
-                                 style={{ width: '50px', height: '50px', fontSize: '1.5rem' }}>
+                            <div className="rounded-circle bg-info text-white d-flex align-items-center justify-content-center me-3"
+                              style={{ width: '50px', height: '50px', fontSize: '1.5rem' }}>
                               {rental.equipmentImage || '🎥'}
                             </div>
                             <div>
@@ -877,14 +877,14 @@ const ClientBookings = () => {
                             )}
                             {rental.status === 'approved' && rental.paymentStatus !== 'paid' && (
                               <>
-                                <button 
+                                <button
                                   className="btn btn-success btn-sm fw-bold"
                                   onClick={() => handlePayForRental(rental)}
                                 >
                                   💳 Pay Now (Rs. {rental.totalAmount.toLocaleString()})
                                 </button>
                                 <small className="text-muted mt-1">
-                                  Rental: Rs. {rental.rentalCost.toLocaleString()}<br/>
+                                  Rental: Rs. {rental.rentalCost.toLocaleString()}<br />
                                   Deposit: Rs. {rental.deposit.toLocaleString()}
                                 </small>
                               </>
@@ -897,14 +897,14 @@ const ClientBookings = () => {
                                 >
                                   📋 View Equipment
                                 </Link>
-                                <button 
+                                <button
                                   className="btn btn-outline-primary btn-sm"
                                   onClick={() => alert(`Contact: ${rental.ownerPhone}`)}
                                 >
                                   📞 Contact Owner
                                 </button>
                                 {rental.status === 'active' && (
-                                  <button 
+                                  <button
                                     className="btn btn-outline-danger btn-sm"
                                     onClick={() => handleOpenDisputeModal(rental)}
                                   >

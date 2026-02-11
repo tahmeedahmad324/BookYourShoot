@@ -12,7 +12,7 @@ import {
   Check
 } from "lucide-react"
 
-const API_BASE = process.env.REACT_APP_API_URL || "http://localhost:5000/api"
+const API_BASE = process.env.REACT_APP_API_URL || "http://localhost:8000/api"
 
 /**
  * DisputeForm Component
@@ -39,14 +39,14 @@ const DisputeForm = ({
   const { user } = useAuth()
   const [loading, setLoading] = useState(false)
   const [submitted, setSubmitted] = useState(false)
-  
+
   const [formData, setFormData] = useState({
     reason: "",
     category: "",
     description: "",
     desiredResolution: ""
   })
-  
+
   const [files, setFiles] = useState([])
   const [dragActive, setDragActive] = useState(false)
 
@@ -80,7 +80,7 @@ const DisputeForm = ({
     e.preventDefault()
     e.stopPropagation()
     setDragActive(false)
-    
+
     const droppedFiles = Array.from(e.dataTransfer.files)
     handleFiles(droppedFiles)
   }, [])
@@ -136,7 +136,7 @@ const DisputeForm = ({
 
   const handleSubmit = async (e) => {
     e.preventDefault()
-    
+
     if (!formData.category || !formData.description) {
       alert("Please fill in all required fields")
       return
@@ -147,7 +147,7 @@ const DisputeForm = ({
     try {
       // In production, this would upload files and create dispute
       // For demo, we just simulate the API call
-      
+
       const disputeData = {
         booking_id: bookingId,
         client_id: user?.email || "client@example.com",
@@ -173,9 +173,9 @@ const DisputeForm = ({
       if (!response.ok) throw new Error('Failed to create dispute')
 
       const result = await response.json()
-      
+
       setSubmitted(true)
-      
+
       if (onSubmit) {
         onSubmit(result)
       }
@@ -221,7 +221,7 @@ const DisputeForm = ({
         </div>
         <button type="button" className="btn-close" onClick={onCancel}></button>
       </div>
-      
+
       <div className="modal-body">
         {/* Booking Info */}
         <div className="bg-light rounded-3 p-3 mb-4">
@@ -243,7 +243,7 @@ const DisputeForm = ({
           <div className="row g-2">
             {categories.map(cat => (
               <div className="col-6" key={cat.value}>
-                <div 
+                <div
                   className={`card h-100 cursor-pointer ${formData.category === cat.value ? 'border-primary bg-primary bg-opacity-10' : ''}`}
                   onClick={() => setFormData(prev => ({ ...prev, category: cat.value }))}
                   style={{ cursor: 'pointer' }}
@@ -292,7 +292,7 @@ const DisputeForm = ({
           <p className="text-muted small mb-2">
             Upload screenshots, photos, or documents to support your dispute (max 5 files, 5MB each)
           </p>
-          
+
           <div
             className={`border-2 border-dashed rounded-3 p-4 text-center ${dragActive ? 'border-primary bg-primary bg-opacity-10' : 'border-secondary'}`}
             onDragEnter={handleDrag}
@@ -370,7 +370,7 @@ const DisputeForm = ({
         <div className="alert alert-warning d-flex gap-2 mb-0">
           <AlertTriangle size={20} className="flex-shrink-0" />
           <div className="small">
-            <strong>Before submitting:</strong> Have you tried contacting the photographer directly? 
+            <strong>Before submitting:</strong> Have you tried contacting the photographer directly?
             Many issues can be resolved through communication. Disputes are reviewed within 24-48 hours.
           </div>
         </div>
@@ -380,8 +380,8 @@ const DisputeForm = ({
         <button type="button" className="btn btn-outline-secondary" onClick={onCancel}>
           Cancel
         </button>
-        <button 
-          type="submit" 
+        <button
+          type="submit"
           className="btn btn-danger"
           disabled={loading || !formData.category || !formData.description}
         >

@@ -3,7 +3,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import StripeCheckout from '../../components/StripeCheckout';
 
-const API_BASE = 'http://localhost:5000/api';
+const API_BASE = 'http://localhost:8000/api';
 
 const RemainingPayment = () => {
   const { bookingId } = useParams();
@@ -27,7 +27,7 @@ const RemainingPayment = () => {
           'Authorization': `Bearer ${localStorage.getItem('accessToken')}`
         }
       });
-      
+
       if (res.ok) {
         const data = await res.json();
         setBooking(data.booking || data);
@@ -72,7 +72,7 @@ const RemainingPayment = () => {
   const handlePaymentSuccess = async () => {
     setPaymentSuccess(true);
     setShowPayment(false);
-    
+
     // Update booking status
     try {
       await fetch(`${API_BASE}/bookings/${bookingId}/payment-complete`, {
@@ -89,7 +89,7 @@ const RemainingPayment = () => {
     } catch (error) {
       console.error('Error updating booking:', error);
     }
-    
+
     // Redirect after 3 seconds
     setTimeout(() => {
       navigate('/client/bookings');
@@ -188,7 +188,7 @@ const RemainingPayment = () => {
                 {/* Photographer Info */}
                 <div className="d-flex align-items-center mb-4 pb-3 border-bottom">
                   <div className="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center me-3"
-                       style={{ width: '60px', height: '60px', fontSize: '1.5rem' }}>
+                    style={{ width: '60px', height: '60px', fontSize: '1.5rem' }}>
                     📸
                   </div>
                   <div>
@@ -243,7 +243,7 @@ const RemainingPayment = () => {
                     <div className="d-flex mb-3">
                       <div className="me-3">
                         <div className="rounded-circle bg-success text-white d-flex align-items-center justify-content-center"
-                             style={{ width: '30px', height: '30px' }}>
+                          style={{ width: '30px', height: '30px' }}>
                           ✓
                         </div>
                       </div>
@@ -257,7 +257,7 @@ const RemainingPayment = () => {
                     <div className="d-flex mb-3">
                       <div className="me-3">
                         <div className="rounded-circle bg-success text-white d-flex align-items-center justify-content-center"
-                             style={{ width: '30px', height: '30px' }}>
+                          style={{ width: '30px', height: '30px' }}>
                           ✓
                         </div>
                       </div>
@@ -271,7 +271,7 @@ const RemainingPayment = () => {
                     <div className="d-flex">
                       <div className="me-3">
                         <div className="rounded-circle bg-warning text-white d-flex align-items-center justify-content-center"
-                             style={{ width: '30px', height: '30px' }}>
+                          style={{ width: '30px', height: '30px' }}>
                           💰
                         </div>
                       </div>

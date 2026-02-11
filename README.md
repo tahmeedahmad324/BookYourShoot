@@ -15,7 +15,7 @@ cd backend && copy .env.example .env && cd ..
 # Add your Stripe keys to both .env files
 
 # Start application
-.\start-backend.ps1  # Starts backend on port 5000
+.\start-backend.ps1  # Starts backend on port 8000
 .\start-app.ps1      # Starts frontend on port 3000
 ```
 
@@ -188,7 +188,7 @@ cd ..
 
 Create `.env` in project root:
 ```env
-REACT_APP_API_URL=http://localhost:5000
+REACT_APP_API_URL=http://localhost:8000
 REACT_APP_STRIPE_PUBLISHABLE_KEY=pk_test_your_key_here
 REACT_APP_SUPABASE_URL=https://ygconukadhkajrgckjru.supabase.co
 REACT_APP_SUPABASE_ANON_KEY=your_key_here
@@ -200,7 +200,7 @@ STRIPE_SECRET_KEY=sk_test_your_key_here
 STRIPE_PUBLISHABLE_KEY=pk_test_your_key_here
 SUPABASE_URL=https://ygconukadhkajrgckjru.supabase.co
 SUPABASE_KEY=your_key_here
-PORT=5000
+PORT=8000
 ```
 
 **3. Get Stripe Keys**
@@ -212,7 +212,7 @@ PORT=5000
 
 Option A - PowerShell Scripts (Recommended):
 ```powershell
-.\start-backend.ps1  # Backend on port 5000
+.\start-backend.ps1  # Backend on port 8000
 .\start-app.ps1      # Frontend on port 3000
 ```
 
@@ -220,7 +220,7 @@ Option B - Manual:
 ```powershell
 # Terminal 1 - Backend
 cd backend
-python -m uvicorn main:app --reload --host 127.0.0.1 --port 5000
+python -m uvicorn main:app --reload --host 127.0.0.1 --port 8000
 
 # Terminal 2 - Frontend
 npm start
@@ -228,8 +228,8 @@ npm start
 
 **5. Access Application**
 - Frontend: http://localhost:3000
-- Backend API: http://localhost:5000
-- API Docs: http://localhost:5000/docs
+- Backend API: http://localhost:8000
+- API Docs: http://localhost:8000/docs
 
 ## 🧪 Testing
 
@@ -336,8 +336,8 @@ BookYourShoot/
 
 **Backend won't start**
 ```powershell
-# Check if port 5000 is in use
-netstat -ano | Select-String ":5000"
+# Check if port 8000 is in use
+netstat -ano | Select-String ":8000"
 
 # Kill process
 Stop-Process -Id <PID> -Force
@@ -353,7 +353,7 @@ npm install
 **Payments not working**
 - Verify Stripe keys in both `.env` files
 - Check backend console for errors
-- Ensure backend is running on port 5000
+- Ensure backend is running on port 8000
 
 **No photographers showing**
 - Backend auto-uses mock data if database unavailable

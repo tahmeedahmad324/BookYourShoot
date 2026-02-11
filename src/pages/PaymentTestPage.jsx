@@ -6,7 +6,7 @@ import '../styles/payment-test.css';
 export default function PaymentTestPage() {
   const [searchParams] = useSearchParams();
   const [showPayment, setShowPayment] = useState(false);
-  
+
   // Demo booking data
   const [bookingData, setBookingData] = useState({
     bookingId: `BOOK-${Date.now()}`,
@@ -69,12 +69,12 @@ export default function PaymentTestPage() {
 
         <div className="demo-card">
           <h2>Configure Test Booking</h2>
-          
+
           <div className="form-group">
             <label>Booking ID:</label>
             <div className="input-with-button">
-              <input 
-                type="text" 
+              <input
+                type="text"
                 value={bookingData.bookingId}
                 readOnly
                 className="readonly-input"
@@ -87,8 +87,8 @@ export default function PaymentTestPage() {
 
           <div className="form-group">
             <label>Photographer Name:</label>
-            <input 
-              type="text" 
+            <input
+              type="text"
               value={bookingData.photographerName}
               onChange={handlePhotographerChange}
               placeholder="Enter photographer name"
@@ -97,8 +97,8 @@ export default function PaymentTestPage() {
 
           <div className="form-group">
             <label>Amount (PKR):</label>
-            <input 
-              type="number" 
+            <input
+              type="number"
               value={bookingData.amount}
               onChange={handleAmountChange}
               placeholder="Enter amount"
@@ -123,7 +123,7 @@ export default function PaymentTestPage() {
             </div>
           </div>
 
-          <button 
+          <button
             onClick={() => setShowPayment(true)}
             className="proceed-button"
           >
@@ -173,7 +173,7 @@ export default function PaymentTestPage() {
         <div className="api-info">
           <h3>🔧 API Endpoints</h3>
           <div className="endpoint">
-            <strong>Backend:</strong> <code>http://localhost:5000</code>
+            <strong>Backend:</strong> <code>http://localhost:8000</code>
           </div>
           <div className="endpoint">
             <strong>Create Payment:</strong> <code>POST /api/payments/create-checkout</code>

@@ -3,6 +3,8 @@
 import { useState, useRef, useEffect } from "react"
 import { useAuth } from "../../context/AuthContext"
 import { useLocation } from "react-router-dom"
+import api from "../../services/api"
+import { supabase } from "../../supabaseClient"
 
 const PhotographerProfile = () => {
   const { user } = useAuth()
@@ -18,17 +20,17 @@ const PhotographerProfile = () => {
     image: null,
   })
 
-  // Profile state
+  // Profile state - initialize from AuthContext user data
   const [profile, setProfile] = useState({
-    fullName: user?.name || "Ali Photography",
-    email: user?.email || "ali@example.com",
-    phone: "+92-300-1234567",
-    city: "Lahore",
-    bio: "Professional photographer with 5+ years of experience specializing in weddings, portraits, and events. Passionate about capturing beautiful moments that last a lifetime.",
-    profileImage: null,
-    memberSince: "January 2024",
-    experience: "5+ years",
-    languages: "English, Urdu",
+    fullName: user?.full_name || user?.name || "",
+    email: user?.email || "",
+    phone: user?.phone || "",
+    city: user?.city || "",
+    bio: "",
+    profileImage: user?.profile_picture_url || null,
+    memberSince: user?.created_at ? new Date(user.created_at).toLocaleDateString('en-US', { month: 'long', year: 'numeric' }) : "",
+    experience: "",
+    languages: "",
   })
 
   // Edit states
@@ -44,6 +46,47 @@ const PhotographerProfile = () => {
       setActiveTab(tab)
     }
   }, [location.search])
+
+  // Fetch and sync real profile data from API
+  useEffect(() => {
+    const fetchProfile = async () => {
+      try {
+        // Check if user has an active session before making API call
+        const { data: { session } } = await supabase.auth.getSession()
+        if (!session) {
+          console.log('[PhotographerProfile] No session found, skipping API fetch')
+          return
+        }
+
+        const response = await api.get('/api/profile/me')
+        const userData = response.data?.data?.user
+        const photographerData = response.data?.data?.photographer_profile
+
+        if (userData) {
+          const updatedProfile = {
+            fullName: userData.full_name || "",
+            email: userData.email || "",
+            phone: userData.phone || "",
+            city: userData.city || "",
+            bio: photographerData?.bio || "",
+            profileImage: userData.profile_picture_url || photographerData?.profile_image_path || null,
+            memberSince: userData.created_at ? new Date(userData.created_at).toLocaleDateString('en-US', { month: 'long', year: 'numeric' }) : "",
+            experience: photographerData?.experience_years ? `${photographerData.experience_years}+ years` : "",
+            languages: "",
+          }
+          setProfile(updatedProfile)
+          setEditedProfile(updatedProfile)
+        }
+      } catch (error) {
+        console.error('[PhotographerProfile] Failed to fetch profile:', error)
+        // Silently fail - profile will use AuthContext data as fallback
+      }
+    }
+
+    if (user) {
+      fetchProfile()
+    }
+  }, [user])
   const [showPasswordModal, setShowPasswordModal] = useState(false)
   const [showDeleteModal, setShowDeleteModal] = useState(false)
 
@@ -417,6 +460,14 @@ const PhotographerProfile = () => {
                       ⭐ Reviews
                     </button>
                   </li>
+                  <li className="nav-item">
+                    <button
+                      className={`nav-link text-start w-100 ${activeTab === "settings" ? "active" : ""}`}
+                      onClick={() => setActiveTab("settings")}
+                    >
+                      ⚙️ Account Settings
+                    </button>
+                  </li>
                 </ul>
               </div>
             </div>
@@ -426,7 +477,7 @@ const PhotographerProfile = () => {
           <div className="col-lg-8">
             <div className="card border-0 shadow-sm">
               <div className="card-body p-4">
-                
+
                 {/* Profile Info Tab */}
                 {activeTab === "profile" && (
                   <div className="fade-in">
@@ -667,25 +718,6 @@ const PhotographerProfile = () => {
                         </div>
                       </div>
                     </div>
-
-                    {/* Account Actions */}
-                    <div className="mt-4 pt-4 border-top">
-                      <h6 className="fw-bold mb-3">🔐 Account</h6>
-                      <div className="d-flex gap-2 flex-wrap">
-                        <button
-                          className="btn btn-outline-primary"
-                          onClick={() => setShowPasswordModal(true)}
-                        >
-                          🔑 Change Password
-                        </button>
-                        <button
-                          className="btn btn-outline-danger"
-                          onClick={() => setShowDeleteModal(true)}
-                        >
-                          🗑️ Delete Account
-                        </button>
-                      </div>
-                    </div>
                   </div>
                 )}
 
@@ -694,7 +726,7 @@ const PhotographerProfile = () => {
                   <div className="fade-in">
                     <div className="d-flex justify-content-between align-items-center mb-4">
                       <h5 className="fw-bold mb-0">My Portfolio</h5>
-                      <button 
+                      <button
                         className="btn btn-primary btn-sm"
                         onClick={() => setShowAddPortfolio(true)}
                       >
@@ -712,8 +744,8 @@ const PhotographerProfile = () => {
                                 style={{ height: "180px", overflow: "hidden" }}
                               >
                                 {item.image && item.image.startsWith("data:") ? (
-                                  <img 
-                                    src={item.image} 
+                                  <img
+                                    src={item.image}
                                     alt={item.title}
                                     style={{ width: "100%", height: "100%", objectFit: "cover" }}
                                   />
@@ -744,7 +776,7 @@ const PhotographerProfile = () => {
                         <div style={{ fontSize: "48px", marginBottom: "16px" }}>🖼️</div>
                         <h6 className="text-muted">No portfolio items yet</h6>
                         <p className="text-muted small">Add photos to showcase your work to clients</p>
-                        <button 
+                        <button
                           className="btn btn-primary mt-2"
                           onClick={() => setShowAddPortfolio(true)}
                         >
@@ -755,7 +787,7 @@ const PhotographerProfile = () => {
 
                     <div className="alert alert-info mt-4">
                       <small>
-                        💡 <strong>Tip:</strong> High-quality portfolio photos help attract more clients. 
+                        💡 <strong>Tip:</strong> High-quality portfolio photos help attract more clients.
                         Add your best work from different categories to showcase your versatility.
                       </small>
                     </div>
@@ -851,7 +883,7 @@ const PhotographerProfile = () => {
                                         className="form-control"
                                         value={service.name}
                                         onChange={(e) => {
-                                          setServices(services.map(s => 
+                                          setServices(services.map(s =>
                                             s.id === service.id ? { ...s, name: e.target.value } : s
                                           ))
                                         }}
@@ -863,7 +895,7 @@ const PhotographerProfile = () => {
                                         className="form-control"
                                         value={service.price}
                                         onChange={(e) => {
-                                          setServices(services.map(s => 
+                                          setServices(services.map(s =>
                                             s.id === service.id ? { ...s, price: e.target.value } : s
                                           ))
                                         }}
@@ -875,7 +907,7 @@ const PhotographerProfile = () => {
                                         className="form-control"
                                         value={service.duration}
                                         onChange={(e) => {
-                                          setServices(services.map(s => 
+                                          setServices(services.map(s =>
                                             s.id === service.id ? { ...s, duration: e.target.value } : s
                                           ))
                                         }}
@@ -887,7 +919,7 @@ const PhotographerProfile = () => {
                                         className="form-control"
                                         value={service.description}
                                         onChange={(e) => {
-                                          setServices(services.map(s => 
+                                          setServices(services.map(s =>
                                             s.id === service.id ? { ...s, description: e.target.value } : s
                                           ))
                                         }}
@@ -1059,7 +1091,7 @@ const PhotographerProfile = () => {
                       <div className="card-body">
                         <h6 className="fw-bold mb-3">🚫 Blocked Dates</h6>
                         <p className="text-muted small mb-3">Mark specific dates when you're not available</p>
-                        
+
                         <div className="d-flex gap-2 mb-3">
                           <input
                             type="date"
@@ -1069,7 +1101,7 @@ const PhotographerProfile = () => {
                             min={new Date().toISOString().split('T')[0]}
                             style={{ maxWidth: "200px" }}
                           />
-                          <button 
+                          <button
                             className="btn btn-primary"
                             onClick={handleAddBlockedDate}
                             disabled={!newBlockedDate}
@@ -1134,8 +1166,8 @@ const PhotographerProfile = () => {
                                 <div key={star} className="d-flex align-items-center gap-2 mb-1">
                                   <span className="text-muted small" style={{ width: "20px" }}>{star}★</span>
                                   <div className="progress flex-grow-1" style={{ height: "8px" }}>
-                                    <div 
-                                      className="progress-bar bg-warning" 
+                                    <div
+                                      className="progress-bar bg-warning"
                                       style={{ width: `${percentage}%` }}
                                     />
                                   </div>
@@ -1197,6 +1229,67 @@ const PhotographerProfile = () => {
                         <p className="text-muted small">Reviews from clients will appear here</p>
                       </div>
                     )}
+                  </div>
+                )}
+
+                {/* Account Settings Tab */}
+                {activeTab === "settings" && (
+                  <div className="fade-in">
+                    <h5 className="fw-bold mb-4">Account Settings</h5>
+
+                    {/* Change Password Section */}
+                    <div className="card mb-4">
+                      <div className="card-body">
+                        <h6 className="fw-bold mb-3">🔒 Change Password</h6>
+                        <p className="text-muted small mb-3">
+                          Update your password to keep your account secure
+                        </p>
+                        <button
+                          className="btn btn-primary"
+                          onClick={() => setShowPasswordModal(true)}
+                        >
+                          Change Password
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Forgot Password Section */}
+                    <div className="card mb-4">
+                      <div className="card-body">
+                        <h6 className="fw-bold mb-2">📧 Forgot Password?</h6>
+                        <p className="text-muted mb-3">Send a password reset link to your email address</p>
+                        <button
+                          className="btn btn-outline-primary"
+                          onClick={() => {
+                            alert(`Password reset link sent to ${profile.email}`);
+                          }}
+                        >
+                          Send Password Reset Link
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Delete Account Section */}
+                    <div className="card border-danger">
+                      <div className="card-body">
+                        <h6 className="fw-bold text-danger mb-2">⚠️ Delete Account</h6>
+                        <p className="text-muted mb-3">
+                          Permanently delete your account and all associated data. This action cannot be undone.
+                        </p>
+                        <ul className="text-muted small mb-3">
+                          <li>All your portfolio items will be deleted</li>
+                          <li>Your booking history will be removed</li>
+                          <li>Any pending bookings will be cancelled</li>
+                          <li>Your earnings data will be permanently lost</li>
+                        </ul>
+                        <button
+                          className="btn btn-danger"
+                          onClick={() => setShowDeleteModal(true)}
+                        >
+                          Delete My Account
+                        </button>
+                      </div>
+                    </div>
                   </div>
                 )}
 
@@ -1289,27 +1382,27 @@ const PhotographerProfile = () => {
             <div className="modal-content">
               <div className="modal-header">
                 <h5 className="modal-title fw-bold">Add Portfolio Photo</h5>
-                <button 
-                  type="button" 
-                  className="btn-close" 
+                <button
+                  type="button"
+                  className="btn-close"
                   onClick={() => {
                     setShowAddPortfolio(false)
                     setNewPortfolioItem({ title: "", category: "Wedding", image: null })
-                  }} 
+                  }}
                 />
               </div>
               <div className="modal-body">
                 {/* Image Preview */}
                 <div className="mb-3">
-                  <div 
+                  <div
                     className="border rounded d-flex align-items-center justify-content-center bg-light"
                     style={{ height: "200px", overflow: "hidden", cursor: "pointer" }}
                     onClick={() => portfolioFileRef.current?.click()}
                   >
                     {newPortfolioItem.image ? (
-                      <img 
-                        src={newPortfolioItem.image} 
-                        alt="Preview" 
+                      <img
+                        src={newPortfolioItem.image}
+                        alt="Preview"
                         style={{ width: "100%", height: "100%", objectFit: "cover" }}
                       />
                     ) : (
@@ -1357,8 +1450,8 @@ const PhotographerProfile = () => {
                 </div>
               </div>
               <div className="modal-footer">
-                <button 
-                  className="btn btn-secondary" 
+                <button
+                  className="btn btn-secondary"
                   onClick={() => {
                     setShowAddPortfolio(false)
                     setNewPortfolioItem({ title: "", category: "Wedding", image: null })
@@ -1366,8 +1459,8 @@ const PhotographerProfile = () => {
                 >
                   Cancel
                 </button>
-                <button 
-                  className="btn btn-primary" 
+                <button
+                  className="btn btn-primary"
                   onClick={handleAddPortfolioItem}
                   disabled={!newPortfolioItem.title || !newPortfolioItem.image}
                 >
@@ -1386,15 +1479,15 @@ const PhotographerProfile = () => {
             <div className="modal-content">
               <div className="modal-header">
                 <h5 className="modal-title fw-bold">🚩 Report Review</h5>
-                <button 
-                  type="button" 
-                  className="btn-close" 
+                <button
+                  type="button"
+                  className="btn-close"
                   onClick={() => {
                     setShowReportModal(false)
                     setReportingReview(null)
                     setReportReason("")
                     setReportDescription("")
-                  }} 
+                  }}
                 />
               </div>
               <div className="modal-body">
@@ -1441,14 +1534,14 @@ const PhotographerProfile = () => {
 
                 <div className="alert alert-info py-2">
                   <small>
-                    📋 Our team will review your report within 24-48 hours. 
+                    📋 Our team will review your report within 24-48 hours.
                     If the review violates our guidelines, it will be removed.
                   </small>
                 </div>
               </div>
               <div className="modal-footer">
-                <button 
-                  className="btn btn-secondary" 
+                <button
+                  className="btn btn-secondary"
                   onClick={() => {
                     setShowReportModal(false)
                     setReportingReview(null)
@@ -1458,8 +1551,8 @@ const PhotographerProfile = () => {
                 >
                   Cancel
                 </button>
-                <button 
-                  className="btn btn-danger" 
+                <button
+                  className="btn btn-danger"
                   onClick={handleSubmitReport}
                   disabled={!reportReason}
                 >

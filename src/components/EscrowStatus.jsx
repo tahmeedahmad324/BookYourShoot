@@ -22,11 +22,11 @@ const EscrowStatus = ({ booking, onRelease, onRefund, userRole }) => {
   // Calculate cancellation refund amount
   const getCancellationRefund = () => {
     if (!booking.date) return { refund: 0, policy: 'Unknown' };
-    
+
     const bookingDate = new Date(booking.date);
     const now = new Date();
     const daysUntilBooking = Math.floor((bookingDate - now) / (1000 * 60 * 60 * 24));
-    
+
     if (daysUntilBooking >= 14) {
       return { refund: 100, policy: 'Full refund - 14+ days notice' };
     } else if (daysUntilBooking >= 7) {
@@ -41,12 +41,12 @@ const EscrowStatus = ({ booking, onRelease, onRefund, userRole }) => {
   const handleReleasePayment = async () => {
     setLoading(true);
     try {
-      await fetch(`http://localhost:5000/api/payments/escrow/release/${booking.transactionId}`, {
+      await fetch(`http://localhost:8000/api/payments/escrow/release/${booking.transactionId}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ reason: 'Work completed - confirmed by client' })
       });
-      
+
       if (onRelease) onRelease(booking.id);
       alert('✅ Payment released to photographer!');
       setShowConfirmDialog(false);
@@ -61,7 +61,7 @@ const EscrowStatus = ({ booking, onRelease, onRefund, userRole }) => {
   const handleRequestRefund = async () => {
     setLoading(true);
     try {
-      const response = await fetch(`http://localhost:5000/api/payments/escrow/refund/${booking.transactionId}`, {
+      const response = await fetch(`http://localhost:8000/api/payments/escrow/refund/${booking.transactionId}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -69,11 +69,11 @@ const EscrowStatus = ({ booking, onRelease, onRefund, userRole }) => {
           reason: 'Booking cancelled by client'
         })
       });
-      
+
       const result = await response.json();
-      
+
       if (onRefund) onRefund(booking.id, result);
-      
+
       alert(`✅ Refund processed!\\n\\nYour refund: Rs. ${result.refund_amount.toLocaleString()}\\nPhotographer payment: Rs. ${result.photographer_payment.toLocaleString()}\\n\\nPolicy: ${result.policy}`);
       setShowConfirmDialog(false);
     } catch (error) {
@@ -91,14 +91,14 @@ const EscrowStatus = ({ booking, onRelease, onRefund, userRole }) => {
 
   const getEscrowStatusBadge = () => {
     if (!booking.escrowStatus) return null;
-    
+
     const statusConfig = {
       held: { color: 'success', icon: '✅', text: 'Payment Secured' },
       released: { color: 'success', icon: '✅', text: 'Completed' },
       refunded: { color: 'info', icon: '↩️', text: 'Refunded' },
       partially_refunded: { color: 'info', icon: '↩️', text: 'Refunded' }
     };
-    
+
     const config = statusConfig[booking.escrowStatus] || statusConfig.held;
     return (
       <span className={`badge bg-${config.color} d-inline-flex align-items-center fs-6`}>
@@ -144,7 +144,7 @@ const EscrowStatus = ({ booking, onRelease, onRefund, userRole }) => {
                   </small>
                 </div>
               )}
-              
+
               {/* Client reminder */}
               {userRole === 'client' && booking.status === 'completed' && (
                 <div className="alert alert-info mb-3">
@@ -175,7 +175,7 @@ const EscrowStatus = ({ booking, onRelease, onRefund, userRole }) => {
               {/* Client Actions */}
               {userRole === 'client' && booking.status === 'completed' && (
                 <div className="d-grid gap-2">
-                  <button 
+                  <button
                     className="btn btn-success"
                     onClick={() => openConfirmDialog('release')}
                     disabled={loading}
@@ -191,7 +191,7 @@ const EscrowStatus = ({ booking, onRelease, onRefund, userRole }) => {
               {/* Client Cancellation */}
               {userRole === 'client' && (booking.status === 'confirmed' || booking.status === 'pending') && (
                 <div className="mt-3">
-                  <button 
+                  <button
                     className="btn btn-outline-secondary btn-sm w-100"
                     onClick={() => openConfirmDialog('refund')}
                     disabled={loading}
@@ -219,7 +219,7 @@ const EscrowStatus = ({ booking, onRelease, onRefund, userRole }) => {
                 <div>
                   <strong>Booking Complete</strong>
                   <p className="mb-0 small mt-1">
-                    {userRole === 'photographer' 
+                    {userRole === 'photographer'
                       ? `Payment of Rs. ${Math.floor(booking.paidAmount * 0.9).toLocaleString()} has been transferred to your account.`
                       : `Thank you! Your booking is complete.`
                     }
@@ -254,9 +254,9 @@ const EscrowStatus = ({ booking, onRelease, onRefund, userRole }) => {
                 <h5 className="modal-title">
                   {action === 'release' ? '✅ Confirm Payment Release' : '❌ Confirm Cancellation'}
                 </h5>
-                <button 
-                  type="button" 
-                  className="btn-close" 
+                <button
+                  type="button"
+                  className="btn-close"
                   onClick={() => setShowConfirmDialog(false)}
                   disabled={loading}
                 ></button>
@@ -296,16 +296,16 @@ const EscrowStatus = ({ booking, onRelease, onRefund, userRole }) => {
                 )}
               </div>
               <div className="modal-footer">
-                <button 
-                  type="button" 
-                  className="btn btn-secondary" 
+                <button
+                  type="button"
+                  className="btn btn-secondary"
                   onClick={() => setShowConfirmDialog(false)}
                   disabled={loading}
                 >
                   Cancel
                 </button>
-                <button 
-                  type="button" 
+                <button
+                  type="button"
                   className={`btn ${action === 'release' ? 'btn-success' : 'btn-danger'}`}
                   onClick={action === 'release' ? handleReleasePayment : handleRequestRefund}
                   disabled={loading}

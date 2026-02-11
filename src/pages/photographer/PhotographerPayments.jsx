@@ -22,7 +22,7 @@ import {
   Heart
 } from "lucide-react"
 
-const API_BASE = 'http://localhost:5000/api';
+const API_BASE = 'http://localhost:8000/api';
 
 const PhotographerPayments = () => {
   const { user } = useAuth()
@@ -173,8 +173,8 @@ const PhotographerPayments = () => {
   const filteredTransactions = transactions.filter(txn => {
     const matchesFilter = filter === "all" || txn.status === filter
     const matchesSearch = txn.clientName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         txn.service.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         txn.id.toLowerCase().includes(searchTerm.toLowerCase())
+      txn.service.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      txn.id.toLowerCase().includes(searchTerm.toLowerCase())
     return matchesFilter && matchesSearch
   })
 

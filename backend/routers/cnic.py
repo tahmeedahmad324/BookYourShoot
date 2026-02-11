@@ -46,23 +46,25 @@ class CNICProcessor:
         )
         return gray, thresh
 
+    # Valid first digits for Pakistani CNIC province codes (1-8)
+    _VALID_PROVINCE_DIGITS = set("12345678")
+
     def _normalize_cnic(self, text: str) -> Optional[str]:
+        """Extract CNIC from QR: drop last digit, take last 13, format."""
         if not text:
             return None
-        m = re.search(r"(\d{5})[-\s]?(\d{7})[-\s]?(\d)\b", text)
-        if m:
-            return f"{m.group(1)}-{m.group(2)}-{m.group(3)}"
+        
+        # Strip all non-digits
         digits = re.sub(r"\D", "", text)
-        m2 = re.search(r"(\d{13})", digits)
-        if m2:
-            d = m2.group(1)
-            return f"{d[:5]}-{d[5:12]}-{d[12]}"
-        return None
+        
+        # Drop last digit, take last 13, format
+        cnic_digits = digits[:-1][-13:]
+        return f"{cnic_digits[:5]}-{cnic_digits[5:12]}-{cnic_digits[12]}"
 
     def _mask_cnic(self, cnic: Optional[str]) -> Optional[str]:
         if not cnic or not re.match(r"^\d{5}-\d{7}-\d$", cnic):
             return None
-        return f"{cnic[:2]}***-*******-{cnic[-1]}"
+        return f"{cnic}"
 
     def _quick_ocr_text(self) -> str:
         """Fast, low-cost OCR pass used for document-type gating (avoid random docs)."""
@@ -261,11 +263,31 @@ class CNICProcessor:
         return best_cnic
 
     def extract_cnic_from_qr_payloads(self, payloads: List[str]) -> Optional[str]:
+        """Extract CNIC from one or more QR payload strings.
+
+        Each payload may be a raw numeric string (e.g. 26 digits) where the
+        13-digit CNIC is embedded, or a formatted string with separators.
+        We try every payload through _normalize_cnic which now handles the
+        long-numeric-string case.
+        """
+        candidates: List[str] = []
         for p in payloads or []:
+            if not p:
+                continue
             n = self._normalize_cnic(p)
             if n:
-                return n
-        return None
+                candidates.append(n)
+
+        if not candidates:
+            return None
+
+        # Prefer candidates whose first digit is a valid province code
+        for c in candidates:
+            first_digit = c[0] if c else ""
+            if first_digit in self._VALID_PROVINCE_DIGITS:
+                return c
+
+        return candidates[0]
     
     def extract_dates(self):
         """Extract dates for expiry check"""
@@ -358,41 +380,113 @@ class CNICProcessor:
             "message": message
         }
     
+    def _build_qr_preprocessing_variants(self) -> List[np.ndarray]:
+        """Build a comprehensive list of preprocessed image variants for QR scanning."""
+        variants: List[np.ndarray] = []
+        h, w = self.image.shape[:2]
+
+        # 1. Original
+        variants.append(self.image)
+
+        # 2. Grayscale
+        gray = cv2.cvtColor(self.image, cv2.COLOR_BGR2GRAY)
+        variants.append(gray)
+
+        # 3. Binary (fixed threshold)
+        _, binary = cv2.threshold(gray, 127, 255, cv2.THRESH_BINARY)
+        variants.append(binary)
+
+        # 4. Otsu threshold (better for varying lighting)
+        _, otsu = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+        variants.append(otsu)
+
+        # 5. Adaptive threshold
+        adaptive = cv2.adaptiveThreshold(
+            gray, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 11, 2
+        )
+        variants.append(adaptive)
+
+        # 6. CLAHE (enhanced contrast)
+        clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
+        enhanced = clahe.apply(gray)
+        variants.append(enhanced)
+
+        # 7. Sharpened
+        kernel = np.array([[0, -1, 0], [-1, 5, -1], [0, -1, 0]], dtype=np.float32)
+        sharpened = cv2.filter2D(gray, -1, kernel)
+        variants.append(sharpened)
+
+        # 8. Inverted binary
+        _, inverted = cv2.threshold(gray, 127, 255, cv2.THRESH_BINARY_INV)
+        variants.append(inverted)
+
+        # 9-10. Upscaled variants (2x, 3x) — helps when QR is small in the image
+        for scale in [2.0, 3.0]:
+            upscaled = cv2.resize(gray, (int(w * scale), int(h * scale)), interpolation=cv2.INTER_CUBIC)
+            variants.append(upscaled)
+            _, up_otsu = cv2.threshold(upscaled, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+            variants.append(up_otsu)
+
+        # 11. Cropped to right-half of the card (QR is typically in upper-right)
+        right_half = gray[:, w // 2 :]
+        variants.append(right_half)
+        right_up = cv2.resize(right_half, (right_half.shape[1] * 2, right_half.shape[0] * 2), interpolation=cv2.INTER_CUBIC)
+        variants.append(right_up)
+
+        return variants
+
     def scan_qr_code(self):
-        """Scan QR code from CNIC back side"""
+        """Scan QR code from CNIC back side with comprehensive preprocessing."""
         payloads: List[str] = []
+        images_to_try = self._build_qr_preprocessing_variants()
 
-        # 1) Try pyzbar if available
-        if PYZBAR_AVAILABLE:
+        # ---- Pass 1: OpenCV QRCodeDetector ----
+        detector = cv2.QRCodeDetector()
+        for img in images_to_try:
+            if payloads:
+                break  # stop early once we have data
             try:
-                decoded_objects = pyzbar_mod.decode(self.image) if pyzbar_mod else []
-                for obj in decoded_objects or []:
-                    try:
-                        payloads.append(obj.data.decode("utf-8", errors="ignore"))
-                    except Exception:
-                        continue
-            except Exception:
-                payloads = payloads
-
-        # 2) Fallback: OpenCV QRCodeDetector (works without zbar)
-        if not payloads:
-            try:
-                detector = cv2.QRCodeDetector()
+                # Multi-detect
                 try:
-                    ok, decoded_info, points, _ = detector.detectAndDecodeMulti(cast(Any, self.image))
+                    ok, decoded_info, points, _ = detector.detectAndDecodeMulti(cast(Any, img))
                     if ok and decoded_info:
-                        payloads.extend([s for s in decoded_info if s])
+                        for data in decoded_info:
+                            if data and data not in payloads:
+                                payloads.append(data)
                 except Exception:
-                    data, points, _ = detector.detectAndDecode(cast(Any, self.image))
-                    if data:
-                        payloads.append(data)
+                    pass
+                # Single detect
+                data, points, _ = detector.detectAndDecode(cast(Any, img))
+                if data and data not in payloads:
+                    payloads.append(data)
+            except Exception:
+                continue
+
+        # ---- Pass 2: pyzbar (reads QR and many other barcode types) ----
+        if PYZBAR_AVAILABLE and not payloads:
+            try:
+                for img in images_to_try:
+                    if payloads:
+                        break
+                    decoded_objects = pyzbar_mod.decode(img) if pyzbar_mod else []
+                    for obj in decoded_objects:
+                        try:
+                            data = obj.data.decode('utf-8')
+                            if data and data not in payloads:
+                                payloads.append(data)
+                        except Exception:
+                            continue
             except Exception:
                 pass
 
         if not payloads:
-            return {"success": False, "message": "No QR code found", "payloads": []}
+            return {
+                "success": False,
+                "message": "No QR code found. Please ensure the QR code is clearly visible and not obscured.",
+                "payloads": [],
+            }
 
-        return {"success": True, "message": "QR code scanned", "payloads": payloads}
+        return {"success": True, "message": "QR code scanned successfully", "payloads": payloads}
 
 
 class VerificationResponse(BaseModel):
@@ -652,6 +746,7 @@ async def verify_cnic_pair(
             )
 
         cnic_qr = back.extract_cnic_from_qr_payloads(qr_result.get("payloads", []))
+        
         if not cnic_qr:
             return PairVerificationResponse(
                 front_is_readable=True,
@@ -665,7 +760,11 @@ async def verify_cnic_pair(
                 message="QR was detected but CNIC number could not be parsed from it. Please retake the back photo." 
             )
 
-        cnic_match = (cnic_front == cnic_qr)
+        # Compare digits only (strip dashes) so formatting differences
+        # between front OCR and QR extraction don't cause false mismatches.
+        front_digits = re.sub(r"\D", "", cnic_front) if cnic_front else ""
+        qr_digits = re.sub(r"\D", "", cnic_qr) if cnic_qr else ""
+        cnic_match = (front_digits == qr_digits) and len(front_digits) == 13
 
         # Best-effort DB write (keep current schema assumptions)
         try:
@@ -681,6 +780,8 @@ async def verify_cnic_pair(
             notes.append(f"QR match: {cnic_match}")
             notes.append(expiry_info.get("message", ""))
             notes.append(f"QR CNIC: {back._mask_cnic(cnic_qr) or 'N/A'}")
+            
+            # Save to cnic_verification table
             supabase.table("cnic_verification").insert({
                 "user_id": user_id,
                 "upload_path": f"{front_file.filename} | {back_file.filename}",
@@ -690,6 +791,13 @@ async def verify_cnic_pair(
                 "status": status,
                 "notes": " | ".join([n for n in notes if n])
             }).execute()
+            
+            # Update user's profile with CNIC verification status
+            if cnic_match:
+                supabase.table("users").update({
+                    "cnic_verified": True,
+                    "cnic_number": cnic_front
+                }).eq("id", user_id).execute()
         except Exception as db_error:
             print(f"Warning: Could not save pair verification to database: {db_error}")
 

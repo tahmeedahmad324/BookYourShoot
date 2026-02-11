@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Container, Row, Col, Card, Form, Button, Alert, ProgressBar, Badge, Spinner } from 'react-bootstrap';
 import axios from 'axios';
+import { supabase } from '../../supabaseClient';
 
 /**
  * AI Album Builder - Complete Redesign
@@ -16,22 +17,22 @@ function AlbumBuilderFresh() {
   // Session
   const [sessionId, setSessionId] = useState(null);
   const [currentStep, setCurrentStep] = useState(0);
-  
+
   // Step 1: People management
   const [people, setPeople] = useState([]); // [{name: '', files: [], previews: []}]
   const [currentPersonName, setCurrentPersonName] = useState('');
   const [currentPersonFiles, setCurrentPersonFiles] = useState([]);
   const [currentPersonPreviews, setCurrentPersonPreviews] = useState([]);
   const [referencesProcessed, setReferencesProcessed] = useState(false);
-  
+
   // Step 2: Event photos
   const [eventFiles, setEventFiles] = useState([]);
   const [eventPreviews, setEventPreviews] = useState([]);
   const [eventsProcessed, setEventsProcessed] = useState(false);
-  
+
   // Step 3: Results
   const [albums, setAlbums] = useState(null);
-  
+
   // UI State
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -39,7 +40,7 @@ function AlbumBuilderFresh() {
   const [progress, setProgress] = useState(0);
   const [progressText, setProgressText] = useState('');
 
-  const API_BASE = 'http://localhost:5000/api/album-builder';
+  const API_BASE = 'http://localhost:8000/api/album-builder';
 
   // ============================================================================
   // STYLES - Pastel colors matching website
@@ -164,38 +165,46 @@ function AlbumBuilderFresh() {
   // ============================================================================
   // UTILITY FUNCTIONS
   // ============================================================================
-  
+
   const showError = (msg) => { setError(msg); setLoading(false); };
   const showSuccess = (msg) => { setSuccess(msg); setTimeout(() => setSuccess(null), 5000); };
   const clearMessages = () => { setError(null); setSuccess(null); };
 
-  const getAuthHeaders = () => ({
-    headers: {
-      'Authorization': `Bearer ${localStorage.getItem('token')}`,
-      'Content-Type': 'multipart/form-data'
-    }
-  });
+  const getAuthToken = async () => {
+    const { data: { session } } = await supabase.auth.getSession();
+    return session?.access_token || localStorage.getItem('token');
+  };
+
+  const getAuthHeaders = async () => {
+    const token = await getAuthToken();
+    return {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'multipart/form-data'
+      }
+    };
+  };
 
   // ============================================================================
   // STEP 0: START SESSION
   // ============================================================================
-  
+
   const startSession = async () => {
     clearMessages();
     setLoading(true);
-    
+
     try {
-      const token = localStorage.getItem('token');
+      const token = await getAuthToken();
       const response = await axios.post(
         `${API_BASE}/start-session`,
         {},
         { headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' } }
       );
-      
+
       setSessionId(response.data.session_id);
       setCurrentStep(1);
       showSuccess('Session started! Add people you want to find in your photos.');
-      
+
     } catch (err) {
       showError(err.response?.data?.detail || 'Failed to start session');
     } finally {
@@ -206,32 +215,32 @@ function AlbumBuilderFresh() {
   // ============================================================================
   // STEP 1: PEOPLE MANAGEMENT
   // ============================================================================
-  
+
   const handlePersonPhotoSelect = (e) => {
     const files = Array.from(e.target.files);
     if (files.length === 0) return;
-    
+
     // Limit to 3 photos per person
     const selectedFiles = files.slice(0, 3);
     setCurrentPersonFiles(selectedFiles);
-    
+
     // Create previews
     const previews = selectedFiles.map(file => URL.createObjectURL(file));
     setCurrentPersonPreviews(previews);
   };
-  
+
   const removeCurrentPersonPhoto = (index) => {
     const newFiles = [...currentPersonFiles];
     const newPreviews = [...currentPersonPreviews];
-    
+
     URL.revokeObjectURL(newPreviews[index]);
     newFiles.splice(index, 1);
     newPreviews.splice(index, 1);
-    
+
     setCurrentPersonFiles(newFiles);
     setCurrentPersonPreviews(newPreviews);
   };
-  
+
   const addPerson = () => {
     if (!currentPersonName.trim()) {
       showError('Please enter a name for this person');
@@ -245,22 +254,22 @@ function AlbumBuilderFresh() {
       showError('Maximum 5 people allowed');
       return;
     }
-    
+
     // Add person to list
     setPeople([...people, {
       name: currentPersonName.trim(),
       files: currentPersonFiles,
       previews: currentPersonPreviews
     }]);
-    
+
     // Reset current person form
     setCurrentPersonName('');
     setCurrentPersonFiles([]);
     setCurrentPersonPreviews([]);
-    
+
     showSuccess(`Added ${currentPersonName}! You can add more people or proceed.`);
   };
-  
+
   const removePerson = (index) => {
     const newPeople = [...people];
     // Revoke preview URLs
@@ -268,22 +277,22 @@ function AlbumBuilderFresh() {
     newPeople.splice(index, 1);
     setPeople(newPeople);
   };
-  
+
   const preprocessReferences = async () => {
     if (people.length === 0) {
       showError('Add at least one person first');
       return;
     }
-    
+
     clearMessages();
     setLoading(true);
     setProgress(0);
     setProgressText('Preparing reference photos...');
-    
+
     try {
       const formData = new FormData();
       const personNames = [];
-      
+
       // Add all files from all people
       people.forEach((person) => {
         personNames.push(person.name);
@@ -291,31 +300,31 @@ function AlbumBuilderFresh() {
           formData.append('reference_files', file);
         });
       });
-      
+
       formData.append('person_names', JSON.stringify(personNames));
-      
+
       setProgress(30);
       setProgressText('Processing faces...');
-      
+
       const response = await axios.post(
         `${API_BASE}/upload-references/${sessionId}`,
         formData,
-        getAuthHeaders()
+        await getAuthHeaders()
       );
-      
+
       setProgress(100);
       setProgressText('References processed!');
       setReferencesProcessed(true);
-      
+
       showSuccess(`${response.data.people_registered} people registered successfully!`);
-      
+
       // Auto-advance to step 2 after a short delay
       setTimeout(() => {
         setCurrentStep(2);
         setProgress(0);
         setProgressText('');
       }, 1500);
-      
+
     } catch (err) {
       showError(err.response?.data?.detail || 'Failed to process references');
     } finally {
@@ -326,15 +335,15 @@ function AlbumBuilderFresh() {
   // ============================================================================
   // STEP 2: EVENT PHOTOS
   // ============================================================================
-  
+
   const handleEventPhotosSelect = (e) => {
     const files = Array.from(e.target.files);
     if (files.length === 0) return;
-    
+
     // Limit to 1000 photos
     const selectedFiles = files.slice(0, 1000);
     setEventFiles(selectedFiles);
-    
+
     // Create previews (only first 50 for performance)
     const previewFiles = selectedFiles.slice(0, 50);
     const previews = previewFiles.map(file => ({
@@ -343,72 +352,73 @@ function AlbumBuilderFresh() {
     }));
     setEventPreviews(previews);
   };
-  
+
   const removeEventPhoto = (index) => {
     const newFiles = [...eventFiles];
     const newPreviews = [...eventPreviews];
-    
+
     if (index < newPreviews.length) {
       URL.revokeObjectURL(newPreviews[index].url);
       newPreviews.splice(index, 1);
     }
     newFiles.splice(index, 1);
-    
+
     setEventFiles(newFiles);
     setEventPreviews(newPreviews);
   };
-  
+
   const processEventPhotos = async () => {
     if (eventFiles.length < 20) {
       showError('Please upload at least 20 event photos');
       return;
     }
-    
+
     clearMessages();
     setLoading(true);
     setProgress(0);
     setProgressText('Uploading event photos...');
-    
+
     try {
       const formData = new FormData();
       eventFiles.forEach(file => formData.append('event_files', file));
-      
+
       setProgress(20);
       setProgressText(`Processing ${eventFiles.length} photos...`);
-      
+
       const response = await axios.post(
         `${API_BASE}/upload-events/${sessionId}`,
         formData,
-        getAuthHeaders()
+        await getAuthHeaders()
       );
-      
+
       setProgress(50);
       setProgressText('Running AI face recognition...');
-      
+
       // Now build albums
+      const token = await getAuthToken();
       const buildResponse = await axios.post(
         `${API_BASE}/build-album/${sessionId}`,
         {},
-        { headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}`, 'Content-Type': 'application/json' } }
+        { headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' } }
       );
-      
+
       setProgress(90);
       setProgressText('Organizing albums...');
-      
+
       setAlbums(buildResponse.data);
       setEventsProcessed(true);
-      
+
       setProgress(100);
       setProgressText('Albums ready!');
-      
+
       showSuccess(`Created ${buildResponse.data.albums_created} albums with ${buildResponse.data.photos_organized} photos!`);
-      
+
       setTimeout(() => {
         setCurrentStep(3);
         setProgress(0);
         setProgressText('');
       }, 1500);
-      
+
     } catch (err) {
       showError(err.response?.data?.detail || 'Failed to process photos');
     } finally {
@@ -419,20 +429,21 @@ function AlbumBuilderFresh() {
   // ============================================================================
   // STEP 3: VIEW & DOWNLOAD
   // ============================================================================
-  
+
   const downloadAlbums = async () => {
     try {
       setLoading(true);
       setProgressText('Preparing download...');
-      
+
+      const token = await getAuthToken();
       const response = await axios.get(
         `${API_BASE}/download-albums/${sessionId}`,
         {
-          headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` },
+          headers: { 'Authorization': `Bearer ${token}` },
           responseType: 'blob'
         }
       );
-      
+
       const url = window.URL.createObjectURL(new Blob([response.data]));
       const link = document.createElement('a');
       link.href = url;
@@ -440,9 +451,9 @@ function AlbumBuilderFresh() {
       document.body.appendChild(link);
       link.click();
       link.remove();
-      
+
       showSuccess('Albums downloaded!');
-      
+
     } catch (err) {
       showError(err.response?.data?.detail || 'Download failed');
     } finally {
@@ -450,18 +461,19 @@ function AlbumBuilderFresh() {
       setProgressText('');
     }
   };
-  
+
   const startNewSession = async () => {
     // Cleanup old session
     if (sessionId) {
       try {
+        const token = await getAuthToken();
         await axios.delete(
           `${API_BASE}/cleanup-session/${sessionId}`,
-          { headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` } }
+          { headers: { 'Authorization': `Bearer ${token}` } }
         );
       } catch (e) { /* ignore */ }
     }
-    
+
     // Reset all state
     setSessionId(null);
     setCurrentStep(0);
@@ -482,7 +494,7 @@ function AlbumBuilderFresh() {
   // ============================================================================
   // NAVIGATION
   // ============================================================================
-  
+
   const goToStep = (step) => {
     if (step < currentStep) {
       setCurrentStep(step);
@@ -492,7 +504,7 @@ function AlbumBuilderFresh() {
   // ============================================================================
   // RENDER COMPONENTS
   // ============================================================================
-  
+
   const renderStepIndicator = () => (
     <div className="d-flex justify-content-center align-items-center gap-3 mb-4">
       {[1, 2, 3].map((step) => {
@@ -502,7 +514,7 @@ function AlbumBuilderFresh() {
         } else if (step === currentStep) {
           stepStyle = styles.activeStep;
         }
-        
+
         return (
           <React.Fragment key={step}>
             <div
@@ -528,13 +540,13 @@ function AlbumBuilderFresh() {
   // ============================================================================
   // MAIN RENDER
   // ============================================================================
-  
+
   return (
     <div style={styles.pageContainer}>
       <Container>
         <Row className="justify-content-center">
           <Col xl={10} lg={11}>
-            
+
             {/* Header */}
             <Card style={styles.headerCard} className="mb-4">
               <Card.Body className="text-white text-center py-4">
@@ -542,25 +554,25 @@ function AlbumBuilderFresh() {
                 <p className="mb-0 opacity-90">Automatically organize your photos by faces</p>
               </Card.Body>
             </Card>
-            
+
             {/* Step Indicator (show after step 0) */}
             {currentStep > 0 && renderStepIndicator()}
-            
+
             {/* Progress Bar */}
             {progress > 0 && (
               <Card style={styles.stepCard} className="mb-3 p-3">
                 <div className="text-center mb-2">
                   <small className="text-muted fw-semibold">{progressText}</small>
                 </div>
-                <ProgressBar 
-                  now={progress} 
+                <ProgressBar
+                  now={progress}
                   variant="primary"
                   animated
                   style={{ height: '10px', borderRadius: '10px' }}
                 />
               </Card>
             )}
-            
+
             {/* Alerts */}
             {error && (
               <Alert variant="danger" dismissible onClose={() => setError(null)} className="border-0" style={{ borderRadius: '12px' }}>
@@ -584,7 +596,7 @@ function AlbumBuilderFresh() {
                     <h3 className="fw-bold mb-3" style={{ color: '#1f2937' }}>Create Smart Photo Albums</h3>
                     <p className="text-muted mb-0">Our AI recognizes faces and organizes your photos automatically</p>
                   </div>
-                  
+
                   {/* How it works */}
                   <div className="mb-5">
                     <h5 className="fw-bold mb-4 text-center" style={{ color: '#4b5563' }}>How It Works</h5>
@@ -612,7 +624,7 @@ function AlbumBuilderFresh() {
                       </Col>
                     </Row>
                   </div>
-                  
+
                   {/* Tips */}
                   <div className="mb-5 p-4" style={{ background: '#f3f4f6', borderRadius: '16px' }}>
                     <h6 className="fw-bold mb-3" style={{ color: '#4b5563' }}>
@@ -633,7 +645,7 @@ function AlbumBuilderFresh() {
                       </Col>
                     </Row>
                   </div>
-                  
+
                   {/* Start Button */}
                   <div className="text-center">
                     <Button
@@ -665,7 +677,7 @@ function AlbumBuilderFresh() {
                     </div>
                     <Badge style={styles.stepBadge}>Step 1 of 3</Badge>
                   </div>
-                  
+
                   {/* Added People List */}
                   {people.length > 0 && (
                     <div className="mb-4">
@@ -710,14 +722,14 @@ function AlbumBuilderFresh() {
                       </Row>
                     </div>
                   )}
-                  
+
                   {/* Add New Person Form */}
                   {people.length < 5 && !referencesProcessed && (
                     <div className="p-4 mb-4" style={{ background: '#faf5ff', borderRadius: '16px', border: '2px solid #e9d5ff' }}>
                       <h6 className="fw-semibold mb-3" style={{ color: '#7c3aed' }}>
                         ➕ Add New Person
                       </h6>
-                      
+
                       <Row className="g-3 align-items-end">
                         <Col md={4}>
                           <Form.Label className="small fw-semibold text-muted">Person's Name</Form.Label>
@@ -750,7 +762,7 @@ function AlbumBuilderFresh() {
                           </Button>
                         </Col>
                       </Row>
-                      
+
                       {/* Current Person Photo Previews */}
                       {currentPersonPreviews.length > 0 && (
                         <div className="mt-3">
@@ -782,13 +794,13 @@ function AlbumBuilderFresh() {
                       )}
                     </div>
                   )}
-                  
+
                   {/* Action Buttons */}
                   <div className="d-flex justify-content-between align-items-center">
                     <Button style={styles.secondaryBtn} onClick={() => setCurrentStep(0)}>
                       ← Back
                     </Button>
-                    
+
                     <Button
                       style={styles.successBtn}
                       onClick={preprocessReferences}
@@ -816,7 +828,7 @@ function AlbumBuilderFresh() {
                     </div>
                     <Badge style={styles.stepBadge}>Step 2 of 3</Badge>
                   </div>
-                  
+
                   {/* People Summary */}
                   <div className="mb-4 p-3" style={{ background: '#f0fdf4', borderRadius: '12px', border: '2px solid #a7f3d0' }}>
                     <div className="d-flex align-items-center">
@@ -826,7 +838,7 @@ function AlbumBuilderFresh() {
                       </span>
                     </div>
                   </div>
-                  
+
                   {/* Upload Zone */}
                   <div style={styles.uploadZone} className="mb-4">
                     <input
@@ -843,14 +855,14 @@ function AlbumBuilderFresh() {
                         {eventFiles.length > 0 ? `${eventFiles.length} photos selected` : 'Click to Select Photos'}
                       </h5>
                       <p className="text-muted mb-0">
-                        {eventFiles.length > 0 
+                        {eventFiles.length > 0
                           ? `${Math.round(eventFiles.reduce((a, f) => a + f.size, 0) / 1024 / 1024)} MB total`
                           : 'Select 20-1000 photos from your event'
                         }
                       </p>
                     </label>
                   </div>
-                  
+
                   {/* Photo Preview Grid */}
                   {eventPreviews.length > 0 && (
                     <div className="mb-4">
@@ -893,13 +905,13 @@ function AlbumBuilderFresh() {
                       </div>
                     </div>
                   )}
-                  
+
                   {/* Action Buttons */}
                   <div className="d-flex justify-content-between align-items-center">
                     <Button style={styles.secondaryBtn} onClick={() => setCurrentStep(1)}>
                       ← Back to People
                     </Button>
-                    
+
                     <Button
                       style={styles.successBtn}
                       onClick={processEventPhotos}
@@ -912,7 +924,7 @@ function AlbumBuilderFresh() {
                       )}
                     </Button>
                   </div>
-                  
+
                   {eventFiles.length > 0 && eventFiles.length < 20 && (
                     <div className="text-center mt-3">
                       <small className="text-danger">
@@ -933,7 +945,7 @@ function AlbumBuilderFresh() {
                     <h3 className="fw-bold mb-2" style={{ color: '#1f2937' }}>Your Albums Are Ready!</h3>
                     <p className="text-muted">AI has organized your photos by person</p>
                   </div>
-                  
+
                   {/* Results Summary */}
                   {albums && (
                     <div className="mb-4">
@@ -959,7 +971,7 @@ function AlbumBuilderFresh() {
                       </Row>
                     </div>
                   )}
-                  
+
                   {/* Album Breakdown */}
                   {albums?.album_breakdown && (
                     <div style={styles.albumCard} className="mb-4 p-4">
@@ -969,8 +981,8 @@ function AlbumBuilderFresh() {
                       <Row className="g-3">
                         {Object.entries(albums.album_breakdown).map(([person, count]) => (
                           <Col md={6} lg={4} key={person}>
-                            <div className="d-flex align-items-center justify-content-between p-3" 
-                                 style={{ background: 'white', borderRadius: '12px', border: '1px solid #d1fae5' }}>
+                            <div className="d-flex align-items-center justify-content-between p-3"
+                              style={{ background: 'white', borderRadius: '12px', border: '1px solid #d1fae5' }}>
                               <div className="d-flex align-items-center">
                                 <div style={{
                                   width: '40px',
@@ -995,7 +1007,7 @@ function AlbumBuilderFresh() {
                       </Row>
                     </div>
                   )}
-                  
+
                   {/* Action Buttons */}
                   <div className="d-flex justify-content-center gap-3">
                     <Button
@@ -1010,7 +1022,7 @@ function AlbumBuilderFresh() {
                         <>📥 Download Albums (ZIP)</>
                       )}
                     </Button>
-                    
+
                     <Button
                       style={styles.secondaryBtn}
                       size="lg"
@@ -1019,20 +1031,20 @@ function AlbumBuilderFresh() {
                       🔄 Create New Album
                     </Button>
                   </div>
-                  
+
                   {/* Go Back Options */}
                   <div className="text-center mt-4">
                     <small className="text-muted">
-                      <span 
-                        className="text-primary" 
+                      <span
+                        className="text-primary"
                         style={{ cursor: 'pointer' }}
                         onClick={() => setCurrentStep(2)}
                       >
                         ← Back to event photos
                       </span>
                       <span className="mx-2">|</span>
-                      <span 
-                        className="text-primary" 
+                      <span
+                        className="text-primary"
                         style={{ cursor: 'pointer' }}
                         onClick={() => setCurrentStep(1)}
                       >

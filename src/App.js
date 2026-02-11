@@ -42,7 +42,7 @@ import PaymentTestPage from "./pages/PaymentTestPage"
 import EscrowDemoPage from "./pages/EscrowDemoPage"
 import BookingSummaryDemo from "./pages/BookingSummaryDemo"
 import NotificationSettings from "./pages/NotificationSettings"
-import ChatTest from "./pages/test/ChatTest"
+// import ChatTest from "./pages/test/ChatTest"  // File not found - commented out
 
 // Photographer Pages
 import PhotographerDashboard from "./pages/photographer/PhotographerDashboard"
@@ -103,7 +103,7 @@ function App() {
               <Route path="/payment-test" element={<PaymentTestPage />} />
               <Route path="/escrow-demo" element={<EscrowDemoPage />} />
               <Route path="/booking-summary-demo" element={<BookingSummaryDemo />} />
-              <Route path="/test/chat" element={<ChatTest />} />
+              {/* <Route path="/test/chat" element={<ChatTest />} /> */}
               <Route
                 path="/settings/notifications"
                 element={

@@ -136,8 +136,8 @@ const ClientPayments = () => {
   const filteredTransactions = transactions.filter(txn => {
     const matchesFilter = filter === "all" || txn.status === filter
     const matchesSearch = txn.photographerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         txn.service.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         txn.id.toLowerCase().includes(searchTerm.toLowerCase())
+      txn.service.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      txn.id.toLowerCase().includes(searchTerm.toLowerCase())
     return matchesFilter && matchesSearch
   })
 
@@ -146,7 +146,7 @@ const ClientPayments = () => {
     held: transactions.filter(t => t.status === "held").reduce((sum, t) => sum + t.amount, 0),
     completed: transactions.filter(t => t.status === "completed").reduce((sum, t) => sum + t.amount, 0),
     refunded: transactions.filter(t => t.status === "refunded" || t.status === "partial_refund")
-                          .reduce((sum, t) => sum + (t.refundAmount || 0), 0)
+      .reduce((sum, t) => sum + (t.refundAmount || 0), 0)
   }
 
   const getDaysUntilRelease = (releaseDate) => {
@@ -160,7 +160,7 @@ const ClientPayments = () => {
   // Download receipt as PDF
   const downloadReceipt = async (transactionId) => {
     try {
-      const response = await fetch(`http://localhost:5000/api/payments/receipts/${transactionId}/pdf`)
+      const response = await fetch(`http://localhost:8000/api/payments/receipts/${transactionId}/pdf`)
       if (response.ok) {
         const blob = await response.blob()
         const url = window.URL.createObjectURL(blob)
@@ -173,7 +173,7 @@ const ClientPayments = () => {
         a.remove()
       } else {
         // Fallback to HTML view if PDF not available
-        window.open(`http://localhost:5000/api/payments/receipts/${transactionId}/html`, '_blank')
+        window.open(`http://localhost:8000/api/payments/receipts/${transactionId}/html`, '_blank')
       }
     } catch (err) {
       console.error('Error downloading receipt:', err)
@@ -183,7 +183,7 @@ const ClientPayments = () => {
 
   // View receipt in new tab
   const viewReceipt = (transactionId) => {
-    window.open(`http://localhost:5000/api/payments/receipts/${transactionId}/html`, '_blank')
+    window.open(`http://localhost:8000/api/payments/receipts/${transactionId}/html`, '_blank')
   }
 
   // Open dispute form
@@ -408,7 +408,7 @@ const ClientPayments = () => {
                             </button>
                             <ul className="dropdown-menu dropdown-menu-end">
                               <li>
-                                <button 
+                                <button
                                   className="dropdown-item d-flex align-items-center gap-2"
                                   onClick={() => viewReceipt(txn.id)}
                                 >
@@ -416,7 +416,7 @@ const ClientPayments = () => {
                                 </button>
                               </li>
                               <li>
-                                <button 
+                                <button
                                   className="dropdown-item d-flex align-items-center gap-2"
                                   onClick={() => downloadReceipt(txn.id)}
                                 >
@@ -432,7 +432,7 @@ const ClientPayments = () => {
                                     </button>
                                   </li>
                                   <li>
-                                    <button 
+                                    <button
                                       className="dropdown-item d-flex align-items-center gap-2 text-danger"
                                       onClick={() => handleOpenDispute(txn)}
                                     >

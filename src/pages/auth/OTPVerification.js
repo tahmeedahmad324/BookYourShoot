@@ -7,17 +7,17 @@ const OTPVerification = () => {
   const location = useLocation();
   const [otp, setOtp] = useState(['', '', '', '', '', '']);
   const [loading, setLoading] = useState(false);
-  const [timeLeft, setTimeLeft] = useState(300); // 5 minutes for email OTP
+  const [timeLeft, setTimeLeft] = useState(60); // 60 seconds for email OTP
   const [isResending, setIsResending] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
-  
+
   // Get email and role from navigation state or sessionStorage
   const stateEmail = location.state?.email;
   const stateMessage = location.state?.message;
   const pendingReg = sessionStorage.getItem('pendingRegistration');
   const pendingData = pendingReg ? JSON.parse(pendingReg) : null;
-  
+
   const email = stateEmail || pendingData?.email;
   const role = location.state?.role || pendingData?.role;
 
@@ -54,7 +54,7 @@ const OTPVerification = () => {
     if (/^\d+$/.test(pastedData)) {
       const newOtp = pastedData.padEnd(6, '').split('');
       setOtp(newOtp);
-      
+
       // Focus last filled input
       const lastIndex = newOtp.findIndex(val => val === '');
       const focusIndex = lastIndex === -1 ? 5 : lastIndex - 1;
@@ -72,7 +72,7 @@ const OTPVerification = () => {
     setSuccess('');
 
     const otpValue = otp.join('');
-    
+
     if (otpValue.length !== 6) {
       setError('Please enter all 6 digits');
       setLoading(false);
@@ -90,17 +90,29 @@ const OTPVerification = () => {
       if (error) throw error;
 
       if (data.session) {
-        setSuccess('Email verified successfully! Redirecting...');
-        
-        // Clear pending registration
-        sessionStorage.removeItem('pendingRegistration');
-        
-        // Redirect based on role
-        setTimeout(() => {
+        setSuccess('Email verified successfully!');
+
+        // Redirect based on role after a brief delay
+        setTimeout(async () => {
           if (role === 'photographer') {
-            navigate('/register/cnic');
+            // Photographers need to complete CNIC verification first
+            // KEEP SESSION ALIVE — CNIC upload API requires authentication
+            // The login CNIC gate prevents dashboard access without CNIC
+            navigate('/register/cnic', {
+              state: {
+                message: 'Email verified! Please upload your CNIC to complete registration.'
+              }
+            });
           } else {
-            navigate(`/${role}/dashboard`);
+            // Clients: sign out and redirect to login
+            await supabase.auth.signOut();
+            sessionStorage.removeItem('pendingRegistration');
+            navigate('/login', {
+              state: {
+                message: 'Registration complete! Please login with your credentials.',
+                email: email
+              }
+            });
           }
         }, 1500);
       }
@@ -117,20 +129,20 @@ const OTPVerification = () => {
       setError('Email not found. Please register again.');
       return;
     }
-    
+
     setIsResending(true);
     setError('');
-    
+
     try {
       const { error } = await supabase.auth.resend({
         type: 'signup',
         email: email
       });
-      
+
       if (error) throw error;
-      
+
       setSuccess('Verification code sent! Check your email.');
-      setTimeLeft(300); // Reset timer
+      setTimeLeft(60); // Reset timer
     } catch (error) {
       setError(error.message || 'Failed to resend code. Please try again.');
     } finally {
@@ -153,7 +165,7 @@ const OTPVerification = () => {
               <div className="card-body p-5">
                 <div className="text-center mb-4">
                   <div className="mb-3">
-                    <span style={{ fontSize: '3rem' }}>�</span>
+                    <span style={{ fontSize: '3rem' }}>📧</span>
                   </div>
                   <h2 className="fw-bold">Verify Your Email</h2>
                   <p className="text-muted">
@@ -198,9 +210,9 @@ const OTPVerification = () => {
                           id={`otp-input-${index}`}
                           type="text"
                           className="form-control text-center fw-bold"
-                          style={{ 
-                            width: '45px', 
-                            height: '50px', 
+                          style={{
+                            width: '45px',
+                            height: '50px',
                             fontSize: '1.5rem',
                             border: `2px solid ${digit ? 'var(--primary-blue)' : 'var(--soft-gray)'}`,
                             borderRadius: '8px'
@@ -218,8 +230,8 @@ const OTPVerification = () => {
                   </div>
 
                   {/* Submit Button */}
-                  <button 
-                    type="submit" 
+                  <button
+                    type="submit"
                     className="btn btn-primary w-100 py-3 mb-3"
                     disabled={loading || otp.join('').length !== 6}
                   >
@@ -241,7 +253,7 @@ const OTPVerification = () => {
                       Resend code in <span className="fw-semibold text-primary">{formatTime(timeLeft)}</span>
                     </p>
                   ) : (
-                    <button 
+                    <button
                       className="btn btn-outline-primary"
                       onClick={handleResendOtp}
                       disabled={isResending}

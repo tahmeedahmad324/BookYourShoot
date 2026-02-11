@@ -5,7 +5,7 @@ import '../styles/payment.css';
 // Load Stripe with your publishable key
 // Replace with your actual test key from .env or config
 const stripePromise = loadStripe(
-  process.env.REACT_APP_STRIPE_PUBLISHABLE_KEY || 
+  process.env.REACT_APP_STRIPE_PUBLISHABLE_KEY ||
   'pk_test_51QivafP8o5TaCBpE8EpQKKqYG5o2iJ3lOMxMVDpJUWoSGSxUf6lOVEMEZbqD6aIqlH0UbxDCGOzrfuTvvATVP0iO00GBjmh0Bo'
 );
 
@@ -19,9 +19,9 @@ export default function StripeCheckout({ bookingId, amount, photographerName, on
 
     try {
       // Call your backend to create checkout session
-      const response = await fetch('http://localhost:5000/api/payments/create-checkout', {
+      const response = await fetch('http://localhost:8000/api/payments/create-checkout', {
         method: 'POST',
-        headers: { 
+        headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
@@ -44,7 +44,7 @@ export default function StripeCheckout({ bookingId, amount, photographerName, on
       });
 
       const data = await response.json();
-      
+
       if (data.error) {
         setError(data.error);
         return;
@@ -112,8 +112,8 @@ export default function StripeCheckout({ bookingId, amount, photographerName, on
             <span className="detail-value">Rs. {amount.toLocaleString()}</span>
           </div>
           <div className="text-muted small text-center mt-2">
-            {isEquipmentRental 
-              ? 'Deposit refundable after equipment return' 
+            {isEquipmentRental
+              ? 'Deposit refundable after equipment return'
               : 'Your payment is secured until work is completed'
             }
           </div>
@@ -126,7 +126,7 @@ export default function StripeCheckout({ bookingId, amount, photographerName, on
         )}
 
         <div className="payment-actions">
-          <button 
+          <button
             onClick={handlePayment}
             disabled={loading}
             className="pay-button"
@@ -144,7 +144,7 @@ export default function StripeCheckout({ bookingId, amount, photographerName, on
           </button>
 
           {onCancel && (
-            <button 
+            <button
               onClick={onCancel}
               disabled={loading}
               className="cancel-button"

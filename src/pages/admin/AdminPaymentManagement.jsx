@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 
-const API_BASE = 'http://localhost:5000/api';
+const API_BASE = 'http://localhost:8000/api';
 
 /**
  * Admin Payment Management Page
@@ -45,7 +45,7 @@ const AdminPaymentManagement = () => {
 
   const handleResolveDispute = async (disputeId) => {
     if (!window.confirm('Are you sure you want to resolve this dispute?')) return;
-    
+
     try {
       const res = await fetch(`${API_BASE}/payments/disputes/${disputeId}/resolve`, {
         method: 'POST',
@@ -56,7 +56,7 @@ const AdminPaymentManagement = () => {
           notes: resolution.notes
         })
       });
-      
+
       const data = await res.json();
       if (data.status === 'success') {
         alert('✅ Dispute resolved successfully!');
@@ -236,7 +236,7 @@ const AdminPaymentManagement = () => {
                           <select
                             className="form-select"
                             value={resolution.type}
-                            onChange={(e) => setResolution({...resolution, type: e.target.value})}
+                            onChange={(e) => setResolution({ ...resolution, type: e.target.value })}
                           >
                             <option value="full_refund">Full Refund to Client</option>
                             <option value="partial_refund">Partial Refund</option>
@@ -256,7 +256,7 @@ const AdminPaymentManagement = () => {
                               min="0"
                               max="100"
                               value={resolution.clientRefundPercent}
-                              onChange={(e) => setResolution({...resolution, clientRefundPercent: parseInt(e.target.value)})}
+                              onChange={(e) => setResolution({ ...resolution, clientRefundPercent: parseInt(e.target.value) })}
                             />
                             <div className="d-flex justify-content-between small text-muted">
                               <span>Client: {resolution.clientRefundPercent}%</span>
@@ -272,7 +272,7 @@ const AdminPaymentManagement = () => {
                             rows="3"
                             placeholder="Add notes about the resolution..."
                             value={resolution.notes}
-                            onChange={(e) => setResolution({...resolution, notes: e.target.value})}
+                            onChange={(e) => setResolution({ ...resolution, notes: e.target.value })}
                           ></textarea>
                         </div>
 
@@ -332,11 +332,10 @@ const AdminPaymentManagement = () => {
                       <div className="d-flex justify-content-between align-items-start">
                         <div>
                           <div className="d-flex align-items-center gap-2 mb-1">
-                            <span className={`badge ${
-                              notif.type.includes('refund') ? 'bg-warning text-dark' :
-                              notif.type.includes('release') ? 'bg-success' :
-                              notif.type.includes('dispute') ? 'bg-danger' : 'bg-info'
-                            }`}>
+                            <span className={`badge ${notif.type.includes('refund') ? 'bg-warning text-dark' :
+                                notif.type.includes('release') ? 'bg-success' :
+                                  notif.type.includes('dispute') ? 'bg-danger' : 'bg-info'
+                              }`}>
                               {notif.type.replace(/_/g, ' ')}
                             </span>
                             <span className="badge bg-secondary">{notif.recipient_role}</span>

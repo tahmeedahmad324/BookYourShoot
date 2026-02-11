@@ -1,10 +1,12 @@
-import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { cnicAPI } from '../../api/api';
+import { supabase } from '../../supabaseClient';
 
 const CNICUpload = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { user } = useAuth();
   const [uploadedFrontFile, setUploadedFrontFile] = useState(null);
   const [uploadedBackFile, setUploadedBackFile] = useState(null);
@@ -14,7 +16,26 @@ const CNICUpload = () => {
   const [frontData, setFrontData] = useState(null);
   const [backData, setBackData] = useState(null);
   const [error, setError] = useState(null);
+  const [infoMessage, setInfoMessage] = useState('');
   const [currentStep, setCurrentStep] = useState(1); // 1: Front, 2: Back
+  const [registrationData, setRegistrationData] = useState(null);
+
+  // Check for message from OTP verification and load registration data
+  useEffect(() => {
+    if (location.state?.message) {
+      setInfoMessage(location.state.message);
+    }
+
+    // Load pending registration data from sessionStorage (for users not yet logged in)
+    const pendingReg = sessionStorage.getItem('pendingRegistration');
+    if (pendingReg) {
+      try {
+        setRegistrationData(JSON.parse(pendingReg));
+      } catch (e) {
+        console.error('Failed to parse registration data:', e);
+      }
+    }
+  }, [location.state]);
 
   const handleFrontUpload = async (event) => {
     const file = event.target.files[0];
@@ -24,9 +45,12 @@ const CNICUpload = () => {
       setError(null);
       setFrontData(null);
 
-      // Check if user is logged in
-      if (!user) {
-        setError('Please complete OTP verification first before uploading CNIC');
+      // Get user info from either logged-in user or registration data
+      const userInfo = user || registrationData;
+      const userName = userInfo?.full_name || userInfo?.name || '';
+
+      if (!userName) {
+        setError('Unable to verify identity. User name not found. Please login or restart registration.');
         setProcessingFront(false);
         return;
       }
@@ -34,18 +58,43 @@ const CNICUpload = () => {
       try {
         // Upload and process CNIC front image
         const response = await cnicAPI.uploadCNIC(file, 'front');
-        
+
         if (response.success) {
           const data = response.data;
+
+          // Check if name matches registered user's name
+          const cnicName = data.possible_name || 'Not detected';
+          const registeredName = userName;
+
+          // Compare names (case-insensitive, allow partial match)
+          let nameMatches = false;
+          if (cnicName !== 'Not detected' && registeredName) {
+            const cleanCnicName = cnicName.toLowerCase().replace(/[^a-z\s]/g, '').trim();
+            const cleanRegName = registeredName.toLowerCase().replace(/[^a-z\s]/g, '').trim();
+
+            // Check if names are similar (allow some flexibility)
+            nameMatches = cleanCnicName.includes(cleanRegName) ||
+              cleanRegName.includes(cleanCnicName) ||
+              cleanCnicName.split(' ').some(part => cleanRegName.includes(part) && part.length > 2);
+          }
+
           setFrontData({
             cnicNumber: data.cnic_number || 'Not detected',
-            name: data.possible_name || 'Not detected',
+            name: cnicName,
             dates: data.dates || [],
             expiryInfo: data.expiry_info || null,
             readability: data.readability_score || 0,
-            isReadable: data.is_readable || false
+            isReadable: data.is_readable || false,
+            nameMatches: nameMatches,
+            registeredName: registeredName
           });
-          
+
+          // Check for name mismatch
+          if (cnicName !== 'Not detected' && !nameMatches) {
+            setError(`Name mismatch: CNIC shows "${cnicName}" but you registered as "${registeredName}". Please ensure the CNIC matches your registration details.`);
+            return;
+          }
+
           // Auto-advance to back side if front is readable
           if (data.is_readable && data.cnic_number && data.cnic_number !== 'Not detected') {
             setTimeout(() => setCurrentStep(2), 1000);
@@ -84,6 +133,7 @@ const CNICUpload = () => {
           setBackData({
             qrSuccess: !!data.cnic_number_from_qr,
             cnicFromQr: data.cnic_number_from_qr || null,
+            cnicFront: data.cnic_number_front || null,
             cnicMatch: !!data.cnic_match,
             message: data.message || ''
           });
@@ -114,12 +164,18 @@ const CNICUpload = () => {
 
     setLoading(true);
     try {
-      // Verification complete - both sides processed
-      // Navigate to profile setup page
-      navigate('/photographer/profile-setup');
+      // Verification complete - CNIC matched and saved in backend
+      // The backend already saved the verification data when verifyPair was called
+
+      // Clear registration data from sessionStorage
+      sessionStorage.removeItem('pendingRegistration');
+
+      // User is always logged in on this page (session was kept alive)
+      // Navigate to photographer dashboard
+      navigate('/photographer/dashboard');
     } catch (error) {
       console.error('Submission error:', error);
-      setError('Failed to submit CNIC for verification');
+      setError('Failed to complete CNIC verification');
     } finally {
       setLoading(false);
     }
@@ -169,8 +225,8 @@ const CNICUpload = () => {
                         className="d-none"
                         id="cnic-front-upload"
                       />
-                      <label 
-                        htmlFor="cnic-front-upload" 
+                      <label
+                        htmlFor="cnic-front-upload"
                         className="btn btn-primary btn-lg"
                         style={{ cursor: 'pointer' }}
                       >
@@ -206,8 +262,8 @@ const CNICUpload = () => {
                         className="d-none"
                         id="cnic-back-upload"
                       />
-                      <label 
-                        htmlFor="cnic-back-upload" 
+                      <label
+                        htmlFor="cnic-back-upload"
                         className="btn btn-success btn-lg"
                         style={{ cursor: 'pointer' }}
                       >
@@ -222,7 +278,7 @@ const CNICUpload = () => {
                         </div>
                       )}
                       <div className="mt-3">
-                        <button 
+                        <button
                           className="btn btn-outline-secondary"
                           onClick={() => setCurrentStep(1)}
                         >
@@ -253,6 +309,13 @@ const CNICUpload = () => {
                   </div>
                 )}
 
+                {/* Info Message */}
+                {infoMessage && (
+                  <div className="alert alert-info">
+                    ℹ️ {infoMessage}
+                  </div>
+                )}
+
                 {/* Error Message */}
                 {error && (
                   <div className="alert alert-danger">
@@ -263,24 +326,7 @@ const CNICUpload = () => {
                 {/* Front Side Extracted Data */}
                 {frontData && (
                   <div className="alert alert-light fade-in">
-                    <h6 className="fw-bold mb-3">🔍 Front Side - Extracted Information:</h6>
-                    
-                    {/* Readability Score */}
-                    <div className="mb-3">
-                      <div className="d-flex justify-content-between align-items-center mb-1">
-                        <strong>Image Quality:</strong>
-                        <span className={`badge ${frontData.isReadable ? 'bg-success' : 'bg-danger'}`}>
-                          {frontData.isReadable ? '✓ Readable' : '✗ Poor Quality'}
-                        </span>
-                      </div>
-                      <div className="progress" style={{ height: '8px' }}>
-                        <div 
-                          className={`progress-bar ${frontData.readability >= 70 ? 'bg-success' : frontData.readability >= 40 ? 'bg-warning' : 'bg-danger'}`}
-                          style={{ width: `${frontData.readability}%` }}
-                        ></div>
-                      </div>
-                      <small className="text-muted">Readability: {frontData.readability}%</small>
-                    </div>
+                    <h6 className="fw-bold mb-3">✅ CNIC Information Extracted</h6>
 
                     <div className="row">
                       <div className="col-md-6">
@@ -334,7 +380,7 @@ const CNICUpload = () => {
                 {backData && (
                   <div className="alert alert-light fade-in">
                     <h6 className="fw-bold mb-3">🔍 Back Side - Identity Verification:</h6>
-                    
+
                     {backData.cnicMatch ? (
                       <div className="alert alert-success mb-0">
                         <strong>✅ Verified:</strong> Front CNIC matches back QR.<br />
@@ -345,7 +391,13 @@ const CNICUpload = () => {
                     ) : (
                       <div className="alert alert-danger mb-0">
                         <strong>❌ Verification failed:</strong> {backData.message || 'CNIC mismatch or QR not readable.'}<br />
-                        <small>Please upload a clearer back image with the QR fully visible.</small>
+                        {backData.cnicFront && backData.cnicFromQr && (
+                          <div className="mt-2 small">
+                            <div><strong>Front CNIC:</strong> {backData.cnicFront}</div>
+                            <div><strong>QR CNIC:</strong> {backData.cnicFromQr}</div>
+                          </div>
+                        )}
+                        <small className="d-block mt-2">Please upload a clearer back image with the QR fully visible.</small>
                       </div>
                     )}
                   </div>
@@ -367,7 +419,7 @@ const CNICUpload = () => {
 
                 {/* Submit Button */}
                 {frontData && (
-                  <button 
+                  <button
                     className="btn btn-primary w-100 py-3"
                     onClick={handleSubmit}
                     disabled={loading || !frontData.isReadable || frontData.cnicNumber === 'Not detected' || !backData || !backData.cnicMatch}
@@ -387,14 +439,9 @@ const CNICUpload = () => {
                   </button>
                 )}
 
-                {/* Skip for Demo */}
-                <div className="text-center mt-3">
-                  <button
-                    className="btn btn-outline-secondary"
-                    onClick={() => navigate('/photographer/dashboard')}
-                  >
-                    Skip for Demo →
-                  </button>
+                {/* Info: CNIC Required */}
+                <div className="alert alert-warning mt-3 small">
+                  <strong>⚠️ CNIC verification is mandatory</strong> for photographer accounts to ensure trust and security on the platform.
                 </div>
               </div>
             </div>

@@ -20,7 +20,7 @@ const PaymentSuccess = () => {
   const { bookingId } = useParams()
   const [searchParams] = useSearchParams()
   const transactionId = searchParams.get("txn") || `TXN-${bookingId}`
-  
+
   const [receipt, setReceipt] = useState(null)
   const [loading, setLoading] = useState(true)
   const [emailSent, setEmailSent] = useState(false)
@@ -31,7 +31,7 @@ const PaymentSuccess = () => {
 
   const fetchReceipt = async () => {
     try {
-      const res = await fetch(`http://localhost:5000/api/payments/receipts/${transactionId}`)
+      const res = await fetch(`http://localhost:8000/api/payments/receipts/${transactionId}`)
       const data = await res.json()
       if (data.success) {
         setReceipt(data.receipt)
@@ -45,7 +45,7 @@ const PaymentSuccess = () => {
 
   const downloadPDF = async () => {
     try {
-      const response = await fetch(`http://localhost:5000/api/payments/receipts/${transactionId}/pdf`)
+      const response = await fetch(`http://localhost:8000/api/payments/receipts/${transactionId}/pdf`)
       if (response.ok) {
         const blob = await response.blob()
         const url = window.URL.createObjectURL(blob)
@@ -58,7 +58,7 @@ const PaymentSuccess = () => {
         a.remove()
       } else {
         // Fallback to HTML
-        window.open(`http://localhost:5000/api/payments/receipts/${transactionId}/html`, '_blank')
+        window.open(`http://localhost:8000/api/payments/receipts/${transactionId}/html`, '_blank')
       }
     } catch (err) {
       alert('Error downloading receipt')
@@ -66,11 +66,11 @@ const PaymentSuccess = () => {
   }
 
   const viewReceipt = () => {
-    window.open(`http://localhost:5000/api/payments/receipts/${transactionId}/html`, '_blank')
+    window.open(`http://localhost:8000/api/payments/receipts/${transactionId}/html`, '_blank')
   }
 
   const shareReceipt = async () => {
-    const url = `http://localhost:5000/api/payments/receipts/${transactionId}/html`
+    const url = `http://localhost:8000/api/payments/receipts/${transactionId}/html`
     if (navigator.share) {
       try {
         await navigator.share({
@@ -181,8 +181,8 @@ const PaymentSuccess = () => {
                   <div>
                     <strong className="d-block mb-1">Payment Secured in Escrow</strong>
                     <small>
-                      Your payment of PKR {(data.total || 0).toLocaleString()} is safely held. 
-                      It will be released to the photographer after you confirm the work is completed 
+                      Your payment of PKR {(data.total || 0).toLocaleString()} is safely held.
+                      It will be released to the photographer after you confirm the work is completed
                       or automatically after 48 hours.
                     </small>
                   </div>
@@ -192,8 +192,8 @@ const PaymentSuccess = () => {
                 <div className="text-center mb-4 p-4 rounded" style={{ background: '#f8f9fa' }}>
                   <h6 className="fw-bold mb-3">Scan to View Receipt</h6>
                   <div className="d-inline-block p-3 bg-white rounded shadow-sm">
-                    <QRCodeSVG 
-                      value={`http://localhost:5000/api/payments/receipts/${transactionId}/html`}
+                    <QRCodeSVG
+                      value={`http://localhost:8000/api/payments/receipts/${transactionId}/html`}
                       size={150}
                       level="M"
                       includeMargin={true}
@@ -207,7 +207,7 @@ const PaymentSuccess = () => {
                 {/* Action Buttons */}
                 <div className="row g-3 mb-4">
                   <div className="col-md-4">
-                    <button 
+                    <button
                       className="btn btn-primary w-100 d-flex align-items-center justify-content-center gap-2"
                       onClick={downloadPDF}
                     >
@@ -215,7 +215,7 @@ const PaymentSuccess = () => {
                     </button>
                   </div>
                   <div className="col-md-4">
-                    <button 
+                    <button
                       className="btn btn-outline-primary w-100 d-flex align-items-center justify-content-center gap-2"
                       onClick={viewReceipt}
                     >
@@ -223,7 +223,7 @@ const PaymentSuccess = () => {
                     </button>
                   </div>
                   <div className="col-md-4">
-                    <button 
+                    <button
                       className="btn btn-outline-secondary w-100 d-flex align-items-center justify-content-center gap-2"
                       onClick={shareReceipt}
                     >

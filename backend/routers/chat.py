@@ -309,29 +309,12 @@ def send_message_rest(
         if participant_check.data[0].get('is_banned'):
             raise HTTPException(status_code=403, detail="You are banned from this conversation")
         
-        # **NEW: Two-phase validation**
-        from backend.routers.chat_two_phase import validate_conversation_features
-        
-        # Determine feature type being used
-        feature_type = 'text'
-        if payload.content_type in ['image', 'video']:
-            feature_type = 'media'
-        elif payload.content_type in ['file', 'document', 'pdf']:
-            feature_type = 'file'
-        elif payload.content_type == 'audio':
-            feature_type = 'voice'
-        
-        # Validate if feature is allowed
-        validation = validate_conversation_features(
-            conversation_id=payload.conversation_id,
-            user_id=user_id,
-            feature=feature_type
-        )
-        
-        if not validation["allowed"]:
+        # Simple content type validation
+        allowed_content_types = ['text', 'image', 'video', 'audio', 'file', 'document', 'pdf']
+        if payload.content_type not in allowed_content_types:
             raise HTTPException(
-                status_code=403, 
-                detail=validation["reason"]
+                status_code=400, 
+                detail=f"Invalid content type. Allowed: {', '.join(allowed_content_types)}"
             )
         
         # Validate file size limits

@@ -333,11 +333,11 @@ def process_audio(music_url: str, video_duration: float, volume: int, temp_dir: 
         audio_path = Path(temp_dir) / "music.mp3"
         
         # Check if it's a local file (localhost URL or relative path)
-        if "localhost:5000/api/reels/music/" in music_url or music_url.startswith("/api/reels/music/"):
+        if "localhost:8000/api/reels/music/" in music_url or music_url.startswith("/api/reels/music/"):
             # Local file - extract path and read directly to avoid HTTP timeout
             # Parse URL to get user_id and filename
-            if "localhost:5000" in music_url:
-                # Extract from full URL: http://localhost:5000/api/reels/music/{user_id}/{filename}
+            if "localhost:8000" in music_url:
+                # Extract from full URL: http://localhost:8000/api/reels/music/{user_id}/{filename}
                 path_part = music_url.split("/api/reels/music/")[1]
             else:
                 # Extract from relative path: /api/reels/music/{user_id}/{filename}
@@ -517,7 +517,7 @@ async def upload_music(
             shutil.copyfileobj(file.file, buffer)
         
         # Create URL
-        music_url = f"http://localhost:5000/api/reels/music/{user_id}/{filename}"
+        music_url = f"http://localhost:8000/api/reels/music/{user_id}/{filename}"
         
         return {
             "url": music_url,
@@ -764,7 +764,7 @@ async def generate_reel(
         file_size = final_output_path.stat().st_size
         
         # Create absolute URL for accessing the video
-        video_url = f"http://localhost:5000/api/reels/videos/{user_id}/{output_filename}"
+        video_url = f"http://localhost:8000/api/reels/videos/{user_id}/{output_filename}"
         
         return ReelResponse(
             video_url=video_url,

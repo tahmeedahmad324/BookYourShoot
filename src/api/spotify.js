@@ -1,4 +1,4 @@
-const API_BASE = process.env.REACT_APP_API_URL || "http://localhost:5000/api"
+const API_BASE = process.env.REACT_APP_API_URL || "http://localhost:8000/api"
 
 // Get music suggestions based on mood, genre, and tempo
 export const getMusicSuggestions = async (filters) => {

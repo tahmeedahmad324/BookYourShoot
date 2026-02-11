@@ -4,7 +4,7 @@ import { useAuth } from '../../context/AuthContext';
 const ReelGenerator = () => {
   const { user } = useAuth();
   const fileInputRef = useRef(null);
-  
+
   // State management
   const [images, setImages] = useState([]);
   const [uploadedUrls, setUploadedUrls] = useState([]);
@@ -15,17 +15,17 @@ const ReelGenerator = () => {
   const [fadeDuration, setFadeDuration] = useState(0.5);
   const [fitMode, setFitMode] = useState('fit');
   const [kenBurns, setKenBurns] = useState(false);
-  
+
   // Music state
   const [musicOption, setMusicOption] = useState('none'); // 'none', 'upload'
   const [uploadedMusicUrl, setUploadedMusicUrl] = useState(null);
   const [musicVolume, setMusicVolume] = useState(70);
   const [uploadingMusic, setUploadingMusic] = useState(false);
   const musicInputRef = useRef(null);
-  
+
   // Filter state
   const [filter, setFilter] = useState('none');
-  
+
   const [uploading, setUploading] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [generatedVideo, setGeneratedVideo] = useState(null);
@@ -45,7 +45,7 @@ const ReelGenerator = () => {
 
   // Get recommended character limit based on aspect ratio
   const getCharLimit = () => {
-    switch(aspectRatio) {
+    switch (aspectRatio) {
       case '9:16': return 25;  // Reduced for portrait
       case '16:9': return 50;
       case '1:1': return 35;
@@ -73,26 +73,26 @@ const ReelGenerator = () => {
   // Handle file selection
   const handleFileSelect = (e) => {
     const files = Array.from(e.target.files);
-    
+
     if (files.length < 1) {
       setError('Please select at least 1 image');
       return;
     }
-    
+
     if (files.length > 15) {
       setError('Maximum 15 images allowed');
       return;
     }
-    
+
     // Validate file types
     const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
     const invalidFiles = files.filter(f => !validTypes.includes(f.type));
-    
+
     if (invalidFiles.length > 0) {
       setError('Only JPG, PNG, and WebP images are allowed');
       return;
     }
-    
+
     setError('');
     setImages(files);
     setUploadedUrls([]); // Clear previous uploads
@@ -103,18 +103,18 @@ const ReelGenerator = () => {
   const handleRemoveImage = (index) => {
     const newImages = images.filter((_, idx) => idx !== index);
     setImages(newImages);
-    
+
     // Also remove from uploaded URLs if already uploaded
     if (uploadedUrls.length > 0) {
       const newUploadedUrls = uploadedUrls.filter((_, idx) => idx !== index);
       setUploadedUrls(newUploadedUrls);
     }
-    
+
     // Reset file input
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
-    
+
     // Show error if no images left
     if (newImages.length === 0) {
       setError('Please select at least 1 image');
@@ -142,7 +142,7 @@ const ReelGenerator = () => {
       const formData = new FormData();
       formData.append('file', file);
 
-      const response = await fetch('http://localhost:5000/api/reels/upload-music', {
+      const response = await fetch('http://localhost:8000/api/reels/upload-music', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`
@@ -178,11 +178,11 @@ const ReelGenerator = () => {
     // Change page title to alert user
     const originalTitle = document.title;
     document.title = 'Reel Ready! - BookYourShoot';
-    
+
     // Play a success sound (optional, can be commented out)
     // const audio = new Audio('/notification-sound.mp3');
     // audio.play().catch(() => {});
-    
+
     // Show browser notification if permitted
     if ('Notification' in window && Notification.permission === 'granted') {
       const notification = new Notification('Reel Ready!', {
@@ -192,13 +192,13 @@ const ReelGenerator = () => {
         tag: 'reel-complete',
         requireInteraction: false
       });
-      
+
       notification.onclick = () => {
         window.focus();
         document.title = originalTitle;
         notification.close();
       };
-      
+
       // Auto-close after 10 seconds and restore title
       setTimeout(() => {
         notification.close();
@@ -218,41 +218,41 @@ const ReelGenerator = () => {
       setError('Please select images first');
       return;
     }
-    
+
     setUploading(true);
     setError('');
     setUploadProgress(0);
-    
+
     try {
       const urls = [];
       const token = localStorage.getItem('token') || sessionStorage.getItem('token');
-      
+
       for (let i = 0; i < images.length; i++) {
         const file = images[i];
         const formData = new FormData();
         formData.append('file', file);
-        
+
         // Upload to backend
-        const response = await fetch('http://localhost:5000/api/reels/upload-image', {
+        const response = await fetch('http://localhost:8000/api/reels/upload-image', {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${token}`
           },
           body: formData
         });
-        
+
         if (!response.ok) {
           const errorData = await response.json();
           throw new Error(`Failed to upload ${file.name}: ${errorData.detail || 'Upload failed'}`);
         }
-        
+
         const data = await response.json();
         urls.push(data.url);
-        
+
         // Update progress
         setUploadProgress(Math.round(((i + 1) / images.length) * 100));
       }
-      
+
       setUploadedUrls(urls);
       setError('');
     } catch (err) {
@@ -269,18 +269,18 @@ const ReelGenerator = () => {
       setError('Please upload images first');
       return;
     }
-    
+
     // Request notification permission before starting
     await requestNotificationPermission();
-    
+
     setGenerating(true);
     setError('');
     setGeneratedVideo(null);
-    
+
     try {
       const token = localStorage.getItem('token') || sessionStorage.getItem('token');
-      
-      const response = await fetch('http://localhost:5000/api/reels/generate', {
+
+      const response = await fetch('http://localhost:8000/api/reels/generate', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -300,18 +300,18 @@ const ReelGenerator = () => {
           filter: filter
         })
       });
-      
+
       if (!response.ok) {
         const errorData = await response.json();
         throw new Error(errorData.detail || 'Failed to generate reel');
       }
-      
+
       const data = await response.json();
       setGeneratedVideo(data);
-      
+
       // Show notification when reel is ready
       showNotification();
-      
+
     } catch (err) {
       setError(err.message || 'Failed to generate reel');
       console.error('Generation error:', err);
@@ -364,18 +364,18 @@ const ReelGenerator = () => {
       alert('Please add clips to your reel first!');
       return;
     }
-    
+
     if (!reelTitle.trim()) {
       alert('Please enter a reel title!');
       return;
     }
-    
+
     setIsCreating(true);
     setIsPlaying(true);
-    
+
     // Simulate reel creation process
     await new Promise(resolve => setTimeout(resolve, 3000));
-    
+
     const reelData = {
       id: Date.now(),
       title: reelTitle,
@@ -386,16 +386,16 @@ const ReelGenerator = () => {
       createdAt: new Date().toISOString(),
       thumbnail: selectedClips[0]?.url || null
     };
-    
+
     // Store reel data (in real app, this would be sent to API)
     const existingReels = JSON.parse(localStorage.getItem('userReels') || '[]');
     existingReels.push(reelData);
     localStorage.setItem('userReels', JSON.stringify(existingReels));
-    
+
     setIsCreating(false);
     setIsPlaying(false);
     alert('Reel created successfully! 🎬');
-    
+
     // Reset form
     setReelTitle('My Photo Reel');
     setSelectedClips([]);
@@ -446,7 +446,7 @@ const ReelGenerator = () => {
               </button>
             )}
           </div>
-          
+
           {error && (
             <div className="alert alert-danger alert-dismissible fade show" role="alert">
               <strong>Error:</strong> {error}
@@ -458,7 +458,7 @@ const ReelGenerator = () => {
           <div className="card mb-4 shadow-sm border-0">
             <div className="card-body p-4">
               <h5 className="card-title mb-3">Step 1: Select Your Photos</h5>
-              
+
               <div className="mb-3">
                 <input
                   ref={fileInputRef}
@@ -470,23 +470,23 @@ const ReelGenerator = () => {
                   onChange={handleFileSelect}
                   disabled={uploading || generating}
                 />
-                <label 
-                  htmlFor="imageUploadInput" 
+                <label
+                  htmlFor="imageUploadInput"
                   className="btn btn-lg btn-primary w-100 mb-2"
-                  style={{ 
+                  style={{
                     cursor: uploading || generating ? 'not-allowed' : 'pointer',
                     padding: '20px'
                   }}
                 >
                   <div className="d-flex flex-column align-items-center">
-                    <svg 
-                      width="48" 
-                      height="48" 
-                      viewBox="0 0 24 24" 
-                      fill="none" 
-                      stroke="currentColor" 
-                      strokeWidth="2" 
-                      strokeLinecap="round" 
+                    <svg
+                      width="48"
+                      height="48"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
                       strokeLinejoin="round"
                       className="mb-2"
                     >
@@ -501,19 +501,19 @@ const ReelGenerator = () => {
                   </div>
                 </label>
               </div>
-              
+
               {images.length > 0 && (
                 <div className="mb-3">
                   <div className="bg-light p-3 rounded mb-3">
                     <p className="mb-2 fw-semibold text-primary">
-                      <svg 
-                        width="20" 
-                        height="20" 
-                        viewBox="0 0 24 24" 
-                        fill="none" 
-                        stroke="currentColor" 
-                        strokeWidth="2" 
-                        strokeLinecap="round" 
+                      <svg
+                        width="20"
+                        height="20"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
                         strokeLinejoin="round"
                         className="me-2"
                         style={{ verticalAlign: 'middle' }}
@@ -524,7 +524,7 @@ const ReelGenerator = () => {
                       </svg>
                       {images.length} {images.length === 1 ? 'photo' : 'photos'} selected
                     </p>
-                  
+
                     {/* Image previews */}
                     <div className="d-flex flex-wrap gap-2 mb-3">
                       {images.map((img, idx) => (
@@ -543,7 +543,7 @@ const ReelGenerator = () => {
                           />
                           <span
                             className="position-absolute top-0 start-0 badge bg-primary"
-                            style={{ 
+                            style={{
                               fontSize: '11px',
                               borderRadius: '8px 0 8px 0'
                             }}
@@ -564,14 +564,14 @@ const ReelGenerator = () => {
                             }}
                             title="Remove photo"
                           >
-                            <svg 
-                              width="14" 
-                              height="14" 
-                              viewBox="0 0 24 24" 
-                              fill="none" 
-                              stroke="currentColor" 
-                              strokeWidth="3" 
-                              strokeLinecap="round" 
+                            <svg
+                              width="14"
+                              height="14"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="3"
+                              strokeLinecap="round"
                               strokeLinejoin="round"
                             >
                               <line x1="18" y1="6" x2="6" y2="18"></line>
@@ -582,7 +582,7 @@ const ReelGenerator = () => {
                       ))}
                     </div>
                   </div>
-                  
+
                   {uploadedUrls.length === 0 && (
                     <button
                       className="btn btn-primary btn-lg w-100"
@@ -597,14 +597,14 @@ const ReelGenerator = () => {
                         </>
                       ) : (
                         <>
-                          <svg 
-                            width="20" 
-                            height="20" 
-                            viewBox="0 0 24 24" 
-                            fill="none" 
-                            stroke="currentColor" 
-                            strokeWidth="2" 
-                            strokeLinecap="round" 
+                          <svg
+                            width="20"
+                            height="20"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                            strokeLinecap="round"
                             strokeLinejoin="round"
                             className="me-2"
                           >
@@ -617,17 +617,17 @@ const ReelGenerator = () => {
                       )}
                     </button>
                   )}
-                  
+
                   {uploadedUrls.length > 0 && (
                     <div className="alert alert-success mb-0 d-flex align-items-center">
-                      <svg 
-                        width="24" 
-                        height="24" 
-                        viewBox="0 0 24 24" 
-                        fill="none" 
-                        stroke="currentColor" 
-                        strokeWidth="2" 
-                        strokeLinecap="round" 
+                      <svg
+                        width="24"
+                        height="24"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
                         strokeLinejoin="round"
                         className="me-2"
                       >
@@ -641,13 +641,13 @@ const ReelGenerator = () => {
               )}
             </div>
           </div>
-          
+
           {/* Configuration Section */}
           {uploadedUrls.length > 0 && (
             <div className="card mb-4 shadow-sm border-0">
               <div className="card-body p-4">
                 <h5 className="card-title mb-4">Step 2: Customize Your Reel</h5>
-                
+
                 <div className="row">
                   {/* Intro Text */}
                   <div className="col-md-6 mb-4">
@@ -666,14 +666,14 @@ const ReelGenerator = () => {
                       <small className={`form-text ${isTextTooLong ? 'text-warning' : 'text-muted'}`}>
                         {isTextTooLong ? (
                           <>
-                            <svg 
-                              width="14" 
-                              height="14" 
-                              viewBox="0 0 24 24" 
-                              fill="none" 
-                              stroke="currentColor" 
-                              strokeWidth="2" 
-                              strokeLinecap="round" 
+                            <svg
+                              width="14"
+                              height="14"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="2"
+                              strokeLinecap="round"
                               strokeLinejoin="round"
                               className="me-1"
                               style={{ verticalAlign: 'middle' }}
@@ -693,7 +693,7 @@ const ReelGenerator = () => {
                       </small>
                     </div>
                   </div>
-                  
+
                   {/* Aspect Ratio */}
                   <div className="col-md-6 mb-4">
                     <label className="form-label fw-semibold">Video Format</label>
@@ -709,7 +709,7 @@ const ReelGenerator = () => {
                       <option value="1:1">Square (1:1) - Instagram Feed</option>
                     </select>
                   </div>
-                  
+
                   {/* Transition */}
                   <div className="col-md-6 mb-4">
                     <label className="form-label fw-semibold">Transition Style</label>
@@ -724,7 +724,7 @@ const ReelGenerator = () => {
                       <option value="none">Quick Cut</option>
                     </select>
                   </div>
-                  
+
                   {/* Duration per image */}
                   <div className="col-md-6 mb-4">
                     <label className="form-label fw-semibold">
@@ -744,7 +744,7 @@ const ReelGenerator = () => {
                       Total video length: approximately {(uploadedUrls.length * durationPerImage).toFixed(1)} seconds
                     </small>
                   </div>
-                  
+
                   {/* Fade duration (only if fade transition) */}
                   {transition === 'fade' && (
                     <div className="col-md-6 mb-4">
@@ -781,8 +781,8 @@ const ReelGenerator = () => {
                       <option value="fill">Fill Screen - Cinematic Look (May crop edges)</option>
                     </select>
                     <small className="form-text text-muted">
-                      {fitMode === 'fit' 
-                        ? 'Nothing gets cut off, entire image visible' 
+                      {fitMode === 'fit'
+                        ? 'Nothing gets cut off, entire image visible'
                         : 'No black bars, fills entire screen'}
                     </small>
                   </div>
@@ -801,8 +801,8 @@ const ReelGenerator = () => {
                         disabled={generating}
                         style={{ width: '48px', height: '24px', cursor: 'pointer' }}
                       />
-                      <label 
-                        className="form-check-label ms-2" 
+                      <label
+                        className="form-check-label ms-2"
                         htmlFor="kenBurnsSwitch"
                         style={{ cursor: 'pointer', fontSize: '16px' }}
                       >
@@ -810,8 +810,8 @@ const ReelGenerator = () => {
                       </label>
                     </div>
                     <small className="form-text text-muted d-block mt-2">
-                      {kenBurns 
-                        ? 'Adds smooth zoom and motion to photos for a professional look' 
+                      {kenBurns
+                        ? 'Adds smooth zoom and motion to photos for a professional look'
                         : 'Photos will remain static without zoom'}
                     </small>
                   </div>
@@ -852,27 +852,27 @@ const ReelGenerator = () => {
                 {/* Music Section */}
                 <div className="mb-4">
                   <h6 className="fw-semibold mb-3">Background Music (Optional)</h6>
-                  
+
                   <div className="row g-3">
                     {/* Music Option Selector */}
                     <div className="col-12">
                       <div className="btn-group w-100" role="group">
-                        <input 
-                          type="radio" 
-                          className="btn-check" 
-                          name="musicOption" 
-                          id="noMusic" 
+                        <input
+                          type="radio"
+                          className="btn-check"
+                          name="musicOption"
+                          id="noMusic"
                           checked={musicOption === 'none'}
                           onChange={() => setMusicOption('none')}
                           disabled={generating}
                         />
                         <label className="btn btn-outline-primary" htmlFor="noMusic">No Music</label>
-                        
-                        <input 
-                          type="radio" 
-                          className="btn-check" 
-                          name="musicOption" 
-                          id="uploadMusic" 
+
+                        <input
+                          type="radio"
+                          className="btn-check"
+                          name="musicOption"
+                          id="uploadMusic"
                           checked={musicOption === 'upload'}
                           onChange={() => setMusicOption('upload')}
                           disabled={generating}
@@ -893,8 +893,8 @@ const ReelGenerator = () => {
                           onChange={handleMusicUpload}
                           disabled={uploadingMusic || generating}
                         />
-                        <label 
-                          htmlFor="musicUploadInput" 
+                        <label
+                          htmlFor="musicUploadInput"
                           className="btn btn-outline-secondary w-100"
                           style={{ cursor: uploadingMusic || generating ? 'not-allowed' : 'pointer' }}
                         >
@@ -941,7 +941,7 @@ const ReelGenerator = () => {
                     )}
                   </div>
                 </div>
-                
+
                 <div className="d-grid gap-2">
                   <button
                     className="btn btn-primary btn-lg"
@@ -956,14 +956,14 @@ const ReelGenerator = () => {
                       </>
                     ) : (
                       <>
-                        <svg 
-                          width="24" 
-                          height="24" 
-                          viewBox="0 0 24 24" 
-                          fill="none" 
-                          stroke="currentColor" 
-                          strokeWidth="2" 
-                          strokeLinecap="round" 
+                        <svg
+                          width="24"
+                          height="24"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeLinecap="round"
                           strokeLinejoin="round"
                           className="me-2"
                         >
@@ -973,18 +973,18 @@ const ReelGenerator = () => {
                       </>
                     )}
                   </button>
-                  
+
                   {generating && (
                     <div className="text-center mt-3">
                       <div className="alert alert-info py-2 mb-0 d-inline-flex align-items-center">
-                        <svg 
-                          width="18" 
-                          height="18" 
-                          viewBox="0 0 24 24" 
-                          fill="none" 
-                          stroke="currentColor" 
-                          strokeWidth="2" 
-                          strokeLinecap="round" 
+                        <svg
+                          width="18"
+                          height="18"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeLinecap="round"
                           strokeLinejoin="round"
                           className="me-2"
                         >
@@ -1002,22 +1002,22 @@ const ReelGenerator = () => {
               </div>
             </div>
           )}
-          
+
           {/* Preview Section */}
           {generatedVideo && (
             <div className="card mb-4 shadow-sm border-0">
               <div className="card-body p-4">
                 <h5 className="card-title mb-4">Step 3: Your Reel is Ready</h5>
-                
+
                 <div className="alert alert-success mb-4 d-flex align-items-start">
-                  <svg 
-                    width="24" 
-                    height="24" 
-                    viewBox="0 0 24 24" 
-                    fill="none" 
-                    stroke="currentColor" 
-                    strokeWidth="2" 
-                    strokeLinecap="round" 
+                  <svg
+                    width="24"
+                    height="24"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
                     strokeLinejoin="round"
                     className="me-2 flex-shrink-0"
                     style={{ marginTop: '2px' }}
@@ -1037,7 +1037,7 @@ const ReelGenerator = () => {
                     </ul>
                   </div>
                 </div>
-                
+
                 {/* Video Preview */}
                 <div className="mb-4 text-center">
                   <video
@@ -1054,7 +1054,7 @@ const ReelGenerator = () => {
                     Your browser does not support the video tag.
                   </video>
                 </div>
-                
+
                 {/* Download Button */}
                 <div className="d-grid gap-2">
                   <button
@@ -1062,14 +1062,14 @@ const ReelGenerator = () => {
                     onClick={handleDownload}
                     style={{ padding: '15px', fontSize: '18px' }}
                   >
-                    <svg 
-                      width="24" 
-                      height="24" 
-                      viewBox="0 0 24 24" 
-                      fill="none" 
-                      stroke="currentColor" 
-                      strokeWidth="2" 
-                      strokeLinecap="round" 
+                    <svg
+                      width="24"
+                      height="24"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
                       strokeLinejoin="round"
                       className="me-2"
                     >

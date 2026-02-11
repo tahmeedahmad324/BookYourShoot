@@ -4,7 +4,7 @@
 
 import axios from 'axios';
 
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000/api';
 
 // Get auth token from localStorage
 const getAuthHeaders = () => {
@@ -112,7 +112,7 @@ export const payoutsAPI = {
      * Get all payouts with optional status filter (admin)
      */
     getAllPayouts: async (status = null) => {
-        const url = status 
+        const url = status
             ? `${API_BASE_URL}/payouts/admin/all?status=${status}`
             : `${API_BASE_URL}/payouts/admin/all`;
         const response = await axios.get(url, {

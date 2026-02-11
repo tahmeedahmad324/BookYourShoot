@@ -211,15 +211,6 @@ const Navbar = () => {
                     </li>
                     <li><hr className="dropdown-divider" /></li>
                     <li>
-                      <button
-                        className="dropdown-item text-danger"
-                        onClick={() => setShowDeleteModal(true)}
-                      >
-                        🗑️ Delete Account
-                      </button>
-                    </li>
-                    <li><hr className="dropdown-divider" /></li>
-                    <li>
                       <button className="dropdown-item" onClick={handleLogout}>Logout</button>
                     </li>
                   </ul>

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Link } from 'react-router-dom';
-import { 
-  Music, Play, Pause, Heart, Search, Sparkles, ExternalLink, 
+import {
+  Music, Play, Pause, Heart, Search, Sparkles, ExternalLink,
   Upload, Image, Wand2, X, Camera, CheckCircle2,
   Loader2, AlertCircle, RefreshCw, Video, FileVideo, ImageIcon
 } from 'lucide-react';
@@ -54,7 +54,7 @@ const MusicDiscoveryUI = () => {
   const [selectedEvent, setSelectedEvent] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
 
-  const API_BASE = process.env.REACT_APP_API_URL || "http://localhost:5000";
+  const API_BASE = process.env.REACT_APP_API_URL || "http://localhost:8000";
 
   // Event categories for browse mode
   const events = [
@@ -96,7 +96,7 @@ const MusicDiscoveryUI = () => {
     e.preventDefault();
     e.stopPropagation();
     setDragActive(false);
-    
+
     if (e.dataTransfer.files && e.dataTransfer.files[0]) {
       handleFile(e.dataTransfer.files[0]);
     }
@@ -117,7 +117,7 @@ const MusicDiscoveryUI = () => {
     // Check if file is image or video
     const isImage = file.type.startsWith('image/');
     const isVideo = file.type.startsWith('video/');
-    
+
     if (!isImage && !isVideo) {
       alert('Please upload an image (JPG, PNG) or video (MP4, MOV) file');
       return;
@@ -170,7 +170,7 @@ const MusicDiscoveryUI = () => {
   const handleMultipleImages = async (files) => {
     // Limit to 20 images
     const imageFiles = files.filter(f => f.type.startsWith('image/')).slice(0, 20);
-    
+
     if (imageFiles.length === 0) {
       alert('Please select at least 1 image file (JPG, PNG)');
       return;
@@ -258,7 +258,7 @@ const MusicDiscoveryUI = () => {
           all_event_votes: data.analysis.all_event_votes,
           individual_predictions: data.analysis.individual_predictions
         });
-        
+
         // Set music suggestions
         if (data.music_suggestions && data.music_suggestions.tracks) {
           setTracks(data.music_suggestions.tracks.map(track => ({
@@ -344,7 +344,7 @@ const MusicDiscoveryUI = () => {
           not_event_score: data.not_event_score,
           file_type: fileType
         });
-        
+
         // Set music suggestions if provided
         if (data.music_suggestions && data.music_suggestions.length > 0) {
           setTracks(data.music_suggestions.map(track => ({
@@ -382,7 +382,7 @@ const MusicDiscoveryUI = () => {
         `${API_BASE}/api/music/suggestions?eventType=${eventId}&limit=15`
       );
       const data = await response.json();
-      
+
       if (data.success && data.tracks) {
         setTracks(data.tracks);
       } else {
@@ -405,7 +405,7 @@ const MusicDiscoveryUI = () => {
   const handleSearch = async (e) => {
     e.preventDefault();
     if (!searchQuery.trim()) return;
-    
+
     setLoading(true);
     setShowAll(false);
     try {
@@ -413,7 +413,7 @@ const MusicDiscoveryUI = () => {
         `${API_BASE}/api/music/suggestions?search=${encodeURIComponent(searchQuery)}&limit=15`
       );
       const data = await response.json();
-      
+
       if (data.success && data.tracks) {
         setTracks(data.tracks);
       }
@@ -455,13 +455,13 @@ const MusicDiscoveryUI = () => {
   const toggleSave = (track) => {
     const isSavedTrack = savedTracks.some(t => t.id === track.id);
     let updated;
-    
+
     if (isSavedTrack) {
       updated = savedTracks.filter(t => t.id !== track.id);
     } else {
       updated = [...savedTracks, track];
     }
-    
+
     setSavedTracks(updated);
     localStorage.setItem('savedTracks', JSON.stringify(updated));
   };
@@ -473,7 +473,7 @@ const MusicDiscoveryUI = () => {
     const isLoadingState = mode === 'browse' ? loading : (mode === 'batch' ? batchAnalyzing : analyzing);
     const hasResults = tracks.length > 0;
     const selectedEventData = events.find(e => e.id === selectedEvent);
-    
+
     let title = 'Recommended Music';
     if (mode === 'smart' && analysis) {
       title = `${analysis.event_label || 'Recommended'} Music`;
@@ -491,7 +491,7 @@ const MusicDiscoveryUI = () => {
             <h5 className="fw-bold mb-0" style={{ color: '#1a1a1a' }}>{title}</h5>
           </div>
           {savedTracks.length > 0 && (
-            <span className="badge" style={{ 
+            <span className="badge" style={{
               background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
               padding: '0.5rem 1rem',
               fontSize: '0.85rem'
@@ -508,10 +508,10 @@ const MusicDiscoveryUI = () => {
               <span className="visually-hidden">Loading...</span>
             </div>
             <p className="mt-3 text-muted">
-              {mode === 'smart' 
-                ? (fileType === 'video' 
-                    ? 'AI is extracting frames and analyzing your video...' 
-                    : 'AI is analyzing your image with CLIP...') 
+              {mode === 'smart'
+                ? (fileType === 'video'
+                  ? 'AI is extracting frames and analyzing your video...'
+                  : 'AI is analyzing your image with CLIP...')
                 : mode === 'batch'
                   ? `AI is analyzing ${uploadedImages.length} images with confidence-weighted voting...`
                   : 'Discovering music...'}
@@ -521,7 +521,7 @@ const MusicDiscoveryUI = () => {
 
         {/* Empty State */}
         {!isLoadingState && !hasResults && (
-          <div className="text-center py-5" style={{ 
+          <div className="text-center py-5" style={{
             background: 'white',
             borderRadius: '16px',
             padding: '3rem',
@@ -619,8 +619,8 @@ const MusicDiscoveryUI = () => {
 
                 {/* Track Info */}
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ 
-                    fontWeight: '600', 
+                  <div style={{
+                    fontWeight: '600',
                     fontSize: '0.95rem',
                     color: '#1a1a1a',
                     marginBottom: '0.25rem',
@@ -630,7 +630,7 @@ const MusicDiscoveryUI = () => {
                   }}>
                     {track.title}
                   </div>
-                  <div style={{ 
+                  <div style={{
                     fontSize: '0.85rem',
                     color: '#6c757d',
                     overflow: 'hidden',
@@ -655,7 +655,7 @@ const MusicDiscoveryUI = () => {
                       height: '40px',
                       borderRadius: '50%',
                       border: 'none',
-                      background: playingTrack?.id === track.id 
+                      background: playingTrack?.id === track.id
                         ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
                         : '#f0f0f0',
                       color: playingTrack?.id === track.id ? 'white' : '#1a1a1a',
@@ -709,7 +709,7 @@ const MusicDiscoveryUI = () => {
                 </div>
               </div>
             ))}
-            
+
             {/* Show More/Less Button */}
             {tracks.length > 5 && (
               <div style={{ textAlign: 'center', marginTop: '1.5rem' }}>
@@ -758,8 +758,8 @@ const MusicDiscoveryUI = () => {
   const selectedEventData = events.find(e => e.id === selectedEvent);
 
   return (
-    <div style={{ 
-      minHeight: '100vh', 
+    <div style={{
+      minHeight: '100vh',
       background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 50%, #e2e8f0 100%)',
       paddingBottom: '4rem'
     }}>
@@ -805,7 +805,7 @@ const MusicDiscoveryUI = () => {
               }}
             >
               <ImageIcon size={18} className="me-2" />
-              Multiple Images <span className="badge bg-success ms-1" style={{fontSize: '0.7rem'}}>Better</span>
+              Multiple Images <span className="badge bg-success ms-1" style={{ fontSize: '0.7rem' }}>Better</span>
             </button>
             <button
               onClick={() => { setMode('browse'); setTracks([]); clearFile(); clearBatchImages(); setSelectedEvent(null); }}
@@ -863,13 +863,13 @@ const MusicDiscoveryUI = () => {
                     }}
                   >
                     <div className="d-flex justify-content-center gap-3 mb-3">
-                      <Upload 
-                        size={40} 
-                        style={{ color: dragActive ? '#0d6efd' : '#6c757d' }} 
+                      <Upload
+                        size={40}
+                        style={{ color: dragActive ? '#0d6efd' : '#6c757d' }}
                       />
-                      <Video 
-                        size={40} 
-                        style={{ color: dragActive ? '#0d6efd' : '#6c757d' }} 
+                      <Video
+                        size={40}
+                        style={{ color: dragActive ? '#0d6efd' : '#6c757d' }}
                       />
                     </div>
                     <p style={{ fontWeight: '600', color: '#1a1a1a', marginBottom: '0.5rem' }}>
@@ -900,8 +900,8 @@ const MusicDiscoveryUI = () => {
                 ) : (
                   <div>
                     {/* File Preview - Image or Video */}
-                    <div style={{ 
-                      position: 'relative', 
+                    <div style={{
+                      position: 'relative',
                       marginBottom: '1rem',
                       background: '#f0f0f0',
                       borderRadius: '12px',
@@ -980,7 +980,7 @@ const MusicDiscoveryUI = () => {
                       style={{
                         width: '100%',
                         padding: '1rem',
-                        background: analyzing 
+                        background: analyzing
                           ? '#e2e8f0'
                           : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
                         color: analyzing ? '#64748b' : '#fff',
@@ -1109,9 +1109,9 @@ const MusicDiscoveryUI = () => {
                   {/* All Scores (Expandable) */}
                   {analysis.all_event_scores && (
                     <details style={{ marginTop: '0.5rem' }}>
-                      <summary style={{ 
-                        cursor: 'pointer', 
-                        opacity: 0.9, 
+                      <summary style={{
+                        cursor: 'pointer',
+                        opacity: 0.9,
                         fontSize: '0.85rem',
                         marginBottom: '0.5rem'
                       }}>
@@ -1175,11 +1175,11 @@ const MusicDiscoveryUI = () => {
                     <AlertCircle size={24} />
                     <h5 className="fw-bold mb-0">Not an Event Photo</h5>
                   </div>
-                  
+
                   <p style={{ margin: '0.5rem 0 1rem', fontSize: '0.95rem', lineHeight: '1.5' }}>
                     {analysis.error}
                   </p>
-                  
+
                   <div style={{
                     background: 'rgba(255,255,255,0.6)',
                     borderRadius: '8px',
@@ -1196,7 +1196,7 @@ const MusicDiscoveryUI = () => {
                       <li>Family gatherings and reunions</li>
                     </ul>
                   </div>
-                  
+
                   <div className="d-flex gap-2">
                     <button
                       onClick={clearFile}
@@ -1249,7 +1249,7 @@ const MusicDiscoveryUI = () => {
                     <strong>{analysis.error.includes('CLIP') ? 'Model Loading...' : 'Analysis Failed'}</strong>
                   </div>
                   <p style={{ margin: '0.5rem 0', fontSize: '0.9rem' }}>
-                    {analysis.error.includes('CLIP') 
+                    {analysis.error.includes('CLIP')
                       ? 'The CLIP model is loading for the first time. This may take 30-60 seconds. Please try again.'
                       : analysis.error}
                   </p>
@@ -1315,7 +1315,7 @@ const MusicDiscoveryUI = () => {
                   Upload Multiple Event Photos
                 </h5>
                 <p className="text-muted mb-3" style={{ fontSize: '0.9rem' }}>
-                  Upload 5-10 photos from your event for best results. Our system will analyze all images and use 
+                  Upload 5-10 photos from your event for best results. Our system will analyze all images and use
                   confidence-weighted voting to determine the event type.
                 </p>
 
@@ -1441,8 +1441,8 @@ const MusicDiscoveryUI = () => {
                       style={{
                         width: '100%',
                         padding: '1rem',
-                        background: batchAnalyzing 
-                          ? '#ccc' 
+                        background: batchAnalyzing
+                          ? '#ccc'
                           : 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
                         color: '#fff',
                         border: 'none',
@@ -1611,8 +1611,8 @@ const MusicDiscoveryUI = () => {
                   onChange={(e) => setSearchQuery(e.target.value)}
                   style={{ fontSize: '1rem', border: '1px solid #dee2e6' }}
                 />
-                <button 
-                  className="btn btn-primary px-4" 
+                <button
+                  className="btn btn-primary px-4"
                   type="submit"
                   style={{ borderRadius: '0 12px 12px 0' }}
                   disabled={loading}
@@ -1638,13 +1638,13 @@ const MusicDiscoveryUI = () => {
                         transition: 'all 0.3s ease',
                         border: selectedEvent === event.id ? '2px solid #667eea' : '2px solid transparent',
                         transform: selectedEvent === event.id ? 'translateY(-5px)' : 'translateY(0)',
-                        boxShadow: selectedEvent === event.id 
+                        boxShadow: selectedEvent === event.id
                           ? '0 8px 25px rgba(102, 126, 234, 0.3)'
                           : '0 4px 15px rgba(0, 0, 0, 0.1)'
                       }}
                     >
                       <div style={{ position: 'relative', height: '140px', overflow: 'hidden' }}>
-                        <img 
+                        <img
                           src={event.image}
                           alt={event.name}
                           style={{
@@ -1722,7 +1722,7 @@ const MusicDiscoveryUI = () => {
                 ×
               </button>
             </div>
-            
+
             <iframe
               src={`https://open.spotify.com/embed/track/${selectedTrackForPlayer.id}?utm_source=generator&theme=0`}
               width="100%"

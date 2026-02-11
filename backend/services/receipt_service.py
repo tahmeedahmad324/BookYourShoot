@@ -398,7 +398,7 @@ class ReceiptService:
         
         # Generate QR code first (before HTML generation)
         # Note: In production, replace localhost with actual domain
-        base_url = "http://localhost:5000"  # TODO: Use environment variable for production
+        base_url = "http://localhost:8000"  # TODO: Use environment variable for production
         qr_data = f"{base_url}/api/payments/receipts/{transaction_id}/html"
         qr_base64 = generate_qr_code_base64(qr_data) if QR_AVAILABLE else None
         qr_html = ""

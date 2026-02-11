@@ -13,35 +13,32 @@ const registerSchema = yup.object().shape({
   role: yup.string()
     .required('Please select your role'),
   name: yup.string()
-    .min(2, 'Name must be at least 2 characters')
+    .min(1, 'Name is required')
     .max(50, 'Name must be less than 50 characters')
-    .matches(/^[A-Za-z\s]+$/, 'Name can only contain alphabets and spaces')
-    .test('valid-name-structure', 'Please enter a valid full name (e.g., John Doe)', function (value) {
+    .matches(/^[A-Za-z\.\s]+$/, 'Name can only contain alphabets, periods, and spaces')
+    .test('valid-name-structure', 'Please enter a valid name (e.g., M Shahbaz or Muhammad Ali)', function (value) {
       if (!value) return false;
       const trimmed = value.trim();
-      // Must contain at least one space (first and last name)
-      if (!trimmed.includes(' ')) {
-        return this.createError({ message: 'Please enter your full name (first and last name)' });
+      // Must have at least 2 parts separated by space (first name/initial and last name)
+      const parts = trimmed.split(/\s+/);
+      if (parts.length < 2) {
+        return this.createError({ message: 'Please enter at least a first name/initial and last name (e.g., M Shahbaz)' });
       }
-      // Split into words
-      const words = trimmed.split(/\s+/);
-      // Must have at least 2 words
-      if (words.length < 2) {
-        return this.createError({ message: 'Please enter your full name (first and last name)' });
-      }
-      // Each word must be at least 2 characters and contain vowels (to avoid nonsense like 'dsf dsfds')
+      // Each part can be 1+ characters (allow single char like M, A, etc)
       const vowelRegex = /[aeiouAEIOU]/;
-      for (const word of words) {
-        if (word.length < 2) {
-          return this.createError({ message: 'Each name part must be at least 2 characters' });
+      for (const part of parts) {
+        if (part.length === 0) {
+          return this.createError({ message: 'Name parts cannot be empty' });
         }
-        if (!vowelRegex.test(word)) {
-          return this.createError({ message: 'Please enter a valid name (names should contain vowels)' });
+        // For single character, allow freely (it's an initial)
+        // For multi-character, require at least one vowel
+        if (part.length > 1 && !vowelRegex.test(part)) {
+          return this.createError({ message: 'Please enter valid name parts (names should contain vowels)' });
         }
       }
       return true;
     })
-    .required('Full name is required')
+    .required('Name is required')
     .transform((value) => {
       if (!value) return value;
       // Capitalize first letter of each word
@@ -88,13 +85,13 @@ const registerSchema = yup.object().shape({
     }),
   city: yup.string()
     .required('Please select your city')
-    .oneOf(['Lahore', 'Karachi', 'Islamabad', 'Rawalpindi', 'Faisalabad', 'Multan', 'Peshawar', 'Quetta', 'Sialkot', 'Gujranwala', 'Other'], 'Please select a valid city'),
+    .oneOf(['Lahore', 'Karachi', 'Islamabad', 'Rawalpindi', 'Faisalabad', 'Multan', 'Sialkot', 'Gujranwala', 'Other'], 'Please select a valid city'),
   password: yup.string()
     .min(8, 'Password must be at least 8 characters')
     .matches(/[a-z]/, 'Password must contain at least one lowercase letter')
     .matches(/[A-Z]/, 'Password must contain at least one uppercase letter')
     .matches(/[0-9]/, 'Password must contain at least one number')
-    .matches(/[@$!%*?&#]/, 'Password must contain at least one special character (@$!%*?&#)')
+    .matches(/[^A-Za-z0-9\s]/, 'Password must contain at least one special character')
     .required('Password is required'),
   confirmPassword: yup.string()
     .oneOf([yup.ref('password'), null], 'Passwords must match')
@@ -133,6 +130,8 @@ const Register = () => {
   const [selectedRole, setSelectedRole] = useState('');
   const [showTermsModal, setShowTermsModal] = useState(false);
   const [showPrivacyModal, setShowPrivacyModal] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   const {
     register,
@@ -387,11 +386,8 @@ const Register = () => {
                           <option value="Rawalpindi">Rawalpindi</option>
                           <option value="Faisalabad">Faisalabad</option>
                           <option value="Multan">Multan</option>
-                          <option value="Peshawar">Peshawar</option>
-                          <option value="Quetta">Quetta</option>
                           <option value="Sialkot">Sialkot</option>
                           <option value="Gujranwala">Gujranwala</option>
-                          <option value="Other">Other</option>
                         </select>
                         {errors.city && (
                           <div className="text-danger small mt-1">{errors.city.message}</div>
@@ -405,37 +401,57 @@ const Register = () => {
                         <label htmlFor="password" className="form-label fw-semibold">
                           Password *
                         </label>
-                        <input
-                          type="password"
-                          className={`form-control ${errors.password ? 'is-invalid' : ''}`}
-                          id="password"
-                          placeholder="Enter your password"
-                          {...register('password')}
-                        />
+                        <div className="input-group">
+                          <input
+                            type={showPassword ? 'text' : 'password'}
+                            className={`form-control ${errors.password ? 'is-invalid' : ''}`}
+                            id="password"
+                            placeholder="Enter your password"
+                            {...register('password')}
+                          />
+                          <button
+                            className="btn btn-outline-secondary"
+                            type="button"
+                            onClick={() => setShowPassword(!showPassword)}
+                            style={{ borderColor: '#6c757d' }}
+                          >
+                            {showPassword ? '👁️' : '🔒'}
+                          </button>
+                        </div>
                         <small className="text-muted d-block mt-1">
-                          Must be at least 8 characters with uppercase, lowercase, number and special character (@$!%*?&#)
+                          Must be at least 8 characters with uppercase, lowercase, number and special character
                         </small>
                         {errors.password && (
                           <div className="text-danger small mt-1">{errors.password.message}</div>
                         )}
                       </div>
-                    </div>
 
-                    {/* Confirm Password */}
-                    <div className="mb-4">
-                      <label htmlFor="confirmPassword" className="form-label fw-semibold">
-                        Confirm Password *
-                      </label>
-                      <input
-                        type="password"
-                        className={`form-control ${errors.confirmPassword ? 'is-invalid' : ''}`}
-                        id="confirmPassword"
-                        placeholder="Re-enter your password"
-                        {...register('confirmPassword')}
-                      />
-                      {errors.confirmPassword && (
-                        <div className="text-danger small mt-1">{errors.confirmPassword.message}</div>
-                      )}
+                      {/* Confirm Password */}
+                      <div className="col-md-6 mb-3">
+                        <label htmlFor="confirmPassword" className="form-label fw-semibold">
+                          Confirm Password *
+                        </label>
+                        <div className="input-group">
+                          <input
+                            type={showConfirmPassword ? 'text' : 'password'}
+                            className={`form-control ${errors.confirmPassword ? 'is-invalid' : ''}`}
+                            id="confirmPassword"
+                            placeholder="Re-enter your password"
+                            {...register('confirmPassword')}
+                          />
+                          <button
+                            className="btn btn-outline-secondary"
+                            type="button"
+                            onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                            style={{ borderColor: '#6c757d' }}
+                          >
+                            {showConfirmPassword ? '👁️' : '🔒'}
+                          </button>
+                        </div>
+                        {errors.confirmPassword && (
+                          <div className="text-danger small mt-1">{errors.confirmPassword.message}</div>
+                        )}
+                      </div>
                     </div>
 
                     {/* Password Strength Indicator */}
@@ -466,21 +482,21 @@ const Register = () => {
                         />
                         <label className="form-check-label" htmlFor="agreeToTerms">
                           I agree to the{' '}
-                          <button
-                            type="button"
-                            className="btn btn-link p-0 text-primary text-decoration-none"
+                          <a
+                            href="#"
+                            className="text-primary text-decoration-underline"
                             onClick={(e) => { e.preventDefault(); setShowTermsModal(true); }}
                           >
                             Terms and Conditions
-                          </button>{' '}
+                          </a>{' '}
                           and{' '}
-                          <button
-                            type="button"
-                            className="btn btn-link p-0 text-primary text-decoration-none"
+                          <a
+                            href="#"
+                            className="text-primary text-decoration-underline"
                             onClick={(e) => { e.preventDefault(); setShowPrivacyModal(true); }}
                           >
                             Privacy Policy
-                          </button>
+                          </a>
                         </label>
                       </div>
                       {errors.agreeToTerms && (
