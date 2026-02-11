@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { cnicAPI } from '../../api/api';
-import { supabase } from '../../supabaseClient';
 
 const CNICUpload = () => {
   const navigate = useNavigate();
@@ -170,9 +169,19 @@ const CNICUpload = () => {
       // Clear registration data from sessionStorage
       sessionStorage.removeItem('pendingRegistration');
 
-      // User is always logged in on this page (session was kept alive)
-      // Navigate to photographer dashboard
-      navigate('/photographer/dashboard');
+      // If user is not logged in (registration flow), redirect to login
+      if (!user) {
+        const email = registrationData?.email || '';
+        navigate('/login', {
+          state: {
+            message: 'Registration complete! Your CNIC has been submitted for verification. Please login to continue.',
+            email: email
+          }
+        });
+      } else {
+        // If user is logged in (updating CNIC), go to profile setup
+        navigate('/photographer/profile-setup');
+      }
     } catch (error) {
       console.error('Submission error:', error);
       setError('Failed to complete CNIC verification');
@@ -443,6 +452,27 @@ const CNICUpload = () => {
                 <div className="alert alert-warning mt-3 small">
                   <strong>⚠️ CNIC verification is mandatory</strong> for photographer accounts to ensure trust and security on the platform.
                 </div>
+
+                {/* Skip option for registration flow */}
+                {isRegistrationFlow && !frontData && (
+                  <div className="text-center mt-3">
+                    <button
+                      className="btn btn-link text-muted"
+                      onClick={() => {
+                        sessionStorage.removeItem('pendingRegistration');
+                        const email = registrationData?.email || '';
+                        navigate('/login', {
+                          state: {
+                            message: 'You can complete CNIC verification later from your profile. Please login to continue.',
+                            email: email
+                          }
+                        });
+                      }}
+                    >
+                      Skip for now (complete later from profile)
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
 
