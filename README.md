@@ -1,6 +1,6 @@
-# 📸 BookYourShoot - Photography Booking Platform (FYP)
+# 📸 BookYourShoot - AI-Powered Photography Booking Platform (FYP)
 
-> A comprehensive photography booking platform connecting clients with professional photographers across Pakistan. Features secure payments, escrow system, equipment rentals, and intelligent booking management.
+> A full-stack photography marketplace connecting clients with professional photographers across Pakistan. Features **ILP optimization** for intelligent photographer matching, **AI-powered smart album builder** with face recognition, secure **escrow payment system**, real-time chat, and equipment rental marketplace.
 
 ## 🚀 Quick Start
 
@@ -35,24 +35,41 @@ cd backend && copy .env.example .env && cd ..
 ## ✨ Features
 
 ### Core Functionality
+- 🎯 **ILP Optimization Engine** - Multi-objective photographer matching using Integer Linear Programming (PuLP)
+  - Weighted scoring: Rating (40%), Price (30%), Travel (20%), Experience (10%)
+  - Constraint satisfaction: Budget, availability, gender preference
+  - Mathematically optimal selections in <1 second
+- 🤖 **AI Smart Album Builder** - Intelligent photo organization using:
+  - InsightFace ArcFace embeddings for face recognition
+  - DBSCAN clustering for automatic person grouping
+  - CLIP zero-shot classification for event/mood detection
+  - OpenCV quality scoring (sharpness, brightness)
+  - YOLOv8 person detection
 - 🔍 **Smart Photographer Search** - Filter by city, specialty, price range with 12 mock photographers
 - 📅 **Booking Management** - Request bookings, track status, manage calendar
-- 💳 **Secure Payments** - Stripe integration with PKR currency support
-- 🔒 **Escrow System** - Payment protection for both clients and photographers
+- 💳 **Stripe Payment Integration** - PKR currency support with test card
+- 🔒 **Escrow System** - Payment protection with auto-release and tiered refunds
 - 📷 **Equipment Rental** - Browse and rent photography equipment with deposits
-- ⭐ **Reviews & Ratings** - Client feedback system with ratings
-- 💬 **Real-time Chat** - Communication between clients and photographers
-- 🎵 **Music Discovery** - Spotify integration for video background music
-- 🎬 **Reel Generator** - Create Instagram-style reels from photos
+- ⭐ **Reviews & Ratings** - Client feedback system
+- 💬 **Real-time WebSocket Chat** - Communication between clients and photographers
+- 🎵 **Music Discovery** - Spotify API integration for video background music
+- 🎬 **Reel Generator** - Create Instagram-style reels with MoviePy
 
 ### Advanced Features
+- 🧮 **Multi-Objective Decision Making** - ILP-based photographer selection
+  - Punjab travel cost matrix (20+ cities)
+  - Attribute normalization (0-1 scale)
+  - Score breakdown for explainability
 - 🛡️ **Payment Protection** - Escrow holds funds until work completion
-- 📊 **Cancellation Policies** - Tiered refunds based on notice period
+- 📊 **Tiered Cancellation Policy** - 100% refund (15+ days), 50% (7-14 days), 0% (<7 days)
 - ⏰ **Auto-Release** - Payments released automatically after 7 days
-- 💰 **Platform Fees** - 10% commission on completed bookings
+- 💰 **Platform Fees & Payouts** - 10% commission with bank account management
 - 📱 **Responsive Design** - Mobile-friendly Bootstrap UI
 - 🎨 **Blue Theme** - Professional gradient design (#1A73E8)
-- 🔐 **CNIC Verification** - ID verification for photographers
+- 🔐 **CNIC Verification** - ID verification for photographers with OCR
+- 🎭 **AI Event & Mood Detection** - Automatic tagging using CLIP
+- 📧 **Email Notifications** - Automated booking confirmations with receipts
+- 🎫 **Support Ticketing** - Admin support system with escalation
 
 ## 🛠️ Tech Stack
 
@@ -61,6 +78,7 @@ cd backend && copy .env.example .env && cd ..
 - Bootstrap 5 for UI
 - Stripe.js for payments
 - Supabase client for auth
+- WebSocket for real-time chat
 
 **Backend**
 - FastAPI (Python 3.13)
@@ -68,10 +86,70 @@ cd backend && copy .env.example .env && cd ..
 - Supabase PostgreSQL (with mock data fallback)
 - Spotify API for music discovery
 
+**AI/ML Stack**
+- **PuLP** - Integer Linear Programming solver
+- **InsightFace** - ArcFace face recognition embeddings
+- **CLIP** (Transformers) - Zero-shot event/mood classification
+- **YOLOv8** (Ultralytics) - Person detection
+- **OpenCV** - Image preprocessing & quality scoring
+- **MoviePy** - Video generation
+- **scikit-learn** - DBSCAN clustering
+- **PyTorch** - Deep learning framework
+- **Pytesseract** - OCR for CNIC verification
+
 **Development**
 - Node.js & npm
 - Python 3.13 & pip
 - PowerShell scripts for easy startup
+
+## 🎯 Key Modules
+
+### Module 1: ILP Optimization Engine
+**Mathematical photographer selection using Integer Linear Programming**
+
+**Objective Function:**
+```
+Maximize: Σ (α·Rating + β·Price + γ·Travel + δ·Experience) · x_i
+  where x_i ∈ {0,1}
+  
+Default weights: Rating (40%), Price (30%), Travel (20%), Experience (10%)
+```
+
+**Constraints:**
+- Budget constraint
+- Availability constraint  
+- Gender preference
+- Selection count (top-k)
+
+**Performance:** <1 second for 100+ photographers
+
+**Endpoints:**
+- `POST /api/bookings/optimize` - Run ILP optimization
+- `POST /api/bookings/optimize/explain` - Get detailed score breakdown
+
+### Module 2: Smart Album Builder
+**AI-powered photo organization with face recognition**
+
+**Pipeline:**
+1. Upload photos → Preprocessing (CLAHE normalization, resize)
+2. Face detection → ArcFace embeddings
+3. DBSCAN clustering → Person albums
+4. Quality scoring → Highlight selection
+5. CLIP analysis → Event/mood tagging
+6. MoviePy → Reel generation
+
+**Endpoints:**
+- `POST /api/albums/smart/upload` - Upload photos
+- `POST /api/albums/smart/process` - Start AI processing
+- `GET /api/albums/smart/status` - Check progress
+- `GET /api/albums/smart/albums` - Get organized albums
+- `POST /api/albums/smart/generate-reel` - Create video reel
+
+**Features:**
+- Automatic person grouping
+- Quality-based highlight extraction (top 25 photos)
+- Multi-face handling
+- Visual debugging with bounding boxes
 
 ## 💳 Payment System
 
