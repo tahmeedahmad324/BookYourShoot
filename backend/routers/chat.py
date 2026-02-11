@@ -309,13 +309,20 @@ def send_message_rest(
         if participant_check.data[0].get('is_banned'):
             raise HTTPException(status_code=403, detail="You are banned from this conversation")
         
-        # Simple content type validation
-        allowed_content_types = ['text', 'image', 'video', 'audio', 'file', 'document', 'pdf']
-        if payload.content_type not in allowed_content_types:
-            raise HTTPException(
-                status_code=400, 
-                detail=f"Invalid content type. Allowed: {', '.join(allowed_content_types)}"
-            )
+        # Simple validation: INQUIRY conversations only allow text
+        conv_check = supabase.table('conversations')\
+            .select('conversation_type')\
+            .eq('id', payload.conversation_id)\
+            .execute()
+        
+        if conv_check.data:
+            conv_type = conv_check.data[0].get('conversation_type')
+            # Block file uploads in INQUIRY conversations
+            if conv_type == 'INQUIRY' and payload.content_type in ['image', 'video', 'file', 'audio', 'document', 'pdf']:
+                raise HTTPException(
+                    status_code=403, 
+                    detail="File uploads not allowed in inquiry conversations. Book the photographer to unlock all features."
+                )
         
         # Validate file size limits
         if payload.attachment_size:

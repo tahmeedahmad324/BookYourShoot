@@ -256,6 +256,9 @@ async def websocket_chat_endpoint(
                             connection_manager.join_conversation(user_id, conv['conversation_id'])
                         logger.info(f"User {user_id} joined {len(conv_resp.data)} conversations")
                     
+                    # NOW broadcast presence after joining conversations
+                    await connection_manager.broadcast_presence_update(user_id, "online")
+                    
                     # Send confirmation
                     await websocket.send_json({
                         "type": "joined_conversations",
@@ -287,21 +290,25 @@ async def websocket_chat_endpoint(
                     content_type = message.get('content_type', 'text')
                     temp_id = message.get('temp_id')
                     
-                    # ======================================
-                    # Simple content type validation
-                    allowed_content_types = ['text', 'image', 'video', 'audio', 'file', 'document', 'pdf']
-                    if content_type not in allowed_content_types:
-                        await websocket.send_json({
-                            "type": "error",
-                            "code": "INVALID_CONTENT_TYPE",
-                            "message": f"Invalid content type. Allowed: {', '.join(allowed_content_types)}",
-                            "temp_id": temp_id
-                        })
-                        logger.warning(f"Invalid content type: {content_type}")
-                        continue
-                    # ======================================
-                    # END TWO-PHASE VALIDATION
-                    # ======================================
+                    # Simple validation: INQUIRY conversations only allow text
+                    conv_check = supabase.table('conversations')\
+                        .select('conversation_type')\
+                        .eq('id', conversation_id)\
+                        .execute()
+                    
+                    if conv_check.data:
+                        conv_type = conv_check.data[0].get('conversation_type')
+                        # Block file uploads in INQUIRY conversations
+                        if conv_type == 'INQUIRY' and content_type in ['image', 'file', 'audio']:
+                            await websocket.send_json({
+                                "type": "error",
+                                "code": "FEATURE_RESTRICTED",
+                                "message": "File uploads not allowed in inquiry conversations. Book the photographer to unlock all features.",
+                                "temp_id": temp_id,
+                                "conversation_type": conv_type
+                            })
+                            logger.warning(f"File upload blocked in INQUIRY conversation {conversation_id}")
+                            continue  # Skip to next message
                     
                     # Save to database
                     msg_data = {

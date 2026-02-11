@@ -58,8 +58,7 @@ class ConnectionManager:
         
         logger.info(f"✅ User {user_id} connected (total connections: {len(self.active_connections[user_id])})")
         
-        # Broadcast presence to user's conversations
-        await self.broadcast_presence_update(user_id, "online")
+        # Note: Presence broadcast happens after user joins conversations (see main.py join_conversations event)
     
     async def disconnect(self, websocket: WebSocket, user_id: str):
         """Remove WebSocket connection and update presence"""
