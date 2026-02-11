@@ -452,27 +452,6 @@ const CNICUpload = () => {
                 <div className="alert alert-warning mt-3 small">
                   <strong>⚠️ CNIC verification is mandatory</strong> for photographer accounts to ensure trust and security on the platform.
                 </div>
-
-                {/* Skip option for registration flow */}
-                {isRegistrationFlow && !frontData && (
-                  <div className="text-center mt-3">
-                    <button
-                      className="btn btn-link text-muted"
-                      onClick={() => {
-                        sessionStorage.removeItem('pendingRegistration');
-                        const email = registrationData?.email || '';
-                        navigate('/login', {
-                          state: {
-                            message: 'You can complete CNIC verification later from your profile. Please login to continue.',
-                            email: email
-                          }
-                        });
-                      }}
-                    >
-                      Skip for now (complete later from profile)
-                    </button>
-                  </div>
-                )}
               </div>
             </div>
 
