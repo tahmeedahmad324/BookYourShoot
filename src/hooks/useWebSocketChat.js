@@ -1,5 +1,9 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 
+// Key for localStorage persistence
+const ONLINE_USERS_KEY = 'chat_online_users';
+const ONLINE_STATUS_EXPIRY = 5 * 60 * 1000; // 5 minutes
+
 /**
  * WebSocket Hook for Real-Time Chat
  * Handles connection, reconnection, and message streaming
@@ -8,11 +12,42 @@ export const useWebSocketChat = (token, userId) => {
   const [isConnected, setIsConnected] = useState(false);
   const [messages, setMessages] = useState([]);
   const [typingUsers, setTypingUsers] = useState({});
-  const [onlineUsers, setOnlineUsers] = useState(new Set());
+  
+  // Initialize online users from localStorage
+  const getInitialOnlineUsers = () => {
+    try {
+      const stored = localStorage.getItem(ONLINE_USERS_KEY);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        const now = Date.now();
+        // Filter out expired entries
+        const valid = parsed.filter(entry => (now - entry.timestamp) < ONLINE_STATUS_EXPIRY);
+        return new Set(valid.map(entry => entry.userId));
+      }
+    } catch (err) {
+      console.error('Error loading online users from localStorage:', err);
+    }
+    return new Set();
+  };
+  
+  const [onlineUsers, setOnlineUsers] = useState(getInitialOnlineUsers);
   const wsRef = useRef(null);
   const reconnectTimeoutRef = useRef(null);
   const reconnectAttemptsRef = useRef(0);
   const maxReconnectAttempts = 5;
+  
+  // Persist online users to localStorage whenever they change
+  useEffect(() => {
+    try {
+      const data = Array.from(onlineUsers).map(userId => ({
+        userId,
+        timestamp: Date.now()
+      }));
+      localStorage.setItem(ONLINE_USERS_KEY, JSON.stringify(data));
+    } catch (err) {
+      console.error('Error saving online users to localStorage:', err);
+    }
+  }, [onlineUsers]);
 
   const connect = useCallback(() => {
     if (!token || !userId) return;
