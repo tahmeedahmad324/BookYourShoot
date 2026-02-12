@@ -10,8 +10,10 @@ class VoiceChatService {
     this.remoteStream = null;
     this.ws = null;
     this.callState = 'idle'; // idle, calling, ringing, connected, ended
-    this.onStateChange = null;
+    this.stateChangeCallback = null;
     this.onRemoteStream = null;
+    this.incomingCallCallback = null;
+    this.micChangeCallback = null;
     this.currentCallId = null;
     this.currentConversationId = null;
     this.currentUserId = null;
@@ -66,6 +68,47 @@ class VoiceChatService {
   }
 
   /**
+   * Optimize SDP for higher audio quality
+   * Prefers Opus codec with maximum bitrate and stereo
+   */
+  optimizeAudioSDP(sdp) {
+    let optimizedSdp = sdp;
+    
+    // Set Opus codec parameters for maximum quality
+    const opusParams = [
+      'maxaveragebitrate=510000',  // Maximum bitrate (510 kbps)
+      'maxplaybackrate=48000',      // 48kHz sample rate
+      'stereo=1',                   // Enable stereo
+      'sprop-stereo=1',             // Signal stereo capability
+      'cbr=0',                      // Variable bitrate for better quality
+      'useinbandfec=1',             // Forward error correction
+      'usedtx=0'                    // Disable discontinuous transmission for quality
+    ].join(';');
+    
+    // Find the Opus codec line and add/update parameters
+    const opusMatch = optimizedSdp.match(/a=rtpmap:(\d+) opus\/48000\/2/);
+    if (opusMatch) {
+      const payloadType = opusMatch[1];
+      
+      // Remove existing fmtp line if present
+      optimizedSdp = optimizedSdp.replace(
+        new RegExp(`a=fmtp:${payloadType}.*\\r\\n`, 'g'),
+        ''
+      );
+      
+      // Add optimized fmtp line after rtpmap
+      optimizedSdp = optimizedSdp.replace(
+        `a=rtpmap:${payloadType} opus/48000/2\r\n`,
+        `a=rtpmap:${payloadType} opus/48000/2\r\na=fmtp:${payloadType} ${opusParams}\r\n`
+      );
+      
+      console.log('🎵 Optimized Opus codec for maximum quality');
+    }
+    
+    return optimizedSdp;
+  }
+
+  /**
    * Initialize WebSocket connection for signaling
    */
   initSignaling(token, userId) {
@@ -109,6 +152,16 @@ class VoiceChatService {
         // Store the offer for when user accepts
         this.pendingOffer = data.offer;
         this.pendingCallerName = data.caller_name;
+        
+        // Notify subscribers of incoming call
+        if (this.incomingCallCallback) {
+          this.incomingCallCallback({
+            call_id: data.call_id,
+            conversation_id: data.conversation_id,
+            from_user_id: data.from_user_id,
+            caller_name: data.caller_name
+          });
+        }
         break;
         
       case 'voice_call_answer':
@@ -203,10 +256,14 @@ class VoiceChatService {
    * Start an outgoing call
    */
   async startCall(conversationId, remoteUserId, callerName) {
+    console.log('📞 voiceChatService.startCall:', { conversationId, remoteUserId, callerName });
+    
     try {
       this.currentConversationId = conversationId;
       this.remoteUserId = remoteUserId;
       this.currentCallId = `call_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      
+      console.log('📞 Call ID generated:', this.currentCallId);
       
       // Prepare audio constraints with selected device
       const constraints = { ...this.audioConstraints };
@@ -271,8 +328,12 @@ class VoiceChatService {
         }
       };
       
-      // Create and send offer
+      // Create and send offer with optimized audio
       const offer = await this.peerConnection.createOffer();
+      
+      // Optimize SDP for better audio quality
+      offer.sdp = this.optimizeAudioSDP(offer.sdp);
+      
       await this.peerConnection.setLocalDescription(offer);
       
       this.sendSignalingMessage({
@@ -379,8 +440,12 @@ class VoiceChatService {
         new RTCSessionDescription(this.pendingOffer)
       );
       
-      // Create and send answer
+      // Create and send answer with optimized audio
       const answer = await this.peerConnection.createAnswer();
+      
+      // Optimize SDP for better audio quality
+      answer.sdp = this.optimizeAudioSDP(answer.sdp);
+      
       await this.peerConnection.setLocalDescription(answer);
       
       this.sendSignalingMessage({
@@ -493,12 +558,61 @@ class VoiceChatService {
   }
 
   /**
+   * Initialize voice service globally
+   */
+  async init(token, userId) {
+    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+      console.log('⚠️  Voice service already initialized');
+      return;
+    }
+    
+    this.initSignaling(token, userId);
+    
+    // Get available microphones
+    const mics = await this.getAvailableMicrophones();
+    if (mics.length > 0) {
+      console.log(`🎤 Found ${mics.length} microphones`);
+    }
+  }
+
+  /**
+   * Register state change callback
+   */
+  onStateChange(callback) {
+    this.stateChangeCallback = callback;
+  }
+
+  /**
+   * Register incoming call callback
+   */
+  onIncomingCall(callback) {
+    this.incomingCallCallback = callback;
+  }
+
+  /**
+   * Register mic change callback
+   */
+  onMicChange(callback) {
+    this.micChangeCallback = callback;
+  }
+
+  /**
+   * Set current microphone and notify listeners
+   */
+  _setCurrentMic(label) {
+    this.currentMicLabel = label;
+    if (this.micChangeCallback) {
+      this.micChangeCallback(label);
+    }
+  }
+
+  /**
    * Set call state and notify listeners
    */
   setState(newState) {
     this.callState = newState;
-    if (this.onStateChange) {
-      this.onStateChange(newState);
+    if (this.stateChangeCallback) {
+      this.stateChangeCallback(newState);
     }
   }
 
@@ -526,6 +640,9 @@ class VoiceChatService {
   playRemoteAudio(stream) {
     if (!this.remoteAudio) {
       this.remoteAudio = new Audio();
+      // Optimize for high quality playback
+      this.remoteAudio.volume = 1.0; // Full volume
+      this.remoteAudio.autoplay = true;
     }
     this.remoteAudio.srcObject = stream;
     this.remoteAudio.play().catch(err => console.error('Failed to play remote audio:', err));

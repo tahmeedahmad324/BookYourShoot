@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import { useVoiceCall } from '../../context/VoiceCallContext';
 import { useWebSocketChat } from '../../hooks/useWebSocketChat';
 import axios from 'axios';
 import { supabase } from '../../supabaseClient';
@@ -25,7 +26,6 @@ import {
   Phone,
   Lock
 } from 'lucide-react';
-import VoiceCallModal from './VoiceCallModal';
 import '../../styles/chat.css';
 
 // Notification sound (base64 encoded short beep)
@@ -34,6 +34,7 @@ const NOTIFICATION_SOUND = 'data:audio/wav;base64,UklGRl9vT19XQVZFZm10IBAAAAABAA
 const ChatContainer = ({ userRole = 'client' }) => {
   const { id: urlConversationId } = useParams();
   const { user, getToken } = useAuth();
+  const { startCall } = useVoiceCall();
   const navigate = useNavigate();
   
   // Get actual user ID (memoized to prevent recalculation on every render)
@@ -95,7 +96,6 @@ const ChatContainer = ({ userRole = 'client' }) => {
   const [showMessageSearch, setShowMessageSearch] = useState(false);
   const [unreadCounts, setUnreadCounts] = useState({});
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
-  const [showVoiceCall, setShowVoiceCall] = useState(false);
   
   // Refs
   const messagesEndRef = useRef(null);
@@ -971,7 +971,23 @@ const ChatContainer = ({ userRole = 'client' }) => {
                   }`}
                   onClick={() => {
                     if (selectedConversation.conversation_type !== 'INQUIRY') {
-                      setShowVoiceCall(true);
+                      // Start voice call using global context
+                      const remoteName = selectedConversation.other_user?.name || 'User';
+                      const remoteUserId = selectedConversation.other_user?.user_id;
+                      const callerName = user?.full_name || user?.name || 'User';
+                      
+                      console.log('📞 Starting call:', { 
+                        conversationId: selectedConversation.id, 
+                        remoteUserId, 
+                        remoteName, 
+                        callerName 
+                      });
+                      
+                      if (remoteUserId) {
+                        startCall(selectedConversation.id, remoteUserId, remoteName, callerName);
+                      } else {
+                        console.error('❌ Cannot start call: remoteUserId is undefined', selectedConversation.other_user);
+                      }
                     }
                   }}
                   disabled={selectedConversation.conversation_type === 'INQUIRY'}
@@ -1318,18 +1334,6 @@ const ChatContainer = ({ userRole = 'client' }) => {
           </div>
         )}
       </div>
-      
-      {/* Voice Call Modal */}
-      <VoiceCallModal
-        isOpen={showVoiceCall}
-        onClose={() => setShowVoiceCall(false)}
-        conversationId={selectedConversation?.id}
-        remoteUserId={selectedConversation?.other_user?.user_id}
-        remoteUserName={selectedConversation?.other_user?.name}
-        currentUserId={currentUserId}
-        currentUserName={user?.full_name || localStorage.getItem('userName') || 'User'}
-        token={authToken}
-      />
     </div>
   );
 };

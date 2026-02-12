@@ -75,19 +75,23 @@ import WebhookSimulator from "./pages/admin/WebhookSimulator"
 
 // Context Providers
 import { AuthProvider } from "./context/AuthContext"
+import { VoiceCallProvider } from "./context/VoiceCallContext"
+import GlobalVoiceCallModal from "./components/voice/GlobalVoiceCallModal"
 
 function App() {
   return (
     <AuthProvider>
-      <Router>
-        <ScrollToTop />
-        <div className="App">
-          <Navbar />
-          <main className="min-vh-100">
-            <Routes>
-              {/* Public Routes */}
-              <Route path="/" element={<Landing />} />
-              <Route path="/landing-old" element={<LandingPage />} />
+      <VoiceCallProvider>
+        <Router>
+          <ScrollToTop />
+          <div className="App">
+            <Navbar />
+            <GlobalVoiceCallModal />
+            <main className="min-vh-100">
+              <Routes>
+                {/* Public Routes */}
+                <Route path="/" element={<Landing />} />
+                <Route path="/landing-old" element={<LandingPage />} />
               <Route path="/login" element={<Login />} />
               <Route path="/register" element={<Register />} />
               <Route path="/register/cnic" element={<CNICUpload />} />
@@ -464,6 +468,7 @@ function App() {
           <AIChatbotV2 />
         </div>
       </Router>
+      </VoiceCallProvider>
     </AuthProvider>
   )
 }
