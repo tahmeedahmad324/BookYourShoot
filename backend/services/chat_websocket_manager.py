@@ -113,6 +113,8 @@ class ConnectionManager:
         """Broadcast message to all members of a conversation"""
         members = self.conversation_members.get(conversation_id, set())
         
+        logger.info(f"🔊 Broadcasting '{message.get('type')}' to conversation {conversation_id}: {len(members)} members")
+        
         for user_id in members:
             if exclude_user and user_id == exclude_user:
                 continue

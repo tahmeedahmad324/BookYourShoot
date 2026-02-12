@@ -145,6 +145,14 @@ export const AuthProvider = ({ children }) => {
       console.log('Auth state changed:', event);
       setSession(session);
 
+      // Skip if using mock authentication
+      const mockUserData = localStorage.getItem('mock_user');
+      const userRole = localStorage.getItem('userRole');
+      if (mockUserData || userRole) {
+        console.log('[AuthContext] Mock auth detected, skipping Supabase state change');
+        return; // Don't override mock auth
+      }
+
       if (session?.user) {
         // Fetch complete user profile from our database
         const profile = await fetchUserProfile(session.user.id, session);

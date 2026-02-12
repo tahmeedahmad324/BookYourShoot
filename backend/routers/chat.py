@@ -9,6 +9,7 @@ from typing import Optional, List
 from datetime import datetime, timedelta
 from backend.supabase_client import supabase
 from backend.auth import get_current_user
+from backend.services.chat_websocket_manager import connection_manager
 import logging
 
 router = APIRouter(prefix="/chat", tags=["Chat"])
@@ -42,6 +43,14 @@ class InitAttachmentRequest(BaseModel):
 
 class MessageReadRequest(BaseModel):
     message_id: str
+
+
+class VoiceCallLogRequest(BaseModel):
+    conversation_id: str
+    call_id: str
+    call_status: str  # 'initiated', 'ringing', 'connected', 'ended', 'missed', 'rejected', 'busy'
+    duration: Optional[int] = None  # Duration in seconds
+    message_id: Optional[str] = None  # For updating existing message
 
 
 # ============================================
@@ -281,7 +290,7 @@ def get_conversation_messages(
 
 
 @router.post("/messages")
-def send_message_rest(
+async def send_message_rest(
     payload: SendMessageRequest,
     current_user: dict = Depends(get_current_user)
 ):
@@ -350,9 +359,24 @@ def send_message_rest(
         
         resp = supabase.table('messages').insert(message).execute()
         
-        logger.info(f"Message sent via REST: {resp.data[0]['id']}")
+        if not resp.data:
+            raise HTTPException(status_code=400, detail="Failed to create message")
         
-        return {"success": True, "data": resp.data[0]}
+        new_message = resp.data[0]
+        
+        # Broadcast new message to conversation
+        await connection_manager.broadcast_to_conversation(
+            payload.conversation_id,
+            {
+                "type": "new_message",
+                "message": new_message,
+                "conversation_id": payload.conversation_id
+            }
+        )
+        
+        logger.info(f"Message sent via REST: {new_message['id']}")
+        
+        return {"success": True, "data": new_message}
     
     except HTTPException:
         raise
@@ -735,3 +759,134 @@ def admin_get_audit_logs(
     except Exception as e:
         logger.error(f"Admin error fetching audit logs: {e}")
         raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/voice-call-log")
+async def log_voice_call(
+    payload: VoiceCallLogRequest,
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Create or update voice call log message in chat
+    Call statuses: initiated, ringing, connected, ended, missed, rejected, busy
+    """
+    try:
+        user_id = current_user.get("id")
+        
+        # Verify participant
+        participant_check = supabase.table('conversation_participants')\
+            .select('*')\
+            .eq('conversation_id', payload.conversation_id)\
+            .eq('user_id', user_id)\
+            .execute()
+        
+        if not participant_check.data:
+            raise HTTPException(status_code=403, detail="Not a participant")
+        
+        # Build message content based on call status
+        call_status_messages = {
+            'initiated': '📞 Voice call started...',
+            'ringing': '📞 Ringing...',
+            'connected': '📞 Call in progress...',
+            'ended': f'📞 Call ended • {format_duration(payload.duration)}' if payload.duration else '📞 Call ended',
+            'missed': '📞 Missed call',
+            'rejected': '📞 Call declined',
+            'busy': '📞 User busy'
+        }
+        
+        content = call_status_messages.get(payload.call_status, '📞 Voice call')
+        
+        # If message_id provided, update existing message
+        if payload.message_id:
+            update_data = {
+                "content": content
+            }
+            
+            resp = supabase.table('messages')\
+                .update(update_data)\
+                .eq('id', payload.message_id)\
+                .eq('sender_id', user_id)\
+                .execute()
+            
+            if not resp.data:
+                raise HTTPException(status_code=404, detail="Message not found or unauthorized")
+            
+            updated_message = resp.data[0]
+            
+            logger.info(f"📞 Broadcasting call log update: {payload.call_status} to conversation {payload.conversation_id}")
+            
+            # Broadcast update to conversation
+            await connection_manager.broadcast_to_conversation(
+                payload.conversation_id,
+                {
+                    "type": "message_updated",
+                    "message": updated_message,
+                    "conversation_id": payload.conversation_id
+                }
+            )
+            
+            logger.info(f"✅ Call log update broadcasted successfully")
+            
+            return {
+                "success": True,
+                "data": updated_message,
+                "message": "Call log updated"
+            }
+        
+        # Otherwise, create new message
+        message = {
+            "conversation_id": payload.conversation_id,
+            "sender_id": user_id,
+            "content": content,
+            "content_type": "text",  # Store as text for compatibility
+            "status": "SENT"
+        }
+        
+        resp = supabase.table('messages').insert(message).execute()
+        
+        if not resp.data:
+            raise HTTPException(status_code=400, detail="Failed to create call log")
+        
+        new_message = resp.data[0]
+        
+        logger.info(f"📞 Broadcasting new call log: {payload.call_status} to conversation {payload.conversation_id}")
+        logger.info(f"📞 Message ID: {new_message.get('id')}, Content: {new_message.get('content')}")
+        
+        # Broadcast new message to conversation
+        await connection_manager.broadcast_to_conversation(
+            payload.conversation_id,
+            {
+                "type": "new_message",
+                "message": new_message,
+                "conversation_id": payload.conversation_id
+            }
+        )
+        
+        logger.info(f"✅ New call log broadcasted successfully")
+        
+        return {
+            "success": True,
+            "data": new_message,
+            "message": "Call log created"
+        }
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error logging voice call: {e}")
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+def format_duration(seconds):
+    """Format call duration in MM:SS or HH:MM:SS"""
+    if not seconds:
+        return "00:00"
+    
+    hours = seconds // 3600
+    minutes = (seconds % 3600) // 60
+    secs = seconds % 60
+    
+    if hours > 0:
+        return f"{hours:02d}:{minutes:02d}:{secs:02d}"
+    else:
+        return f"{minutes:02d}:{secs:02d}"

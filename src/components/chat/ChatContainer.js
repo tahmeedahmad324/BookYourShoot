@@ -21,8 +21,11 @@ import {
   Image as ImageIcon,
   File as FileIcon,
   Bell,
-  BellOff
+  BellOff,
+  Phone,
+  Lock
 } from 'lucide-react';
+import VoiceCallModal from './VoiceCallModal';
 import '../../styles/chat.css';
 
 // Notification sound (base64 encoded short beep)
@@ -92,6 +95,7 @@ const ChatContainer = ({ userRole = 'client' }) => {
   const [showMessageSearch, setShowMessageSearch] = useState(false);
   const [unreadCounts, setUnreadCounts] = useState({});
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
+  const [showVoiceCall, setShowVoiceCall] = useState(false);
   
   // Refs
   const messagesEndRef = useRef(null);
@@ -293,12 +297,32 @@ const ChatContainer = ({ userRole = 'client' }) => {
             return !hasMatch; // Remove if matched
           });
           
-          // Add new messages that don't exist yet
-          const existingIds = new Set(optimisticRemoved.map(m => m.id));
-          const newMsgs = relevantMessages.filter(m => !existingIds.has(m.id) && !m.id?.startsWith?.('temp-'));
+          // Build a map of existing messages for faster lookup
+          const existingMap = new Map(optimisticRemoved.map(m => [m.id, m]));
           
-          // Merge and sort by created_at to ensure correct order
-          const merged = [...optimisticRemoved, ...newMsgs];
+          // Process relevant messages: update existing or add new
+          const newMsgs = [];
+          const updatedMessages = optimisticRemoved.map(existing => {
+            // Check if this message has an update in wsMessages
+            const updated = relevantMessages.find(rm => rm.id === existing.id);
+            if (updated && updated.content !== existing.content) {
+              // Message was updated (e.g., call status changed)
+              console.log('🔄 Updating message:', existing.content, '→', updated.content);
+              return { ...existing, ...updated };
+            }
+            return existing;
+          });
+          
+          // Find truly new messages (not in existing map)
+          relevantMessages.forEach(rm => {
+            if (!existingMap.has(rm.id) && !rm.id?.startsWith?.('temp-')) {
+              newMsgs.push(rm);
+            }
+          });
+          
+          // Merge updated and new messages
+          const merged = [...updatedMessages, ...newMsgs];
+          
           // Sort by timestamp, handling potential format issues
           merged.sort((a, b) => {
             const timeA = a.created_at ? new Date(a.created_at).getTime() : 0;
@@ -936,8 +960,44 @@ const ChatContainer = ({ userRole = 'client' }) => {
                 </div>
               )}
               
-              {/* Search & Notification Toggle */}
+              {/* Search, Voice Call & Notification Toggle */}
               <div className="chat-header-actions d-flex align-items-center gap-2">
+                {/* Voice call - Always visible but disabled for INQUIRY */}
+                <button 
+                  className={`btn btn-link p-1 position-relative ${
+                    selectedConversation.conversation_type === 'INQUIRY' 
+                      ? 'text-muted opacity-50' 
+                      : 'text-white'
+                  }`}
+                  onClick={() => {
+                    if (selectedConversation.conversation_type !== 'INQUIRY') {
+                      setShowVoiceCall(true);
+                    }
+                  }}
+                  disabled={selectedConversation.conversation_type === 'INQUIRY'}
+                  title={
+                    selectedConversation.conversation_type === 'INQUIRY'
+                      ? '📞 Voice calls available after booking'
+                      : 'Voice call'
+                  }
+                  style={{ cursor: selectedConversation.conversation_type === 'INQUIRY' ? 'not-allowed' : 'pointer' }}
+                >
+                  <Phone size={20} />
+                  {selectedConversation.conversation_type === 'INQUIRY' && (
+                    <Lock 
+                      size={10} 
+                      className="position-absolute" 
+                      style={{ 
+                        bottom: '-2px', 
+                        right: '-2px', 
+                        background: '#6c757d', 
+                        borderRadius: '50%', 
+                        padding: '2px',
+                        color: 'white'
+                      }} 
+                    />
+                  )}
+                </button>
                 <button 
                   className={`btn btn-link text-white p-1 ${showMessageSearch ? 'active' : ''}`}
                   onClick={() => setShowMessageSearch(!showMessageSearch)}
@@ -1258,6 +1318,18 @@ const ChatContainer = ({ userRole = 'client' }) => {
           </div>
         )}
       </div>
+      
+      {/* Voice Call Modal */}
+      <VoiceCallModal
+        isOpen={showVoiceCall}
+        onClose={() => setShowVoiceCall(false)}
+        conversationId={selectedConversation?.id}
+        remoteUserId={selectedConversation?.other_user?.user_id}
+        remoteUserName={selectedConversation?.other_user?.name}
+        currentUserId={currentUserId}
+        currentUserName={user?.full_name || localStorage.getItem('userName') || 'User'}
+        token={authToken}
+      />
     </div>
   );
 };

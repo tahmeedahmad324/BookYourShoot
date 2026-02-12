@@ -405,6 +405,142 @@ async def websocket_chat_endpoint(
 
 
 # ============================================
+# WebSocket Endpoint for Voice Chat Signaling
+# ============================================
+
+# Voice call connection manager (separate from chat)
+voice_connections: dict[str, WebSocket] = {}
+
+@app.websocket("/ws/voice")
+async def websocket_voice_endpoint(
+    websocket: WebSocket,
+    token: str = Query(..., description="JWT token for authentication")
+):
+    """
+    WebSocket endpoint for voice chat signaling (WebRTC)
+    URL: ws://localhost:8000/ws/voice?token=<jwt_token>
+    
+    Events handled:
+    - voice_call_offer: Send call offer to another user
+    - voice_call_answer: Answer a call
+    - voice_call_ice_candidate: Exchange ICE candidates
+    - voice_call_rejected: Reject an incoming call
+    - voice_call_ended: End an active call
+    """
+    user_id = None
+    
+    try:
+        from backend.supabase_client import supabase
+        from backend.config import DEV_MODE
+        
+        # Mock token support for development
+        if DEV_MODE and token.startswith('mock-jwt-token'):
+            parts = token.split('-')
+            role = parts[-1] if len(parts) > 3 else 'client'
+            
+            mock_user_ids = {
+                'client': '257f9b67-99fa-44ce-ae67-6229c36380b5',
+                'photographer': '21bf398a-e012-4c4d-9b55-caeac7ec6dc7',
+                'admin': '5fb7a96b-3dd0-4d44-9631-c07a256292ee'
+            }
+            user_id = mock_user_ids.get(role, '257f9b67-99fa-44ce-ae67-6229c36380b5')
+            logger.info(f"⚠️  DEV MODE: Voice WebSocket using mock {role} user: {user_id}")
+        else:
+            # Real token validation
+            try:
+                if hasattr(supabase.auth, 'get_user'):
+                    user_resp = supabase.auth.get_user(token)
+                    supabase_user = getattr(user_resp, 'user', None) or user_resp
+                else:
+                    user_resp = supabase.auth.api.get_user(token)
+                    supabase_user = getattr(user_resp, 'user', None) or user_resp
+                
+                user_id = supabase_user.id if hasattr(supabase_user, 'id') else supabase_user.get('id')
+                
+                if not user_id:
+                    await websocket.close(code=1008, reason="Invalid token")
+                    return
+            except Exception as auth_error:
+                logger.error(f"Voice WebSocket auth error: {auth_error}")
+                await websocket.close(code=1008, reason="Authentication failed")
+                return
+        
+        # Accept connection
+        await websocket.accept()
+        voice_connections[user_id] = websocket
+        logger.info(f"📞 Voice WebSocket connected: {user_id}")
+        
+        # Main message loop
+        while True:
+            try:
+                data = await websocket.receive_text()
+                message = json.loads(data)
+                event_type = message.get('type')
+                to_user_id = message.get('to_user_id')
+                
+                logger.info(f"📞 Voice event: {event_type} from {user_id} to {to_user_id}")
+                
+                # Validate conversation type for voice calls
+                if event_type == 'voice_call_offer':
+                    conversation_id = message.get('conversation_id')
+                    if conversation_id:
+                        # Check if conversation is INQUIRY type
+                        conv_check = supabase.table('conversations')\
+                            .select('conversation_type')\
+                            .eq('id', conversation_id)\
+                            .execute()
+                        
+                        if conv_check.data and conv_check.data[0].get('conversation_type') == 'INQUIRY':
+                            # Reject voice call for inquiry conversations
+                            await websocket.send_json({
+                                "type": "voice_call_busy",
+                                "call_id": message.get('call_id'),
+                                "reason": "Voice calls are not available in inquiry conversations. Please book the photographer to unlock this feature."
+                            })
+                            logger.info(f"📞 Voice call blocked: INQUIRY conversation {conversation_id}")
+                            continue  # Skip forwarding this message
+                
+                if event_type in [
+                    'voice_call_offer', 
+                    'voice_call_answer', 
+                    'voice_call_ice_candidate',
+                    'voice_call_rejected',
+                    'voice_call_ended',
+                    'voice_call_busy'
+                ]:
+                    # Forward the message to the target user
+                    if to_user_id and to_user_id in voice_connections:
+                        target_ws = voice_connections[to_user_id]
+                        await target_ws.send_json(message)
+                        logger.info(f"📞 Forwarded {event_type} to {to_user_id}")
+                    else:
+                        # User not connected - send busy signal back
+                        if event_type == 'voice_call_offer':
+                            await websocket.send_json({
+                                "type": "voice_call_busy",
+                                "call_id": message.get('call_id'),
+                                "reason": "User is not available"
+                            })
+                            logger.info(f"📞 User {to_user_id} not available for call")
+            
+            except WebSocketDisconnect:
+                break
+            except json.JSONDecodeError:
+                logger.error(f"Invalid JSON from voice connection {user_id}")
+            except Exception as msg_error:
+                logger.error(f"Error processing voice message from {user_id}: {msg_error}")
+    
+    except Exception as e:
+        logger.error(f"Voice WebSocket error for {user_id}: {e}")
+    
+    finally:
+        # Disconnect user
+        if user_id and user_id in voice_connections:
+            del voice_connections[user_id]
+            logger.info(f"📞 Voice WebSocket disconnected: {user_id}")
+
+
+# ============================================
 # Regular HTTP Routes
 # ============================================
 
@@ -452,7 +588,8 @@ if __name__ == "__main__":
     print(f"   Port: {port}")
     print(f"   API URL: http://{host}:{port}")
     print(f"   Swagger Docs: http://{host}:{port}/docs")
-    print(f"   WebSocket: ws://{host}:{port}/ws/chat")
+    print(f"   WebSocket Chat: ws://{host}:{port}/ws/chat")
+    print(f"   WebSocket Voice: ws://{host}:{port}/ws/voice")
     print(f"\n   Press CTRL+C to quit\n")
     
     uvicorn.run("backend.main:app", host=host, port=port, reload=True)

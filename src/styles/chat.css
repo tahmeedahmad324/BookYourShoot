@@ -596,6 +596,16 @@
   opacity: 1;
 }
 
+.chat-header-actions .btn-link:disabled {
+  opacity: 0.5;
+  cursor: not-allowed !important;
+  pointer-events: auto; /* Keep pointer events for tooltip */
+}
+
+.chat-header-actions .btn-link:disabled:hover {
+  opacity: 0.6; /* Slight increase on hover to show it's there but disabled */
+}
+
 /* Message Search Bar */
 .chat-search-bar {
   background: #f8f9fa;

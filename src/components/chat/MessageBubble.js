@@ -44,6 +44,40 @@ const MessageBubble = ({ message, isOwnMessage, showSender = false, onImageClick
   };
 
   const renderContent = () => {
+    // Check if this is a voice call message (starts with phone emoji)
+    if (content && content.startsWith('📞')) {
+      // Voice call log message
+      const getCallStyle = () => {
+        if (content.includes('declined') || content.includes('Missed')) {
+          return { color: '#dc3545', icon: '📞❌' };
+        } else if (content.includes('ended') || content.includes('•')) {
+          return { color: '#28a745', icon: '📞✓' };
+        } else if (content.includes('started') || content.includes('Ringing')) {
+          return { color: '#0d6efd', icon: '📞⏳' };
+        } else if (content.includes('progress')) {
+          return { color: '#20c997', icon: '📞🔊' };
+        } else {
+          return { color: '#6c757d', icon: '📞' };
+        }
+      };
+      
+      const callStyle = getCallStyle();
+      
+      return (
+        <div className="voice-call-log" style={{ 
+          padding: '8px 12px', 
+          background: isOwnMessage ? 'rgba(13, 110, 253, 0.1)' : 'rgba(108, 117, 125, 0.1)',
+          borderRadius: '8px',
+          borderLeft: `3px solid ${callStyle.color}`
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: callStyle.color, fontWeight: '500' }}>
+            <span style={{ fontSize: '1.2em' }}>{callStyle.icon}</span>
+            <span>{content}</span>
+          </div>
+        </div>
+      );
+    }
+    
     switch (content_type) {
       case 'image':
         return (
