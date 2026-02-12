@@ -76,13 +76,15 @@ import WebhookSimulator from "./pages/admin/WebhookSimulator"
 // Context Providers
 import { AuthProvider } from "./context/AuthContext"
 import { VoiceCallProvider } from "./context/VoiceCallContext"
+import { GlobalWebSocketProvider } from "./context/GlobalWebSocketContext"
 import GlobalVoiceCallModal from "./components/voice/GlobalVoiceCallModal"
 
 function App() {
   return (
     <AuthProvider>
-      <VoiceCallProvider>
-        <Router>
+      <GlobalWebSocketProvider>
+        <VoiceCallProvider>
+          <Router>
           <ScrollToTop />
           <div className="App">
             <Navbar />
@@ -467,8 +469,9 @@ function App() {
           <Footer />
           <AIChatbotV2 />
         </div>
-      </Router>
-      </VoiceCallProvider>
+          </Router>
+        </VoiceCallProvider>
+      </GlobalWebSocketProvider>
     </AuthProvider>
   )
 }

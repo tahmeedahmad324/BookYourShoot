@@ -165,12 +165,12 @@ def get_conversations(
         # Limit results
         conversations = conversations[:limit]
         
-        # ENHANCEMENT: Add participants and other_user info to each conversation
+        # ENHANCEMENT: Add participants, other_user info, and unread count to each conversation
         for conv in conversations:
             try:
                 # Get all participants for this conversation
                 parts_resp = supabase.table('conversation_participants')\
-                    .select('user_id, role')\
+                    .select('user_id, role, last_read_at')\
                     .eq('conversation_id', conv['id'])\
                     .execute()
                 
@@ -187,6 +187,7 @@ def get_conversations(
                     
                     # Build participants list with user details
                     participants = []
+                    current_user_last_read = None
                     for part in parts_resp.data:
                         user = users_map.get(part['user_id'], {})
                         participants.append({
@@ -197,20 +198,45 @@ def get_conversations(
                             'profile_picture_url': user.get('profile_picture_url'),
                             'user_role': user.get('role')
                         })
+                        # Track current user's last read timestamp
+                        if part['user_id'] == user_id:
+                            current_user_last_read = part.get('last_read_at')
                     
                     conv['participants'] = participants
                     
                     # Find the "other user" (not the current user)
                     other_participant = next((p for p in participants if p['user_id'] != user_id), None)
                     conv['other_user'] = other_participant
+                    
+                    # Calculate unread count: messages sent by others after user's last_read_at
+                    if current_user_last_read:
+                        unread_resp = supabase.table('messages')\
+                            .select('id', count='exact')\
+                            .eq('conversation_id', conv['id'])\
+                            .neq('sender_id', user_id)\
+                            .gt('created_at', current_user_last_read)\
+                            .eq('is_deleted', False)\
+                            .execute()
+                        conv['unread_count'] = unread_resp.count if unread_resp.count else 0
+                    else:
+                        # If user never read, count all messages from others
+                        unread_resp = supabase.table('messages')\
+                            .select('id', count='exact')\
+                            .eq('conversation_id', conv['id'])\
+                            .neq('sender_id', user_id)\
+                            .eq('is_deleted', False)\
+                            .execute()
+                        conv['unread_count'] = unread_resp.count if unread_resp.count else 0
                 else:
                     conv['participants'] = []
                     conv['other_user'] = None
+                    conv['unread_count'] = 0
                     
             except Exception as part_error:
                 logger.warning(f"Error fetching participants for conversation {conv['id']}: {part_error}")
                 conv['participants'] = []
                 conv['other_user'] = None
+                conv['unread_count'] = 0
         
         return {
             "success": True,
@@ -363,6 +389,62 @@ async def send_message_rest(
             raise HTTPException(status_code=400, detail="Failed to create message")
         
         new_message = resp.data[0]
+        
+        # Get sender info for notification
+        sender_info = supabase.table('users')\
+            .select('full_name')\
+            .eq('id', user_id)\
+            .execute()
+        sender_name = sender_info.data[0].get('full_name', 'Someone') if sender_info.data else 'Someone'
+        
+        # Get other participants for notification
+        participants = supabase.table('conversation_participants')\
+            .select('user_id')\
+            .eq('conversation_id', payload.conversation_id)\
+            .neq('user_id', user_id)\
+            .execute()
+        
+        # Create notification for other participants
+        for participant in (participants.data or []):
+            other_user_id = participant.get('user_id')
+            if other_user_id:
+                # Get recipient's role to set correct link
+                recipient_info = supabase.table('users')\
+                    .select('role')\
+                    .eq('id', other_user_id)\
+                    .execute()
+                recipient_role = recipient_info.data[0].get('role', 'client') if recipient_info.data else 'client'
+                
+                # Set role-specific chat link
+                if recipient_role == 'photographer':
+                    chat_link = f"/photographer/chat?conversation={payload.conversation_id}"
+                elif recipient_role == 'admin':
+                    chat_link = f"/admin/chat?conversation={payload.conversation_id}"
+                else:
+                    chat_link = f"/client/chat?conversation={payload.conversation_id}"
+                
+                notification_data = {
+                    "user_id": other_user_id,
+                    "title": "New Message",
+                    "message": f"{sender_name}: {payload.content[:100]}..." if len(payload.content) > 100 else f"{sender_name}: {payload.content}",
+                    "type": "message",
+                    "link": chat_link,
+                    "read": False
+                }
+                try:
+                    notif_resp = supabase.table('notifications').insert(notification_data).execute()
+                    if notif_resp.data:
+                        # Broadcast notification via WebSocket in real-time
+                        await connection_manager.send_personal_message(
+                            other_user_id,
+                            {
+                                "type": "notification",
+                                "notification": notif_resp.data[0]
+                            }
+                        )
+                        logger.info(f"📢 Sent notification to user {other_user_id} via WebSocket")
+                except Exception as notif_err:
+                    logger.error(f"Failed to create notification: {notif_err}")
         
         # Broadcast new message to conversation
         await connection_manager.broadcast_to_conversation(

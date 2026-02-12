@@ -179,7 +179,7 @@ app.include_router(ai_detection.router, prefix="/api")  # AI Event & Mood Detect
 @app.websocket("/ws/chat")
 async def websocket_chat_endpoint(
     websocket: WebSocket,
-    token: str = Query(..., description="JWT token for authentication")
+    token: str = Query(None, description="JWT token for authentication")
 ):
     """
     WebSocket endpoint for real-time chat
@@ -192,12 +192,21 @@ async def websocket_chat_endpoint(
     - typing
     - message_read
     """
+    logger.info(f"🔌 WebSocket connection attempt - token: {token[:30] if token else 'NONE'}...")
     user_id = None
+    
+    if not token:
+        logger.error("❌ WebSocket rejected: No token provided")
+        await websocket.accept()
+        await websocket.close(code=1008, reason="No token provided")
+        return
     
     try:
         # Authenticate user from token
         from backend.supabase_client import supabase
         from backend.config import DEV_MODE
+        
+        logger.info(f"🔑 DEV_MODE={DEV_MODE}, token starts with: {token[:20] if token else 'EMPTY'}")
         
         # Mock token support for development
         if DEV_MODE and token.startswith('mock-jwt-token'):
@@ -225,10 +234,14 @@ async def websocket_chat_endpoint(
                 user_id = supabase_user.id if hasattr(supabase_user, 'id') else supabase_user.get('id')
                 
                 if not user_id:
+                    # Accept first then close - required by WebSocket protocol
+                    await websocket.accept()
                     await websocket.close(code=1008, reason="Invalid token")
                     return
             except Exception as auth_error:
                 logger.error(f"WebSocket auth error: {auth_error}")
+                # Accept first then close - required by WebSocket protocol
+                await websocket.accept()
                 await websocket.close(code=1008, reason="Authentication failed")
                 return
         
@@ -245,25 +258,41 @@ async def websocket_chat_endpoint(
                 
                 # Handle join_conversations (plural) - join all user's conversations
                 if event_type == 'join_conversations':
-                    # Fetch all conversations user is part of
-                    conv_resp = supabase.table('conversation_participants')\
-                        .select('conversation_id')\
-                        .eq('user_id', user_id)\
-                        .execute()
-                    
-                    if conv_resp.data:
-                        for conv in conv_resp.data:
-                            connection_manager.join_conversation(user_id, conv['conversation_id'])
-                        logger.info(f"User {user_id} joined {len(conv_resp.data)} conversations")
-                    
-                    # NOW broadcast presence after joining conversations
-                    await connection_manager.broadcast_presence_update(user_id, "online")
-                    
-                    # Send confirmation
-                    await websocket.send_json({
-                        "type": "joined_conversations",
-                        "count": len(conv_resp.data) if conv_resp.data else 0
-                    })
+                    try:
+                        logger.info(f"📥 User {user_id} requesting to join conversations")
+                        
+                        # Fetch all conversations user is part of
+                        conv_resp = supabase.table('conversation_participants')\
+                            .select('conversation_id')\
+                            .eq('user_id', user_id)\
+                            .execute()
+                        
+                        logger.info(f"📊 Found {len(conv_resp.data) if conv_resp.data else 0} conversations for user {user_id}")
+                        
+                        if conv_resp.data:
+                            for conv in conv_resp.data:
+                                connection_manager.join_conversation(user_id, conv['conversation_id'])
+                            logger.info(f"✅ User {user_id} joined {len(conv_resp.data)} conversations")
+                        
+                        # NOW broadcast presence after joining conversations
+                        logger.info(f"📢 Broadcasting presence update for user {user_id}")
+                        await connection_manager.broadcast_presence_update(user_id, "online")
+                        
+                        # Send confirmation
+                        await websocket.send_json({
+                            "type": "joined_conversations",
+                            "count": len(conv_resp.data) if conv_resp.data else 0
+                        })
+                        logger.info(f"✅ Sent joined_conversations confirmation to user {user_id}")
+                        
+                    except Exception as join_error:
+                        logger.error(f"❌ Error in join_conversations for user {user_id}: {join_error}")
+                        logger.exception(join_error)
+                        # Send error response
+                        await websocket.send_json({
+                            "type": "error",
+                            "message": "Failed to join conversations"
+                        })
                 
                 elif event_type == 'join_conversation':
                     conversation_id = message.get('conversation_id')
@@ -328,6 +357,63 @@ async def websocket_chat_endpoint(
                     saved_message = msg_resp.data[0] if msg_resp.data else None
                     
                     if saved_message:
+                        # Get sender info for notification
+                        sender_info = supabase.table('users')\
+                            .select('full_name')\
+                            .eq('id', user_id)\
+                            .execute()
+                        sender_name = sender_info.data[0].get('full_name', 'Someone') if sender_info.data else 'Someone'
+                        
+                        # Get other participants for notification
+                        participants = supabase.table('conversation_participants')\
+                            .select('user_id')\
+                            .eq('conversation_id', conversation_id)\
+                            .neq('user_id', user_id)\
+                            .execute()
+                        
+                        # Create notification for other participants (not the sender)
+                        for participant in (participants.data or []):
+                            other_user_id = participant.get('user_id')
+                            if other_user_id:
+                                # Get recipient's role to set correct link
+                                recipient_info = supabase.table('users')\
+                                    .select('role')\
+                                    .eq('id', other_user_id)\
+                                    .execute()
+                                recipient_role = recipient_info.data[0].get('role', 'client') if recipient_info.data else 'client'
+                                
+                                # Set role-specific chat link
+                                if recipient_role == 'photographer':
+                                    chat_link = f"/photographer/chat?conversation={conversation_id}"
+                                elif recipient_role == 'admin':
+                                    chat_link = f"/admin/chat?conversation={conversation_id}"
+                                else:
+                                    chat_link = f"/client/chat?conversation={conversation_id}"
+                                
+                                # Create a notification for unread message
+                                notification_data = {
+                                    "user_id": other_user_id,
+                                    "title": "New Message",
+                                    "message": f"{sender_name}: {content[:100]}..." if len(content) > 100 else f"{sender_name}: {content}",
+                                    "type": "message",
+                                    "link": chat_link,
+                                    "read": False
+                                }
+                                try:
+                                    notif_resp = supabase.table('notifications').insert(notification_data).execute()
+                                    if notif_resp.data:
+                                        # Broadcast notification via WebSocket in real-time
+                                        await connection_manager.send_personal_message(
+                                            other_user_id,
+                                            {
+                                                "type": "notification",
+                                                "notification": notif_resp.data[0]
+                                            }
+                                        )
+                                        logger.info(f"📢 Sent notification to user {other_user_id} via WebSocket")
+                                except Exception as notif_err:
+                                    logger.error(f"Failed to create notification: {notif_err}")
+                        
                         # Get updated conversation info (for inquiry limits)
                         conv_info = supabase.table('conversations')\
                             .select('conversation_type, inquiry_message_limit, inquiry_messages_sent')\
@@ -370,19 +456,22 @@ async def websocket_chat_endpoint(
                     message_id = message.get('message_id')
                     conversation_id = message.get('conversation_id')
                     
-                    # Update database
+                    # Update database with read timestamp
+                    read_time = datetime.utcnow().isoformat()
                     supabase.table('messages')\
-                        .update({'status': 'READ', 'read_at': datetime.utcnow().isoformat()})\
+                        .update({'status': 'READ', 'read_at': read_time})\
                         .eq('id', message_id)\
                         .execute()
                     
-                    # Broadcast read status
+                    # Broadcast read status with all fields frontend expects
                     await connection_manager.broadcast_to_conversation(
                         conversation_id,
                         {
                             "type": "message_status",
                             "message_id": message_id,
-                            "status": "READ"
+                            "status": "READ",
+                            "is_read": True,
+                            "read_at": read_time
                         },
                         exclude_user=user_id
                     )
@@ -393,7 +482,15 @@ async def websocket_chat_endpoint(
                 logger.error(f"Invalid JSON from {user_id}")
             except Exception as msg_error:
                 logger.error(f"Error processing message from {user_id}: {msg_error}")
+                # Check if connection is still alive
+                try:
+                    await websocket.send_json({"type": "ping"})
+                except:
+                    # Connection is dead, break out of loop
+                    break
     
+    except WebSocketDisconnect:
+        logger.info(f"WebSocket disconnected gracefully: {user_id}")
     except Exception as e:
         logger.error(f"WebSocket error for {user_id}: {e}")
     
@@ -458,10 +555,14 @@ async def websocket_voice_endpoint(
                 user_id = supabase_user.id if hasattr(supabase_user, 'id') else supabase_user.get('id')
                 
                 if not user_id:
+                    # Accept first then close - required by WebSocket protocol
+                    await websocket.accept()
                     await websocket.close(code=1008, reason="Invalid token")
                     return
             except Exception as auth_error:
                 logger.error(f"Voice WebSocket auth error: {auth_error}")
+                # Accept first then close - required by WebSocket protocol
+                await websocket.accept()
                 await websocket.close(code=1008, reason="Authentication failed")
                 return
         
@@ -529,7 +630,15 @@ async def websocket_voice_endpoint(
                 logger.error(f"Invalid JSON from voice connection {user_id}")
             except Exception as msg_error:
                 logger.error(f"Error processing voice message from {user_id}: {msg_error}")
+                # Check if connection is still alive
+                try:
+                    await websocket.send_json({"type": "ping"})
+                except:
+                    # Connection is dead, break out of loop
+                    break
     
+    except WebSocketDisconnect:
+        logger.info(f"Voice WebSocket disconnected gracefully: {user_id}")
     except Exception as e:
         logger.error(f"Voice WebSocket error for {user_id}: {e}")
     

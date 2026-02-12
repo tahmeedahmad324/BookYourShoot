@@ -176,7 +176,7 @@ const Navbar = () => {
 
             <div className="d-flex align-items-center gap-3">
               {isAuthenticated && (
-                <NotificationDropdown userId={user?.email} />
+                <NotificationDropdown />
               )}
               {isAuthenticated ? (
                 <div className="dropdown">

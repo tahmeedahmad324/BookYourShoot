@@ -1,26 +1,46 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
+import { useGlobalWebSocket } from '../context/GlobalWebSocketContext';
 
 const API_BASE = process.env.REACT_APP_API_URL || 'http://localhost:8000';
 
 /**
  * NotificationDropdown Component
- * Shows payment/booking notifications in navbar
+ * Shows all notifications including messages, payment/booking notifications in navbar
+ * Real-time updates via GlobalWebSocket
  */
-const NotificationDropdown = ({ userId }) => {
+const NotificationDropdown = () => {
+  const { getToken, user } = useAuth();
+  const { unreadCount, setUnreadCount, addNotificationListener } = useGlobalWebSocket();
+  const navigate = useNavigate();
   const [notifications, setNotifications] = useState([]);
-  const [unreadCount, setUnreadCount] = useState(0);
   const [isOpen, setIsOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const dropdownRef = useRef(null);
 
+  // Load initial notifications
   useEffect(() => {
-    if (userId) {
+    if (user?.id) {
       loadNotifications();
-      // Poll every 30 seconds
-      const interval = setInterval(loadNotifications, 30000);
-      return () => clearInterval(interval);
     }
-  }, [userId]);
+  }, [user?.id]);
+
+  // Subscribe to WebSocket notifications
+  useEffect(() => {
+    if (user?.id) {
+      const unsubscribe = addNotificationListener((event) => {
+        console.log('🔔 Notification received:', event.type);
+        
+        // Reload notifications when new one arrives
+        if (event.type === 'new_message' || event.type === 'notification') {
+          loadNotifications();
+        }
+      });
+
+      return unsubscribe;
+    }
+  }, [user?.id]);
 
   useEffect(() => {
     // Close dropdown when clicking outside
@@ -34,14 +54,25 @@ const NotificationDropdown = ({ userId }) => {
   }, []);
 
   const loadNotifications = async () => {
-    if (!userId) return;
+    if (!user?.id) return;
 
     try {
-      const res = await fetch(`${API_BASE}/api/payments/notifications/${userId}`);
+      const token = await getToken();
+      if (!token) {
+        console.warn('No auth token available for notifications');
+        return;
+      }
+      
+      const res = await fetch(`${API_BASE}/api/notifications/?limit=20`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
       const data = await res.json();
-      if (data.status === 'success') {
-        setNotifications(data.notifications || []);
-        setUnreadCount(data.unread_count || 0);
+      if (data.success) {
+        setNotifications(data.data || []);
+      } else {
+        console.error('Failed to load notifications:', data.error);
       }
     } catch (err) {
       console.error('Failed to load notifications:', err);
@@ -50,38 +81,73 @@ const NotificationDropdown = ({ userId }) => {
 
   const markAsRead = async (notificationId) => {
     try {
-      await fetch(`${API_BASE}/api/payments/notifications/${notificationId}/read`, {
-        method: 'POST'
+      const token = await getToken();
+      if (!token) return;
+      
+      await fetch(`${API_BASE}/api/notifications/${notificationId}/read`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
       });
-      loadNotifications();
+      
+      // Update local state
+      setNotifications(prev => 
+        prev.map(n => n.id === notificationId ? { ...n, read: true } : n)
+      );
+      
+      // Decrement unread count
+      setUnreadCount(prev => Math.max(0, prev - 1));
     } catch (err) {
       console.error('Failed to mark notification as read:', err);
     }
   };
 
   const markAllAsRead = async () => {
-    if (!userId || unreadCount === 0) return;
+    if (!user?.id || unreadCount === 0) return;
     try {
-      await fetch(`${API_BASE}/api/payments/notifications/${userId}/read-all`, {
-        method: 'POST'
+      const token = await getToken();
+      if (!token) return;
+      
+      await fetch(`${API_BASE}/api/notifications/mark-all-read`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
       });
-      loadNotifications();
+      
+      // Update local state
+      setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+      
+      // Reset unread count
+      setUnreadCount(0);
     } catch (err) {
       console.error('Failed to mark all notifications as read:', err);
     }
   };
 
+  const handleNotificationClick = async (notification) => {
+    // Mark as read first
+    if (!notification.read) {
+      await markAsRead(notification.id);
+    }
+    
+    // Navigate to link if exists
+    if (notification.link) {
+      navigate(notification.link);
+    }
+    
+    setIsOpen(false);
+  };
+
   const handleToggle = () => {
     const newIsOpen = !isOpen;
     setIsOpen(newIsOpen);
-    // Mark all as read when opening the dropdown
-    if (newIsOpen && unreadCount > 0) {
-      markAllAsRead();
-    }
   };
 
   const getNotificationIcon = (type) => {
     const icons = {
+      message: '💬',
       payment_received: '💳',
       payment_held: '🔒',
       payment_released: '💰',
@@ -89,8 +155,13 @@ const NotificationDropdown = ({ userId }) => {
       booking_confirmed: '✅',
       booking_cancelled: '❌',
       booking_completed: '🎉',
+      booking: '📅',
       dispute_opened: '⚠️',
-      dispute_resolved: '✔️'
+      dispute_resolved: '✔️',
+      system: '🔔',
+      payment: '💳',
+      payout: '💸',
+      review: '⭐'
     };
     return icons[type] || '🔔';
   };
@@ -110,7 +181,7 @@ const NotificationDropdown = ({ userId }) => {
     return date.toLocaleDateString();
   };
 
-  if (!userId) return null;
+  if (!user?.id) return null;
 
   return (
     <div className="notification-dropdown position-relative" ref={dropdownRef}>
@@ -118,6 +189,7 @@ const NotificationDropdown = ({ userId }) => {
         className="btn btn-link text-dark position-relative p-2"
         onClick={handleToggle}
         style={{ textDecoration: 'none' }}
+        title="Notifications"
       >
         🔔
         {unreadCount > 0 && (
@@ -142,9 +214,20 @@ const NotificationDropdown = ({ userId }) => {
         >
           <div className="dropdown-header d-flex justify-content-between align-items-center">
             <strong>Notifications</strong>
-            {unreadCount > 0 && (
-              <span className="badge bg-primary">{unreadCount} new</span>
-            )}
+            <div className="d-flex gap-2 align-items-center">
+              {unreadCount > 0 && (
+                <>
+                  <span className="badge bg-primary">{unreadCount} new</span>
+                  <button 
+                    className="btn btn-link btn-sm p-0 text-decoration-none"
+                    onClick={markAllAsRead}
+                    style={{ fontSize: '0.75rem' }}
+                  >
+                    Mark all read
+                  </button>
+                </>
+              )}
+            </div>
           </div>
           <div className="dropdown-divider m-0"></div>
 
@@ -164,7 +247,7 @@ const NotificationDropdown = ({ userId }) => {
                   key={notif.id}
                   className={`dropdown-item py-2 px-3 ${!notif.read ? 'bg-light' : ''}`}
                   style={{ cursor: 'pointer', whiteSpace: 'normal' }}
-                  onClick={() => markAsRead(notif.id)}
+                  onClick={() => handleNotificationClick(notif)}
                 >
                   <div className="d-flex gap-2">
                     <span style={{ fontSize: '1.2rem' }}>

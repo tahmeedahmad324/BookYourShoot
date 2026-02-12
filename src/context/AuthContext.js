@@ -179,6 +179,15 @@ export const AuthProvider = ({ children }) => {
 
   // Get current session token for API calls
   const getToken = async () => {
+    // Check if using mock account
+    const mockUser = localStorage.getItem('mock_user');
+    if (mockUser) {
+      const userData = JSON.parse(mockUser);
+      // Return mock token format that backend expects in DEV_MODE
+      return `mock-jwt-token-${userData.role}`;
+    }
+    
+    // Real Supabase session
     const { data: { session } } = await supabase.auth.getSession();
     return session?.access_token || null;
   };
@@ -238,7 +247,9 @@ export const AuthProvider = ({ children }) => {
     logout,
     getToken,
     isAuthenticated: !!user,
-    loading
+    loading,
+    userId: user?.id || localStorage.getItem('userId'),
+    userRole: user?.role || localStorage.getItem('userRole')
   };
 
   return (

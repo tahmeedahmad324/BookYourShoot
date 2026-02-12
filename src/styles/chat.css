@@ -267,7 +267,29 @@
   gap: 4px;
 }
 
+/* Read receipt icons */
+.message-time svg {
+  flex-shrink: 0;
+  opacity: 0.8;
+}
+
+/* Read receipt styling */
+.read-receipt {
+  color: rgba(255, 255, 255, 0.7);
+  transition: color 0.2s ease;
+}
+
+/* Double check (read) - blue color for read receipts like WhatsApp */
+.read-receipt.read {
+  color: #53bdeb !important;
+  opacity: 1 !important;
+}
+
 .message-received .message-time {
+  color: #6b7280;
+}
+
+.message-received .message-time svg {
   color: #6b7280;
 }
 

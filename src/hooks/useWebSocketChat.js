@@ -104,12 +104,20 @@ export const useWebSocketChat = (token, userId) => {
               break;
               
             case 'message_read':
+            case 'message_status':
               // Update message read status
-              setMessages(prev => prev.map(msg => 
-                msg.id === data.message_id 
-                  ? { ...msg, is_read: true, read_at: data.read_at }
-                  : msg
-              ));
+              if (data.status === 'READ' || data.is_read) {
+                setMessages(prev => prev.map(msg => 
+                  msg.id === data.message_id 
+                    ? { ...msg, is_read: true, status: 'READ', read_at: data.read_at }
+                    : msg
+                ));
+              }
+              break;
+            
+            case 'notification':
+              // System notification - ignore in chat WebSocket (handled by GlobalWebSocket)
+              console.log('📬 Notification event received (handled by GlobalWebSocket)');
               break;
               
             case 'error':
@@ -196,12 +204,13 @@ export const useWebSocketChat = (token, userId) => {
     }));
   }, []);
 
-  const markMessageAsRead = useCallback((messageId) => {
+  const markMessageAsRead = useCallback((messageId, conversationId) => {
     if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) return;
 
     wsRef.current.send(JSON.stringify({
-      type: 'mark_read',
-      message_id: messageId
+      type: 'message_read',
+      message_id: messageId,
+      conversation_id: conversationId
     }));
   }, []);
 

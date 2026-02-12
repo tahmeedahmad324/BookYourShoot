@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useParams, useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useVoiceCall } from '../../context/VoiceCallContext';
 import { useWebSocketChat } from '../../hooks/useWebSocketChat';
+import { useGlobalWebSocket } from '../../context/GlobalWebSocketContext';
 import axios from 'axios';
 import { supabase } from '../../supabaseClient';
 import EmojiPicker from 'emoji-picker-react';
@@ -33,8 +34,10 @@ const NOTIFICATION_SOUND = 'data:audio/wav;base64,UklGRl9vT19XQVZFZm10IBAAAAABAA
 
 const ChatContainer = ({ userRole = 'client' }) => {
   const { id: urlConversationId } = useParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { user, getToken } = useAuth();
   const { startCall } = useVoiceCall();
+  const { addNotificationListener } = useGlobalWebSocket();
   const navigate = useNavigate();
   
   // Get actual user ID (memoized to prevent recalculation on every render)
@@ -131,7 +134,8 @@ const ChatContainer = ({ userRole = 'client' }) => {
     typingUsers,
     onlineUsers,
     sendMessage: wsSendMessage,
-    sendTypingIndicator
+    sendTypingIndicator,
+    markMessageAsRead
   } = useWebSocketChat(authToken, currentUserId);
   
   // Initialize notification audio
@@ -197,6 +201,31 @@ const ChatContainer = ({ userRole = 'client' }) => {
     }
   }, [notificationsEnabled, navigate, userRole]);
   
+  // Sync WebSocket messages with local state (for read receipts and real-time updates)
+  useEffect(() => {
+    if (wsMessages.length > 0) {
+      setMessages(prev => {
+        // Create a map of existing messages by ID
+        const existingMap = new Map(prev.map(msg => [msg.id, msg]));
+        
+        // Update with WebSocket messages (preserves read receipts and status updates)
+        wsMessages.forEach(wsMsg => {
+          existingMap.set(wsMsg.id, {
+            ...(existingMap.get(wsMsg.id) || {}),
+            ...wsMsg
+          });
+        });
+        
+        // Convert back to array and sort by created_at
+        return Array.from(existingMap.values()).sort((a, b) => {
+          const timeA = a.created_at ? new Date(a.created_at).getTime() : 0;
+          const timeB = b.created_at ? new Date(b.created_at).getTime() : 0;
+          return timeA - timeB;
+        });
+      });
+    }
+  }, [wsMessages]);
+  
   // File upload with react-dropzone
   const onDrop = useCallback((acceptedFiles) => {
     const newAttachments = acceptedFiles.map(file => ({
@@ -247,12 +276,68 @@ const ChatContainer = ({ userRole = 'client' }) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authToken]);
   
+  // Auto-select conversation from query parameter
+  useEffect(() => {
+    const conversationIdFromQuery = searchParams.get('conversation');
+    if (conversationIdFromQuery && conversations.length > 0) {
+      const conversation = conversations.find(c => c.id === conversationIdFromQuery);
+      if (conversation && (!selectedConversation || selectedConversation.id !== conversationIdFromQuery)) {
+        console.log('🔗 Auto-selecting conversation from notification:', conversationIdFromQuery);
+        setSelectedConversation(conversation);
+        // Clear the query parameter after selecting
+        setSearchParams({});
+      }
+    }
+  }, [conversations, searchParams, selectedConversation, setSearchParams]);
+  
+  // Subscribe to GlobalWebSocket for new messages (even when not viewing chat)
+  useEffect(() => {
+    if (!currentUserId || !addNotificationListener) return;
+    
+    const unsubscribe = addNotificationListener((event) => {
+      if (event.type === 'new_message') {
+        // Refresh conversation list to update unread counts and last message
+        console.log('🔄 Refreshing conversations due to new message');
+        loadConversations();
+      }
+    });
+    
+    return unsubscribe;
+  }, [currentUserId, addNotificationListener]);
+  
   // Load messages when conversation selected
   useEffect(() => {
     if (!selectedConversation) return;
     loadMessages(selectedConversation.id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedConversation?.id]);
+  
+  // Mark unread messages as read when viewing a conversation
+  useEffect(() => {
+    if (!selectedConversation || !messages.length || !currentUserId || !markMessageAsRead) return;
+    
+    // Find unread messages not sent by current user
+    const unreadMessages = messages.filter(msg => 
+      msg.sender_id !== currentUserId && 
+      !msg.is_read && 
+      msg.status !== 'READ'
+    );
+    
+    // Mark each unread message as read
+    unreadMessages.forEach(msg => {
+      if (msg.id) {
+        markMessageAsRead(msg.id, selectedConversation.id);
+      }
+    });
+    
+    // Update unread count for this conversation
+    if (unreadMessages.length > 0) {
+      setUnreadCounts(prev => ({
+        ...prev,
+        [selectedConversation.id]: 0
+      }));
+    }
+  }, [selectedConversation?.id, messages, currentUserId, markMessageAsRead]);
   
   // Handle URL-based conversation selection
   useEffect(() => {
@@ -474,9 +559,17 @@ const ChatContainer = ({ userRole = 'client' }) => {
   
   const loadConversations = async () => {
     try {
+      // Always get fresh token to avoid stale state issues
+      const token = await getToken() || localStorage.getItem('token');
+      if (!token) {
+        console.error('No auth token available');
+        navigate('/login');
+        return;
+      }
+
       const response = await axios.get(
         'http://localhost:8000/api/chat/conversations',
-        { headers: { 'Authorization': `Bearer ${authToken}` } }
+        { headers: { 'Authorization': `Bearer ${token}` } }
       );
       const loadedConversations = response.data.data || [];
       setConversations(loadedConversations);
@@ -500,15 +593,18 @@ const ChatContainer = ({ userRole = 'client' }) => {
   
   const loadMessages = async (conversationId) => {
     try {
+      // Get fresh token to avoid stale state
+      const token = await getToken() || localStorage.getItem('token');
       const response = await axios.get(
         `http://localhost:8000/api/chat/conversations/${conversationId}/messages`,
-        { headers: { 'Authorization': `Bearer ${authToken}` } }
+        { headers: { 'Authorization': `Bearer ${token}` } }
       );
       const loadedMessages = response.data.data || [];
-      // Ensure each message has proper sender_id and sort by created_at ascending
+      // Ensure each message has proper sender_id, is_read mapping, and sort by created_at ascending
       const processedMessages = loadedMessages.map(msg => ({
         ...msg,
-        sender_id: msg.sender_id || msg.user_id || msg.from_user_id
+        sender_id: msg.sender_id || msg.user_id || msg.from_user_id,
+        is_read: msg.is_read || msg.status === 'READ' || msg.read_at !== null
       })).sort((a, b) => {
         const timeA = a.created_at ? new Date(a.created_at).getTime() : 0;
         const timeB = b.created_at ? new Date(b.created_at).getTime() : 0;
@@ -680,7 +776,7 @@ const ChatContainer = ({ userRole = 'client' }) => {
           content_type: uploadedFiles.length > 0 ? 'file' : 'text',
           attachment_urls: attachmentData
         },
-        { headers: { 'Authorization': `Bearer ${authToken}` } }
+        { headers: { 'Authorization': `Bearer ${await getToken() || localStorage.getItem('token')}` } }
       );
       
       // Replace optimistic message with real one
@@ -785,7 +881,10 @@ const ChatContainer = ({ userRole = 'client' }) => {
   };
   
   const formatTime = (dateString) => {
-    return new Date(dateString).toLocaleTimeString('en-US', { 
+    if (!dateString) return '';
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) return '';
+    return date.toLocaleTimeString('en-US', { 
       hour: 'numeric', 
       minute: '2-digit',
       hour12: true 
@@ -1164,7 +1263,9 @@ const ChatContainer = ({ userRole = 'client' }) => {
                           <div className="message-time">
                             {formatTime(msg.created_at)}
                             {isSent && (
-                              msg.is_read ? <CheckCheck size={14} /> : <Check size={14} />
+                              msg.is_read 
+                                ? <CheckCheck size={14} className="read-receipt read" /> 
+                                : <Check size={14} className="read-receipt" />
                             )}
                             {msg._optimistic && <span className="opacity-50"> • Sending...</span>}
                           </div>
