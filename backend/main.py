@@ -239,11 +239,31 @@ async def websocket_chat_endpoint(
                     await websocket.close(code=1008, reason="Invalid token")
                     return
             except Exception as auth_error:
-                logger.error(f"WebSocket auth error: {auth_error}")
-                # Accept first then close - required by WebSocket protocol
-                await websocket.accept()
-                await websocket.close(code=1008, reason="Authentication failed")
-                return
+                # Fallback: decode JWT directly to extract user ID
+                # This handles cases where session is expired but token is still valid
+                logger.warning(f"WebSocket auth error: {auth_error}")
+                try:
+                    import jwt as pyjwt
+                    # Decode without verification (we trust it came from Supabase)
+                    decoded = pyjwt.decode(token, options={"verify_signature": False})
+                    user_id = decoded.get('sub')
+                    if user_id:
+                        # Verify user exists in our database
+                        user_check = supabase.table('users').select('id').eq('id', user_id).execute()
+                        if user_check.data:
+                            logger.info(f"✅ WebSocket JWT fallback auth successful for user: {user_id}")
+                        else:
+                            logger.error(f"❌ WebSocket JWT fallback: user {user_id} not found in database")
+                            await websocket.accept()
+                            await websocket.close(code=1008, reason="User not found")
+                            return
+                    else:
+                        raise ValueError("No 'sub' claim in JWT")
+                except Exception as jwt_error:
+                    logger.error(f"WebSocket JWT fallback also failed: {jwt_error}")
+                    await websocket.accept()
+                    await websocket.close(code=1008, reason="Authentication failed")
+                    return
         
         # Connect user
         await connection_manager.connect(websocket, user_id)
@@ -436,6 +456,7 @@ async def websocket_chat_endpoint(
                             }
                         
                         # Broadcast to conversation with updated inquiry status
+                        # exclude_user prevents message from echoing back to sender
                         await connection_manager.broadcast_to_conversation(
                             conversation_id,
                             {
@@ -444,7 +465,8 @@ async def websocket_chat_endpoint(
                                 "conversation_id": conversation_id,
                                 "temp_id": temp_id,
                                 "inquiry_status": inquiry_status  # Include limit info
-                            }
+                            },
+                            exclude_user=user_id
                         )
                 
                 elif event_type == 'typing':

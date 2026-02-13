@@ -186,7 +186,7 @@ export const AuthProvider = ({ children }) => {
       // Return mock token format that backend expects in DEV_MODE
       return `mock-jwt-token-${userData.role}`;
     }
-    
+
     // Real Supabase session
     const { data: { session } } = await supabase.auth.getSession();
     return session?.access_token || null;
@@ -219,22 +219,25 @@ export const AuthProvider = ({ children }) => {
       // Check if mock account
       const mockUser = localStorage.getItem('mock_user');
       if (mockUser) {
-        // Just clear mock data
+        // Clear mock data
         localStorage.removeItem('mock_user');
-        setUser(null);
-        return;
+      } else {
+        // Real Supabase logout
+        await supabase.auth.signOut();
       }
 
-      // Real Supabase logout
-      await supabase.auth.signOut();
       setUser(null);
       setSession(null);
 
-      // Clear any legacy storage (backwards compatibility)
+      // Clear ALL user-related storage (both mock and real)
       localStorage.removeItem('user');
       localStorage.removeItem('token');
+      localStorage.removeItem('userId');
+      localStorage.removeItem('userRole');
+      localStorage.removeItem('userName');
       sessionStorage.removeItem('user');
       sessionStorage.removeItem('token');
+      sessionStorage.removeItem('real_user');
     } catch (error) {
       console.error('Logout error:', error);
     }

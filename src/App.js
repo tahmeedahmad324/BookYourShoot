@@ -119,20 +119,15 @@ function App() {
                 }
               />
 
+              {/* Public photographer profile (accessible to all) */}
+              <Route path="/photographer/:id" element={<PhotographerProfile />} />
+
               {/* Protected Client Routes */}
               <Route
                 path="/client/dashboard"
                 element={
                   <ProtectedRoute allowedRoles={["client"]}>
                     <ClientDashboard />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/photographer/:id"
-                element={
-                  <ProtectedRoute allowedRoles={["client"]}>
-                    <PhotographerProfile />
                   </ProtectedRoute>
                 }
               />

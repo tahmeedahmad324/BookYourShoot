@@ -62,7 +62,7 @@ const Login = () => {
           setLoading(false);
           return;
         }
-        await login(response.user);
+        await login({ ...response.user, is_mock: true });
         console.log('[Login] Navigating to:', `/${response.user.role}/dashboard`);
         navigate(`/${response.user.role}/dashboard`);
       } else {

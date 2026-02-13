@@ -84,11 +84,11 @@ const PhotographerSearch = () => {
         type: "photographer",
         value: p.name,
         display: p.name,
-        subtitle: `${p.location} • ${p.specialty.join(", ")}`,
+        subtitle: `${p.location} • ${Array.isArray(p.specialty) ? p.specialty.join(", ") : "Photographer"}`,
       }))
 
     // Add specialty/service suggestions
-    const specialtyMatches = [...new Set(photographers.flatMap((p) => p.specialty))]
+    const specialtyMatches = [...new Set(photographers.flatMap((p) => Array.isArray(p.specialty) ? p.specialty : []))]
       .filter((specialty) => specialty.toLowerCase().includes(inputLower))
       .slice(0, 3)
       .map((specialty) => ({
@@ -175,10 +175,13 @@ const PhotographerSearch = () => {
 
   const filterPhotographers = () => {
     const filtered = photographers.filter((photographer) => {
+      // Safety check: ensure specialty is an array
+      const specialty = Array.isArray(photographer.specialty) ? photographer.specialty : [];
+      
       const matchesSearch =
         !searchTerm ||
         photographer.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (photographer.specialty && photographer.specialty.some((spec) => spec.toLowerCase().includes(searchTerm.toLowerCase())))
+        (specialty.length > 0 && specialty.some((spec) => spec.toLowerCase().includes(searchTerm.toLowerCase())))
 
       const matchesPrice = photographer.hourly_rate >= priceRange[0] && photographer.hourly_rate <= priceRange[1]
 
@@ -542,7 +545,7 @@ const PhotographerSearch = () => {
                                 📍 {photographer.location} • {photographer.experience} years experience
                               </p>
                               <div className="d-flex flex-wrap gap-1 mb-2">
-                                {photographer.specialty.map((spec, index) => (
+                                {Array.isArray(photographer.specialty) && photographer.specialty.map((spec, index) => (
                                   <span key={index} className="badge bg-light text-dark small">
                                     {spec}
                                   </span>

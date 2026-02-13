@@ -16,11 +16,17 @@ const PhotographerProfile = () => {
         setLoading(true);
         setError(null);
         
+        console.log('Fetching photographer with ID:', id);
+        
         // Fetch photographer from API
         const response = await photographerAPI.getById(id);
         
+        console.log('API Response:', response);
+        
         if (response.success && response.data) {
           const photographerData = response.data;
+          
+          console.log('Photographer Data:', photographerData);
           
           // Transform API data to match component expectations
           setPhotographer({
@@ -107,10 +113,16 @@ const PhotographerProfile = () => {
             ]
           });
         } else {
+          console.error('API returned unsuccessful response:', response);
           setError('Photographer not found');
         }
       } catch (err) {
         console.error('Error fetching photographer:', err);
+        console.error('Error details:', {
+          message: err.message,
+          stack: err.stack,
+          photographerId: id
+        });
         setError(err.message || 'Failed to load photographer profile');
       } finally {
         setLoading(false);
@@ -201,7 +213,7 @@ const PhotographerProfile = () => {
                 <span className="me-3">📱 {photographer.phone}</span>
               </div>
               <div className="text-white-50">
-                <span className="me-3">💼 {photographer.specialty.join(', ')}</span>
+                <span className="me-3">💼 {Array.isArray(photographer.specialty) ? photographer.specialty.join(', ') : 'Professional Photography'}</span>
                 <span className="me-3">⏱️ {photographer.response_time} response time</span>
                 <span>📅 {photographer.completed_bookings} bookings completed</span>
               </div>
@@ -391,7 +403,7 @@ const PhotographerProfile = () => {
                   <div className="mt-4">
                     <h6>Portfolio Categories:</h6>
                     <div className="d-flex flex-wrap gap-2">
-                      {photographer.specialty.map((spec, index) => (
+                      {Array.isArray(photographer.specialty) && photographer.specialty.map((spec, index) => (
                         <span key={index} className="badge bg-primary">
                           {spec}
                         </span>

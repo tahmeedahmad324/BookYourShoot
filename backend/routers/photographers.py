@@ -119,29 +119,67 @@ def get_photographer(photographer_id: str):
         ).eq('user_id', photographer_id).limit(1).execute()
         
         if not profile_response.data:
+            # Photographer profile doesn't exist, check if user exists
+            user_response = supabase.table('users').select('*').eq('id', photographer_id).eq('role', 'photographer').limit(1).execute()
+            
+            if user_response.data:
+                # User exists but has no photographer profile - return basic profile
+                user = user_response.data[0]
+                photographer = {
+                    "id": user['id'],
+                    "name": user.get('full_name', 'Photographer'),
+                    "email": user.get('email', ''),
+                    "phone": user.get('phone', ''),
+                    "specialty": [],
+                    "experience": 0,
+                    "location": user.get('city', ''),
+                    "hourly_rate": 0,
+                    "profile_image": '',
+                    "portfolio": [],
+                    "rating": 0,
+                    "reviews_count": 0,
+                    "availability": False,
+                    "verified": False,
+                    "completed_bookings": 0,
+                    "response_time": "1 hour",
+                    "cnic_verified": False,
+                    "equipment": [],
+                    "reviews": [],
+                    "profile_incomplete": True  # Flag to indicate profile needs setup
+                }
+                return {"success": True, "data": photographer}
+            
+            # Neither profile nor user found, try mock data
             raise Exception("Not found in database, trying mock data")
         
         item = profile_response.data[0]
         user = item.get('users', {})
         
-        # Get equipment
-        equipment_response = supabase.table('equipment').select('*').eq('photographer_id', item['id']).eq('is_active', True).execute()
+        # Get equipment (without is_active filter - column doesn't exist)
+        equipment_data = []
+        try:
+            equipment_response = supabase.table('equipment').select('*').eq('photographer_id', item['id']).execute()
+            equipment_data = equipment_response.data or []
+        except Exception as eq_err:
+            print(f"Equipment query failed (non-critical): {eq_err}")
         
         # Get recent reviews
-        reviews_response = supabase.table('review').select(
-            '*, users!review_client_id_fkey(full_name)'
-        ).eq('photographer_id', item['id']).order('created_at', desc=True).limit(10).execute()
-        
-        # Transform reviews
         reviews = []
-        for review in reviews_response.data:
-            reviews.append({
-                "id": review['id'],
-                "client_name": review.get('users', {}).get('full_name', 'Anonymous'),
-                "rating": float(review.get('rating', 0)),
-                "comment": review.get('comment', ''),
-                "created_at": review.get('created_at', '')
-            })
+        try:
+            reviews_response = supabase.table('review').select(
+                '*, users!review_client_id_fkey(full_name)'
+            ).eq('photographer_id', item['id']).order('created_at', desc=True).limit(10).execute()
+            
+            for review in reviews_response.data:
+                reviews.append({
+                    "id": review['id'],
+                    "client_name": review.get('users', {}).get('full_name', 'Anonymous'),
+                    "rating": float(review.get('rating', 0)),
+                    "comment": review.get('comment', ''),
+                    "created_at": review.get('created_at', '')
+                })
+        except Exception as rev_err:
+            print(f"Reviews query failed (non-critical): {rev_err}")
         
         # Build complete photographer profile
         photographer = {
@@ -162,7 +200,7 @@ def get_photographer(photographer_id: str):
             "completed_bookings": 0,
             "response_time": "1 hour",
             "cnic_verified": item.get('admin_approved', False),
-            "equipment": equipment_response.data,
+            "equipment": equipment_data,
             "reviews": reviews
         }
         

@@ -56,7 +56,7 @@ DEV_MODE = os.getenv("DEV_MODE", "false").lower() == "true"
 # Password for all: "Test@1234"
 MOCK_ACCOUNTS = {
     "client@test.com": {
-        "id": "mock-client-uuid-001",
+        "id": "257f9b67-99fa-44ce-ae67-6229c36380b5",
         "email": "client@test.com",
         "full_name": "Test Client",
         "phone": "+92-300-1111111",
@@ -65,7 +65,7 @@ MOCK_ACCOUNTS = {
         "password": "Test@1234"
     },
     "photographer@test.com": {
-        "id": "mock-photographer-uuid-002",
+        "id": "21bf398a-e012-4c4d-9b55-caeac7ec6dc7",
         "email": "photographer@test.com",
         "full_name": "Test Photographer",
         "phone": "+92-300-2222222",
@@ -74,7 +74,7 @@ MOCK_ACCOUNTS = {
         "password": "Test@1234"
     },
     "admin@test.com": {
-        "id": "mock-admin-uuid-003",
+        "id": "5fb7a96b-3dd0-4d44-9631-c07a256292ee",
         "email": "admin@test.com",
         "full_name": "Test Admin",
         "phone": "+92-300-3333333",

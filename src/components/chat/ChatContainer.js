@@ -8,10 +8,10 @@ import axios from 'axios';
 import { supabase } from '../../supabaseClient';
 import EmojiPicker from 'emoji-picker-react';
 import { useDropzone } from 'react-dropzone';
-import { 
-  Send, 
-  ArrowLeft, 
-  ChevronDown, 
+import {
+  Send,
+  ArrowLeft,
+  ChevronDown,
   AlertCircle,
   MessageSquare,
   Check,
@@ -39,7 +39,7 @@ const ChatContainer = ({ userRole = 'client' }) => {
   const { startCall } = useVoiceCall();
   const { addNotificationListener } = useGlobalWebSocket();
   const navigate = useNavigate();
-  
+
   // Get actual user ID (memoized to prevent recalculation on every render)
   const currentUserId = useMemo(() => {
     // Try localStorage first (for mock users)
@@ -47,12 +47,12 @@ const ChatContainer = ({ userRole = 'client' }) => {
     if (storedUserId) {
       return storedUserId;
     }
-    
+
     // Try user context
     if (user?.id) {
       return user.id;
     }
-    
+
     // Fallback - extract from token if it's a mock token
     const token = localStorage.getItem('token');
     if (token && token.startsWith('mock-jwt-token')) {
@@ -65,22 +65,22 @@ const ChatContainer = ({ userRole = 'client' }) => {
       };
       return mockUserIds[role] || null;
     }
-    
+
     return null;
   }, [user?.id]);
-  
+
   // Log userId once on mount
   useEffect(() => {
     console.log('🔑 [ChatContainer] Current userId:', currentUserId);
   }, [currentUserId]);
-  
+
   // Debugging - only log once on mount
   useEffect(() => {
     console.log('💬 [ChatContainer] Mounted:', { userRole, userId: currentUserId });
     return () => console.log('💬 [ChatContainer] Unmounted');
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-  
+
   // State
   const [conversations, setConversations] = useState([]);
   const [selectedConversation, setSelectedConversation] = useState(null);
@@ -91,7 +91,7 @@ const ChatContainer = ({ userRole = 'client' }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [showScrollButton, setShowScrollButton] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
-  
+
   // New Feature States
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [attachments, setAttachments] = useState([]);
@@ -99,18 +99,19 @@ const ChatContainer = ({ userRole = 'client' }) => {
   const [showMessageSearch, setShowMessageSearch] = useState(false);
   const [unreadCounts, setUnreadCounts] = useState({});
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
-  
+
   // Refs
   const messagesEndRef = useRef(null);
   const messagesContainerRef = useRef(null);
   const textareaRef = useRef(null);
   const typingTimeoutRef = useRef(null);
   const initialScrollDoneRef = useRef(false);
+  const lastProcessedUrlRef = useRef(null);
   const notificationAudioRef = useRef(null);
-  
+
   // Get auth token
   const [authToken, setAuthToken] = useState(null);
-  
+
   useEffect(() => {
     const loadToken = async () => {
       try {
@@ -126,7 +127,7 @@ const ChatContainer = ({ userRole = 'client' }) => {
     };
     loadToken();
   }, [getToken]);
-  
+
   // WebSocket connection
   const {
     isConnected,
@@ -137,14 +138,14 @@ const ChatContainer = ({ userRole = 'client' }) => {
     sendTypingIndicator,
     markMessageAsRead
   } = useWebSocketChat(authToken, currentUserId);
-  
+
   // Initialize notification audio
   useEffect(() => {
     // Try to load notification sound, fallback to synthesized beep
     const audio = new Audio();
     audio.src = '/notification.mp3';
     audio.volume = 0.5;
-    
+
     // If mp3 fails to load, use Web Audio API for a simple beep
     audio.onerror = () => {
       // Create a simple beep using Web Audio API
@@ -169,22 +170,22 @@ const ChatContainer = ({ userRole = 'client' }) => {
         }
       };
     };
-    
+
     notificationAudioRef.current = audio;
-    
+
     // Request notification permission on mount
     if ('Notification' in window && Notification.permission === 'default') {
       Notification.requestPermission();
     }
   }, []);
-  
+
   // Play sound and show notification for new messages
   const playNotificationSound = useCallback(() => {
     if (notificationsEnabled && notificationAudioRef.current) {
-      notificationAudioRef.current.play().catch(() => {});
+      notificationAudioRef.current.play().catch(() => { });
     }
   }, [notificationsEnabled]);
-  
+
   const showBrowserNotification = useCallback((title, body, conversationId) => {
     if (!notificationsEnabled) return;
     if ('Notification' in window && Notification.permission === 'granted') {
@@ -200,14 +201,14 @@ const ChatContainer = ({ userRole = 'client' }) => {
       };
     }
   }, [notificationsEnabled, navigate, userRole]);
-  
+
   // Sync WebSocket messages with local state (for read receipts and real-time updates)
   useEffect(() => {
     if (wsMessages.length > 0) {
       setMessages(prev => {
         // Create a map of existing messages by ID
         const existingMap = new Map(prev.map(msg => [msg.id, msg]));
-        
+
         // Update with WebSocket messages (preserves read receipts and status updates)
         wsMessages.forEach(wsMsg => {
           existingMap.set(wsMsg.id, {
@@ -215,7 +216,7 @@ const ChatContainer = ({ userRole = 'client' }) => {
             ...wsMsg
           });
         });
-        
+
         // Convert back to array and sort by created_at
         return Array.from(existingMap.values()).sort((a, b) => {
           const timeA = a.created_at ? new Date(a.created_at).getTime() : 0;
@@ -225,7 +226,7 @@ const ChatContainer = ({ userRole = 'client' }) => {
       });
     }
   }, [wsMessages]);
-  
+
   // File upload with react-dropzone
   const onDrop = useCallback((acceptedFiles) => {
     const newAttachments = acceptedFiles.map(file => ({
@@ -237,7 +238,7 @@ const ChatContainer = ({ userRole = 'client' }) => {
     }));
     setAttachments(prev => [...prev, ...newAttachments]);
   }, []);
-  
+
   const { getRootProps, getInputProps, isDragActive, open: openFilePicker } = useDropzone({
     onDrop,
     noClick: true,
@@ -250,7 +251,7 @@ const ChatContainer = ({ userRole = 'client' }) => {
     },
     maxSize: 10 * 1024 * 1024 // 10MB max
   });
-  
+
   const removeAttachment = (index) => {
     setAttachments(prev => {
       const newAttachments = [...prev];
@@ -261,21 +262,21 @@ const ChatContainer = ({ userRole = 'client' }) => {
       return newAttachments;
     });
   };
-  
+
   // Emoji picker handler
   const onEmojiClick = (emojiData) => {
     setNewMessage(prev => prev + emojiData.emoji);
     setShowEmojiPicker(false);
     textareaRef.current?.focus();
   };
-  
+
   // Load conversations
   useEffect(() => {
     if (!authToken) return;
     loadConversations();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authToken]);
-  
+
   // Auto-select conversation from query parameter
   useEffect(() => {
     const conversationIdFromQuery = searchParams.get('conversation');
@@ -289,11 +290,11 @@ const ChatContainer = ({ userRole = 'client' }) => {
       }
     }
   }, [conversations, searchParams, selectedConversation, setSearchParams]);
-  
+
   // Subscribe to GlobalWebSocket for new messages (even when not viewing chat)
   useEffect(() => {
     if (!currentUserId || !addNotificationListener) return;
-    
+
     const unsubscribe = addNotificationListener((event) => {
       if (event.type === 'new_message') {
         // Refresh conversation list to update unread counts and last message
@@ -301,35 +302,35 @@ const ChatContainer = ({ userRole = 'client' }) => {
         loadConversations();
       }
     });
-    
+
     return unsubscribe;
   }, [currentUserId, addNotificationListener]);
-  
+
   // Load messages when conversation selected
   useEffect(() => {
     if (!selectedConversation) return;
     loadMessages(selectedConversation.id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedConversation?.id]);
-  
+
   // Mark unread messages as read when viewing a conversation
   useEffect(() => {
     if (!selectedConversation || !messages.length || !currentUserId || !markMessageAsRead) return;
-    
+
     // Find unread messages not sent by current user
-    const unreadMessages = messages.filter(msg => 
-      msg.sender_id !== currentUserId && 
-      !msg.is_read && 
+    const unreadMessages = messages.filter(msg =>
+      msg.sender_id !== currentUserId &&
+      !msg.is_read &&
       msg.status !== 'READ'
     );
-    
+
     // Mark each unread message as read
     unreadMessages.forEach(msg => {
       if (msg.id) {
         markMessageAsRead(msg.id, selectedConversation.id);
       }
     });
-    
+
     // Update unread count for this conversation
     if (unreadMessages.length > 0) {
       setUnreadCounts(prev => ({
@@ -338,17 +339,71 @@ const ChatContainer = ({ userRole = 'client' }) => {
       }));
     }
   }, [selectedConversation?.id, messages, currentUserId, markMessageAsRead]);
-  
-  // Handle URL-based conversation selection
+
+  // Handle URL-based conversation selection or photographer ID
   useEffect(() => {
-    if (urlConversationId && conversations.length > 0) {
-      const conv = conversations.find(c => c.id === urlConversationId);
-      if (conv) {
-        setSelectedConversation(conv);
+    const handleUrlParameter = async () => {
+      if (!urlConversationId || !authToken) return;
+
+      // Skip if we already processed this exact URL parameter
+      if (lastProcessedUrlRef.current === urlConversationId) return;
+
+      // First, try to find it as an existing conversation ID (only if we have conversations)
+      if (conversations.length > 0) {
+        const conv = conversations.find(c => c.id === urlConversationId);
+        if (conv) {
+          setSelectedConversation(conv);
+          lastProcessedUrlRef.current = urlConversationId;
+          return;
+        }
       }
-    }
-  }, [urlConversationId, conversations]);
-  
+
+      // If not found in conversations (or no conversations exist), 
+      // it might be a photographer ID - try to create a direct conversation
+      try {
+        console.log('🔍 URL parameter not found in conversations, attempting to create direct conversation with photographer:', urlConversationId);
+
+        const response = await axios.post(
+          'http://localhost:8000/api/chat/conversations/direct',
+          { photographer_id: urlConversationId },
+          { headers: { 'Authorization': `Bearer ${authToken}` } }
+        );
+
+        if (response.data.success) {
+          const conversation = response.data.data;
+          console.log('✅ Direct conversation created/found:', conversation.id);
+
+          // Mark both the photographer ID and conversation ID as processed
+          lastProcessedUrlRef.current = urlConversationId;
+
+          // Add to conversations list if it's new
+          if (response.data.is_new) {
+            setConversations(prev => [conversation, ...prev]);
+          } else {
+            // Update existing conversation in list
+            setConversations(prev => prev.map(c =>
+              c.id === conversation.id ? conversation : c
+            ));
+          }
+
+          // Select the conversation
+          setSelectedConversation(conversation);
+
+          // Update URL to use conversation ID instead of photographer ID
+          // Also mark the new URL as processed to prevent re-triggering
+          lastProcessedUrlRef.current = conversation.id;
+          navigate(`/${userRole}/chat/${conversation.id}`, { replace: true });
+        }
+      } catch (err) {
+        console.error('❌ Error creating/finding direct conversation:', err.response?.data?.detail || err.message);
+        // Mark as processed to prevent infinite retries
+        lastProcessedUrlRef.current = urlConversationId;
+      }
+    };
+
+    handleUrlParameter();
+  }, [urlConversationId, conversations.length, authToken, navigate, userRole]);
+
   // Scroll to bottom helper - scrolls only the chat container, not the page
   const scrollToBottomOfContainer = useCallback((smooth = false) => {
     const container = messagesContainerRef.current;
@@ -363,7 +418,7 @@ const ChatContainer = ({ userRole = 'client' }) => {
       }
     }
   }, []);
-  
+
   // Add WebSocket messages to local state and handle optimistic message replacement
   useEffect(() => {
     if (wsMessages.length > 0 && selectedConversation) {
@@ -381,10 +436,10 @@ const ChatContainer = ({ userRole = 'client' }) => {
             );
             return !hasMatch; // Remove if matched
           });
-          
+
           // Build a map of existing messages for faster lookup
           const existingMap = new Map(optimisticRemoved.map(m => [m.id, m]));
-          
+
           // Process relevant messages: update existing or add new
           const newMsgs = [];
           const updatedMessages = optimisticRemoved.map(existing => {
@@ -397,17 +452,17 @@ const ChatContainer = ({ userRole = 'client' }) => {
             }
             return existing;
           });
-          
+
           // Find truly new messages (not in existing map)
           relevantMessages.forEach(rm => {
             if (!existingMap.has(rm.id) && !rm.id?.startsWith?.('temp-')) {
               newMsgs.push(rm);
             }
           });
-          
+
           // Merge updated and new messages
           const merged = [...updatedMessages, ...newMsgs];
-          
+
           // Sort by timestamp, handling potential format issues
           merged.sort((a, b) => {
             const timeA = a.created_at ? new Date(a.created_at).getTime() : 0;
@@ -417,17 +472,17 @@ const ChatContainer = ({ userRole = 'client' }) => {
             if (isNaN(timeB)) return -1;
             return timeA - timeB;
           });
-          
+
           // If new messages were added (not our optimistic ones), scroll to bottom
           if (newMsgs.length > 0) {
             // Check if any message is not from us (received from other user)
             const hasReceivedMessages = newMsgs.some(m => m.sender_id !== currentUserId);
             if (hasReceivedMessages) {
               setTimeout(() => scrollToBottomOfContainer(true), 100);
-              
+
               // Play notification sound and show browser notification
               playNotificationSound();
-              
+
               // Get sender info for notification
               const otherMessage = newMsgs.find(m => m.sender_id !== currentUserId);
               if (otherMessage && document.hidden) {
@@ -440,13 +495,13 @@ const ChatContainer = ({ userRole = 'client' }) => {
               }
             }
           }
-          
+
           return merged;
         });
       }
     }
   }, [wsMessages, selectedConversation, currentUserId, scrollToBottomOfContainer, playNotificationSound, showBrowserNotification]);
-  
+
   // Listen for inquiry status updates from WebSocket
   useEffect(() => {
     const handleInquiryUpdate = (e) => {
@@ -461,30 +516,30 @@ const ChatContainer = ({ userRole = 'client' }) => {
         return conv;
       }));
     };
-    
+
     window.addEventListener('inquiry-status-update', handleInquiryUpdate);
     return () => window.removeEventListener('inquiry-status-update', handleInquiryUpdate);
   }, []);
-  
+
   // Track processed message IDs to avoid duplicate counting
   const processedMessageIdsRef = useRef(new Set());
-  
+
   // Update unread counts when WebSocket messages arrive for other conversations
   useEffect(() => {
     if (wsMessages.length > 0) {
       // Check for NEW messages in conversations that are NOT currently selected
       const messagesForOtherConvs = wsMessages.filter(
-        msg => msg.conversation_id !== selectedConversation?.id && 
-               msg.sender_id !== currentUserId &&
-               !processedMessageIdsRef.current.has(msg.id)
+        msg => msg.conversation_id !== selectedConversation?.id &&
+          msg.sender_id !== currentUserId &&
+          !processedMessageIdsRef.current.has(msg.id)
       );
-      
+
       if (messagesForOtherConvs.length > 0) {
         // Mark these messages as processed
         messagesForOtherConvs.forEach(msg => {
           processedMessageIdsRef.current.add(msg.id);
         });
-        
+
         // Group by conversation and update unread counts using functional update
         setUnreadCounts(prev => {
           const newCounts = { ...prev };
@@ -496,7 +551,7 @@ const ChatContainer = ({ userRole = 'client' }) => {
           });
           return newCounts;
         });
-        
+
         // Also update last_message in conversations list
         setConversations(prev => prev.map(conv => {
           const latestMsg = messagesForOtherConvs.find(m => m.conversation_id === conv.id);
@@ -512,7 +567,7 @@ const ChatContainer = ({ userRole = 'client' }) => {
       }
     }
   }, [wsMessages, selectedConversation?.id, currentUserId]);
-  
+
   // Clear unread count when conversation is selected
   useEffect(() => {
     if (selectedConversation) {
@@ -520,14 +575,14 @@ const ChatContainer = ({ userRole = 'client' }) => {
         ...prev,
         [selectedConversation.id]: 0
       }));
-      setConversations(prev => prev.map(conv => 
-        conv.id === selectedConversation.id 
+      setConversations(prev => prev.map(conv =>
+        conv.id === selectedConversation.id
           ? { ...conv, unread_count: 0 }
           : conv
       ));
     }
   }, [selectedConversation?.id]);
-  
+
   // Initial scroll when messages load
   useEffect(() => {
     if (messages.length > 0 && !initialScrollDoneRef.current) {
@@ -537,26 +592,26 @@ const ChatContainer = ({ userRole = 'client' }) => {
       }, 50);
     }
   }, [messages.length, scrollToBottomOfContainer]);
-  
+
   // Reset initial scroll ref when conversation changes
   useEffect(() => {
     initialScrollDoneRef.current = false;
   }, [selectedConversation?.id]);
-  
+
   // Scroll button visibility
   useEffect(() => {
     const container = messagesContainerRef.current;
     if (!container) return;
-    
+
     const handleScroll = () => {
       const { scrollTop, scrollHeight, clientHeight } = container;
       setShowScrollButton(scrollHeight - scrollTop - clientHeight > 200);
     };
-    
+
     container.addEventListener('scroll', handleScroll);
     return () => container.removeEventListener('scroll', handleScroll);
   }, [selectedConversation]);
-  
+
   const loadConversations = async () => {
     try {
       // Always get fresh token to avoid stale state issues
@@ -573,14 +628,14 @@ const ChatContainer = ({ userRole = 'client' }) => {
       );
       const loadedConversations = response.data.data || [];
       setConversations(loadedConversations);
-      
+
       // Calculate unread counts per conversation
       const counts = {};
       loadedConversations.forEach(conv => {
         counts[conv.id] = conv.unread_count || 0;
       });
       setUnreadCounts(counts);
-      
+
       setLoading(false);
     } catch (err) {
       console.error('Error loading conversations:', err.response?.data?.detail || err.message);
@@ -590,7 +645,7 @@ const ChatContainer = ({ userRole = 'client' }) => {
       setLoading(false);
     }
   };
-  
+
   const loadMessages = async (conversationId) => {
     try {
       // Get fresh token to avoid stale state
@@ -618,16 +673,16 @@ const ChatContainer = ({ userRole = 'client' }) => {
       console.error('Error loading messages:', err.response?.data?.detail || err.message);
     }
   };
-  
+
   const scrollToBottom = (smooth = true) => {
     scrollToBottomOfContainer(smooth);
   };
-  
+
   const handleConversationClick = (conversation) => {
     setSelectedConversation(conversation);
     navigate(`/${userRole}/chat/${conversation.id}`);
   };
-  
+
   // Upload file to Supabase Storage
   const uploadFileToStorage = async (file, conversationId) => {
     try {
@@ -635,7 +690,7 @@ const ChatContainer = ({ userRole = 'client' }) => {
       const timestamp = Date.now();
       const fileExt = file.name.split('.').pop();
       const fileName = `${conversationId}/${timestamp}-${Math.random().toString(36).substr(2, 9)}.${fileExt}`;
-      
+
       // Upload to Supabase Storage
       const { data, error } = await supabase.storage
         .from('chat-attachments')
@@ -643,14 +698,14 @@ const ChatContainer = ({ userRole = 'client' }) => {
           cacheControl: '3600',
           upsert: false
         });
-      
+
       if (error) throw error;
-      
+
       // Get public URL
       const { data: urlData } = supabase.storage
         .from('chat-attachments')
         .getPublicUrl(fileName);
-      
+
       return {
         success: true,
         url: urlData.publicUrl,
@@ -666,17 +721,17 @@ const ChatContainer = ({ userRole = 'client' }) => {
       };
     }
   };
-  
+
   const handleSendMessage = async (e) => {
     e?.preventDefault();
-    
+
     // For INQUIRY conversations, only text is allowed (no attachments)
     const isInquiry = selectedConversation?.conversation_type === 'INQUIRY';
     const effectiveAttachments = isInquiry ? [] : attachments;
-    
+
     // Allow sending if there's text OR attachments (for non-inquiry)
     if ((!newMessage.trim() && effectiveAttachments.length === 0) || sending || !selectedConversation) return;
-    
+
     // Check inquiry limit
     if (isInquiry) {
       const sentCount = selectedConversation.inquiry_messages_sent || 0;
@@ -685,13 +740,13 @@ const ChatContainer = ({ userRole = 'client' }) => {
         return;
       }
     }
-    
+
     setSending(true);
     const messageContent = newMessage.trim();
     const currentAttachments = [...effectiveAttachments];
     setNewMessage('');
     setAttachments([]); // Clear attachments after sending
-    
+
     // Upload files to Supabase Storage first
     let uploadedFiles = [];
     if (currentAttachments.length > 0) {
@@ -709,23 +764,23 @@ const ChatContainer = ({ userRole = 'client' }) => {
         }
       }
     }
-    
+
     // Optimistic UI update with unique temp ID
     const tempId = `temp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-    
+
     // Build message content with attachment info (URLs for uploaded files)
     let displayContent = messageContent;
     let attachmentData = null;
-    
+
     if (uploadedFiles.length > 0) {
       // Store attachment URLs as JSON in a special format
       attachmentData = JSON.stringify(uploadedFiles);
       const attachmentText = uploadedFiles.map(f => `📎 ${f.name}`).join('\n');
-      displayContent = messageContent 
+      displayContent = messageContent
         ? `${messageContent}\n${attachmentText}`
         : attachmentText;
     }
-    
+
     const optimisticMessage = {
       id: tempId,
       conversation_id: selectedConversation.id,
@@ -740,25 +795,25 @@ const ChatContainer = ({ userRole = 'client' }) => {
       attachment_urls: attachmentData
     };
     setMessages(prev => [...prev, optimisticMessage]);
-    
+
     // Scroll chat container (not page) after adding message
     setTimeout(() => scrollToBottomOfContainer(true), 50);
-    
+
     try {
       // Try WebSocket first - send displayContent (includes attachment names)
       if (isConnected) {
         const contentType = uploadedFiles.length > 0 ? 'file' : 'text';
         const success = wsSendMessage(
-          selectedConversation.id, 
-          displayContent, 
-          contentType, 
+          selectedConversation.id,
+          displayContent,
+          contentType,
           attachmentData
         );
         if (success) {
           // WebSocket will echo the message back, which will replace the optimistic one
           // Set a timeout to clear optimistic flag if no confirmation (fallback)
           setTimeout(() => {
-            setMessages(prev => prev.map(m => 
+            setMessages(prev => prev.map(m =>
               m.id === tempId ? { ...m, _optimistic: false } : m
             ));
           }, 5000);
@@ -766,7 +821,7 @@ const ChatContainer = ({ userRole = 'client' }) => {
           return;
         }
       }
-      
+
       // Fallback to HTTP - include attachment_urls
       const response = await axios.post(
         'http://localhost:8000/api/chat/messages',
@@ -778,13 +833,13 @@ const ChatContainer = ({ userRole = 'client' }) => {
         },
         { headers: { 'Authorization': `Bearer ${await getToken() || localStorage.getItem('token')}` } }
       );
-      
+
       // Replace optimistic message with real one
       setMessages(prev => {
         const filtered = prev.filter(m => m.id !== tempId);
         return [...filtered, response.data.data];
       });
-      
+
       // Reload conversations to update last message
       loadConversations();
     } catch (err) {
@@ -795,27 +850,27 @@ const ChatContainer = ({ userRole = 'client' }) => {
       setSending(false);
     }
   };
-  
+
   const handleTextareaChange = (e) => {
     setNewMessage(e.target.value);
-    
+
     // Auto-resize
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto';
       textareaRef.current.style.height = Math.min(textareaRef.current.scrollHeight, 120) + 'px';
     }
-    
+
     // Typing indicator
     if (!isTyping && selectedConversation) {
       setIsTyping(true);
       sendTypingIndicator(selectedConversation.id, true);
     }
-    
+
     // Clear previous timeout
     if (typingTimeoutRef.current) {
       clearTimeout(typingTimeoutRef.current);
     }
-    
+
     // Stop typing after 3 seconds of inactivity
     typingTimeoutRef.current = setTimeout(() => {
       setIsTyping(false);
@@ -824,27 +879,27 @@ const ChatContainer = ({ userRole = 'client' }) => {
       }
     }, 3000);
   };
-  
+
   const handleKeyDown = (e) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleSendMessage();
     }
   };
-  
+
   // Filter conversations by search
   const filteredConversations = conversations.filter(conv => {
     if (!searchQuery) return true;
     const name = conv.other_user?.name || '';
     return name.toLowerCase().includes(searchQuery.toLowerCase());
   });
-  
+
   // Group messages by date
   const groupMessagesByDate = (messages) => {
     const groups = [];
     let currentDate = null;
     let currentGroup = [];
-    
+
     messages.forEach(msg => {
       const msgDate = new Date(msg.created_at).toDateString();
       if (msgDate !== currentDate) {
@@ -857,20 +912,20 @@ const ChatContainer = ({ userRole = 'client' }) => {
         currentGroup.push(msg);
       }
     });
-    
+
     if (currentGroup.length > 0) {
       groups.push({ date: currentDate, messages: currentGroup });
     }
-    
+
     return groups;
   };
-  
+
   const formatDate = (dateString) => {
     const date = new Date(dateString);
     const today = new Date();
     const yesterday = new Date(today);
     yesterday.setDate(yesterday.getDate() - 1);
-    
+
     if (date.toDateString() === today.toDateString()) {
       return 'Today';
     } else if (date.toDateString() === yesterday.toDateString()) {
@@ -879,47 +934,47 @@ const ChatContainer = ({ userRole = 'client' }) => {
       return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
     }
   };
-  
+
   const formatTime = (dateString) => {
     if (!dateString) return '';
     const date = new Date(dateString);
     if (isNaN(date.getTime())) return '';
-    return date.toLocaleTimeString('en-US', { 
-      hour: 'numeric', 
+    return date.toLocaleTimeString('en-US', {
+      hour: 'numeric',
       minute: '2-digit',
-      hour12: true 
+      hour12: true
     });
   };
-  
+
   const getInitials = (name) => {
     if (!name) return '?';
     return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
   };
-  
+
   // Filter messages by search query
   const filteredMessages = messageSearchQuery.trim()
-    ? messages.filter(msg => 
-        msg.content?.toLowerCase().includes(messageSearchQuery.toLowerCase())
-      )
+    ? messages.filter(msg =>
+      msg.content?.toLowerCase().includes(messageSearchQuery.toLowerCase())
+    )
     : messages;
-  
+
   const messageGroups = groupMessagesByDate(filteredMessages);
   const currentTypingUser = selectedConversation ? typingUsers[selectedConversation.id] : null;
-  
+
   // Calculate inquiry limit progress
-  const inquiryProgress = selectedConversation?.conversation_type === 'INQUIRY' 
+  const inquiryProgress = selectedConversation?.conversation_type === 'INQUIRY'
     ? {
-        sent: selectedConversation.inquiry_messages_sent || 0,
-        limit: selectedConversation.inquiry_message_limit || 15,
-        remaining: (selectedConversation.inquiry_message_limit || 15) - (selectedConversation.inquiry_messages_sent || 0)
-      }
+      sent: selectedConversation.inquiry_messages_sent || 0,
+      limit: selectedConversation.inquiry_message_limit || 15,
+      remaining: (selectedConversation.inquiry_message_limit || 15) - (selectedConversation.inquiry_messages_sent || 0)
+    }
     : null;
-  
+
   const isInquiryLimitReached = inquiryProgress && inquiryProgress.remaining <= 0;
-  
+
   // Check if this is an inquiry conversation (attachments disabled)
   const isInquiryConversation = selectedConversation?.conversation_type === 'INQUIRY';
-  
+
   return (
     <div className="chat-container">
       {/* Conversation Sidebar */}
@@ -938,16 +993,16 @@ const ChatContainer = ({ userRole = 'client' }) => {
             )}
           </div>
         </div>
-        
+
         <div className="chat-sidebar-search">
-          <input 
+          <input
             type="text"
             placeholder="Search conversations..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
           />
         </div>
-        
+
         <div className="conversations-list">
           {loading ? (
             <div className="chat-loading">
@@ -963,7 +1018,7 @@ const ChatContainer = ({ userRole = 'client' }) => {
             filteredConversations.map(conv => {
               const isOnline = conv.other_user && onlineUsers.has(conv.other_user.user_id);
               const isActive = selectedConversation?.id === conv.id;
-              
+
               return (
                 <div
                   key={conv.id}
@@ -978,7 +1033,7 @@ const ChatContainer = ({ userRole = 'client' }) => {
                     )}
                     {isOnline && <div className="online-indicator"></div>}
                   </div>
-                  
+
                   <div className="conversation-details">
                     <div className="conversation-name">
                       <span>{conv.other_user?.name || 'Unknown User'}</span>
@@ -988,15 +1043,15 @@ const ChatContainer = ({ userRole = 'client' }) => {
                         </span>
                       )}
                     </div>
-                    
+
                     {conv.last_message && (
                       <div className="conversation-preview">
-                        {(conv.last_message.sender_id === currentUserId || 
+                        {(conv.last_message.sender_id === currentUserId ||
                           conv.last_message.sender?.id === currentUserId) ? 'You: ' : ''}
                         {conv.last_message.content}
                       </div>
                     )}
-                    
+
                     {conv.conversation_type === 'INQUIRY' && (
                       <div className="mt-1">
                         <span className="badge bg-warning text-dark" style={{ fontSize: '10px' }}>
@@ -1005,7 +1060,7 @@ const ChatContainer = ({ userRole = 'client' }) => {
                       </div>
                     )}
                   </div>
-                  
+
                   {conv.unread_count > 0 && (
                     <div className="unread-badge">{conv.unread_count}</div>
                   )}
@@ -1015,7 +1070,7 @@ const ChatContainer = ({ userRole = 'client' }) => {
           )}
         </div>
       </div>
-      
+
       {/* Chat Main Area */}
       <div className="chat-main">
         {selectedConversation ? (
@@ -1028,11 +1083,11 @@ const ChatContainer = ({ userRole = 'client' }) => {
                     <ArrowLeft size={20} />
                   </Link>
                 </div>
-                
+
                 <div className="chat-header-avatar">
                   {selectedConversation.other_user?.profile_picture_url ? (
-                    <img 
-                      src={selectedConversation.other_user.profile_picture_url} 
+                    <img
+                      src={selectedConversation.other_user.profile_picture_url}
                       alt={selectedConversation.other_user.name}
                       style={{ width: '100%', height: '100%', borderRadius: '50%' }}
                     />
@@ -1040,17 +1095,17 @@ const ChatContainer = ({ userRole = 'client' }) => {
                     getInitials(selectedConversation.other_user?.name)
                   )}
                 </div>
-                
+
                 <div className="chat-header-details">
                   <h3 className="mb-0">{selectedConversation.other_user?.name || 'Unknown User'}</h3>
                   <div className="chat-header-status">
-                    {selectedConversation.other_user && onlineUsers.has(selectedConversation.other_user.user_id) 
-                      ? 'Online' 
+                    {selectedConversation.other_user && onlineUsers.has(selectedConversation.other_user.user_id)
+                      ? 'Online'
                       : 'Offline'}
                   </div>
                 </div>
               </div>
-              
+
               {selectedConversation.conversation_type === 'INQUIRY' && inquiryProgress && (
                 <div className="text-white text-end me-3">
                   <small className="opacity-90">
@@ -1058,30 +1113,29 @@ const ChatContainer = ({ userRole = 'client' }) => {
                   </small>
                 </div>
               )}
-              
+
               {/* Search, Voice Call & Notification Toggle */}
               <div className="chat-header-actions d-flex align-items-center gap-2">
                 {/* Voice call - Always visible but disabled for INQUIRY */}
-                <button 
-                  className={`btn btn-link p-1 position-relative ${
-                    selectedConversation.conversation_type === 'INQUIRY' 
-                      ? 'text-muted opacity-50' 
-                      : 'text-white'
-                  }`}
+                <button
+                  className={`btn btn-link p-1 position-relative ${selectedConversation.conversation_type === 'INQUIRY'
+                    ? 'text-muted opacity-50'
+                    : 'text-white'
+                    }`}
                   onClick={() => {
                     if (selectedConversation.conversation_type !== 'INQUIRY') {
                       // Start voice call using global context
                       const remoteName = selectedConversation.other_user?.name || 'User';
                       const remoteUserId = selectedConversation.other_user?.user_id;
                       const callerName = user?.full_name || user?.name || 'User';
-                      
-                      console.log('📞 Starting call:', { 
-                        conversationId: selectedConversation.id, 
-                        remoteUserId, 
-                        remoteName, 
-                        callerName 
+
+                      console.log('📞 Starting call:', {
+                        conversationId: selectedConversation.id,
+                        remoteUserId,
+                        remoteName,
+                        callerName
                       });
-                      
+
                       if (remoteUserId) {
                         startCall(selectedConversation.id, remoteUserId, remoteName, callerName);
                       } else {
@@ -1099,28 +1153,28 @@ const ChatContainer = ({ userRole = 'client' }) => {
                 >
                   <Phone size={20} />
                   {selectedConversation.conversation_type === 'INQUIRY' && (
-                    <Lock 
-                      size={10} 
-                      className="position-absolute" 
-                      style={{ 
-                        bottom: '-2px', 
-                        right: '-2px', 
-                        background: '#6c757d', 
-                        borderRadius: '50%', 
+                    <Lock
+                      size={10}
+                      className="position-absolute"
+                      style={{
+                        bottom: '-2px',
+                        right: '-2px',
+                        background: '#6c757d',
+                        borderRadius: '50%',
                         padding: '2px',
                         color: 'white'
-                      }} 
+                      }}
                     />
                   )}
                 </button>
-                <button 
+                <button
                   className={`btn btn-link text-white p-1 ${showMessageSearch ? 'active' : ''}`}
                   onClick={() => setShowMessageSearch(!showMessageSearch)}
                   title="Search messages"
                 >
                   <Search size={20} />
                 </button>
-                <button 
+                <button
                   className={`btn btn-link p-1 ${notificationsEnabled ? 'text-white' : 'text-muted'}`}
                   onClick={() => setNotificationsEnabled(!notificationsEnabled)}
                   title={notificationsEnabled ? 'Mute notifications' : 'Enable notifications'}
@@ -1129,7 +1183,7 @@ const ChatContainer = ({ userRole = 'client' }) => {
                 </button>
               </div>
             </div>
-            
+
             {/* Message Search Bar */}
             {showMessageSearch && (
               <div className="chat-search-bar p-2" style={{ background: '#f0f2f5', borderBottom: '1px solid #ddd' }}>
@@ -1146,7 +1200,7 @@ const ChatContainer = ({ userRole = 'client' }) => {
                     autoFocus
                   />
                   {messageSearchQuery && (
-                    <button 
+                    <button
                       className="btn btn-outline-secondary"
                       onClick={() => setMessageSearchQuery('')}
                     >
@@ -1161,7 +1215,7 @@ const ChatContainer = ({ userRole = 'client' }) => {
                 )}
               </div>
             )}
-            
+
             {/* Messages */}
             <div className="chat-messages" ref={messagesContainerRef}>
               {messageGroups.map((group, idx) => (
@@ -1169,14 +1223,14 @@ const ChatContainer = ({ userRole = 'client' }) => {
                   <div className="date-separator">
                     <span>{formatDate(group.date)}</span>
                   </div>
-                  
+
                   {group.messages.map((msg) => {
                     // Robust sender comparison - handle string/object mismatches
-                    const msgSenderId = typeof msg.sender_id === 'object' 
-                      ? msg.sender_id?.id || msg.sender?.id 
+                    const msgSenderId = typeof msg.sender_id === 'object'
+                      ? msg.sender_id?.id || msg.sender?.id
                       : msg.sender_id;
                     const isSent = msgSenderId === currentUserId || msg.sender?.id === currentUserId;
-                    
+
                     // Parse attachment URLs if available
                     let attachmentFiles = [];
                     try {
@@ -1188,17 +1242,17 @@ const ChatContainer = ({ userRole = 'client' }) => {
                     } catch (e) {
                       console.error('Failed to parse attachments:', e);
                     }
-                    
+
                     // Check if message has attachment
                     const hasAttachment = attachmentFiles.length > 0 || msg.content?.includes('📎') || msg.content_type === 'file';
-                    
+
                     // Parse content for display
                     const renderContent = () => {
                       // Split content into text and attachment lines
                       const lines = msg.content ? msg.content.split('\n') : [];
                       const textLines = lines.filter(line => !line.startsWith('📎'));
                       const attachmentLines = lines.filter(line => line.startsWith('📎'));
-                      
+
                       return (
                         <>
                           {/* Text content */}
@@ -1209,17 +1263,17 @@ const ChatContainer = ({ userRole = 'client' }) => {
                               ))}
                             </div>
                           )}
-                          
+
                           {/* Attachment files with URLs */}
                           {attachmentFiles.map((file, idx) => {
                             const isImage = /\.(jpg|jpeg|png|gif|webp)$/i.test(file.name);
-                            
+
                             if (isImage && file.url) {
                               return (
                                 <div key={idx} className="attachment-image-container">
                                   <a href={file.url} target="_blank" rel="noopener noreferrer">
-                                    <img 
-                                      src={file.url} 
+                                    <img
+                                      src={file.url}
                                       alt={file.name}
                                       className="attachment-image"
                                       loading="lazy"
@@ -1230,10 +1284,10 @@ const ChatContainer = ({ userRole = 'client' }) => {
                               );
                             } else if (file.url) {
                               return (
-                                <a 
-                                  key={idx} 
-                                  href={file.url} 
-                                  target="_blank" 
+                                <a
+                                  key={idx}
+                                  href={file.url}
+                                  target="_blank"
                                   rel="noopener noreferrer"
                                   className="attachment-file-link"
                                 >
@@ -1255,7 +1309,7 @@ const ChatContainer = ({ userRole = 'client' }) => {
                         </>
                       );
                     };
-                    
+
                     return (
                       <div key={msg.id} className="message-group">
                         <div className={`message-bubble ${isSent ? 'message-sent' : 'message-received'} ${hasAttachment ? 'has-attachment' : ''}`}>
@@ -1263,8 +1317,8 @@ const ChatContainer = ({ userRole = 'client' }) => {
                           <div className="message-time">
                             {formatTime(msg.created_at)}
                             {isSent && (
-                              msg.is_read 
-                                ? <CheckCheck size={14} className="read-receipt read" /> 
+                              msg.is_read
+                                ? <CheckCheck size={14} className="read-receipt read" />
                                 : <Check size={14} className="read-receipt" />
                             )}
                             {msg._optimistic && <span className="opacity-50"> • Sending...</span>}
@@ -1275,7 +1329,7 @@ const ChatContainer = ({ userRole = 'client' }) => {
                   })}
                 </React.Fragment>
               ))}
-              
+
               {currentTypingUser && (
                 <div className="typing-indicator">
                   {currentTypingUser.user_name || 'User'} is typing
@@ -1286,13 +1340,13 @@ const ChatContainer = ({ userRole = 'client' }) => {
                   </div>
                 </div>
               )}
-              
+
               <div ref={messagesEndRef} />
             </div>
-            
+
             {/* Scroll to Bottom Button */}
             {showScrollButton && (
-              <button 
+              <button
                 className="scroll-to-bottom"
                 onClick={() => scrollToBottom(true)}
                 aria-label="Scroll to bottom"
@@ -1300,11 +1354,11 @@ const ChatContainer = ({ userRole = 'client' }) => {
                 <ChevronDown size={20} />
               </button>
             )}
-            
+
             {/* Input Area */}
             <div className="chat-input-container" {...(isInquiryConversation ? {} : getRootProps())}>
               {!isInquiryConversation && <input {...getInputProps()} />}
-              
+
               {/* Drag overlay - only for non-inquiry */}
               {isDragActive && !isInquiryConversation && (
                 <div className="chat-drag-overlay">
@@ -1312,12 +1366,12 @@ const ChatContainer = ({ userRole = 'client' }) => {
                   <p>Drop files here to upload</p>
                 </div>
               )}
-              
+
               {inquiryProgress && inquiryProgress.remaining <= 3 && inquiryProgress.remaining > 0 && (
                 <div className="inquiry-limit-warning">
                   <AlertCircle size={16} />
                   <span>
-                    Only {inquiryProgress.remaining} message{inquiryProgress.remaining !== 1 ? 's' : ''} remaining. 
+                    Only {inquiryProgress.remaining} message{inquiryProgress.remaining !== 1 ? 's' : ''} remaining.
                     Upgrade to unlimited messaging!
                   </span>
                   <button className="upgrade-cta">
@@ -1325,7 +1379,7 @@ const ChatContainer = ({ userRole = 'client' }) => {
                   </button>
                 </div>
               )}
-              
+
               {isInquiryLimitReached && (
                 <div className="inquiry-limit-warning" style={{ background: '#fee2e2', borderColor: '#ef4444' }}>
                   <AlertCircle size={16} style={{ color: '#dc2626' }} />
@@ -1337,7 +1391,7 @@ const ChatContainer = ({ userRole = 'client' }) => {
                   </button>
                 </div>
               )}
-              
+
               {/* Attachment Preview */}
               {attachments.length > 0 && (
                 <div className="attachment-preview-container">
@@ -1351,7 +1405,7 @@ const ChatContainer = ({ userRole = 'client' }) => {
                         </div>
                       )}
                       <span className="attachment-name">{attachment.name}</span>
-                      <button 
+                      <button
                         type="button"
                         className="attachment-remove"
                         onClick={() => removeAttachment(idx)}
@@ -1362,11 +1416,11 @@ const ChatContainer = ({ userRole = 'client' }) => {
                   ))}
                 </div>
               )}
-              
+
               {/* Emoji Picker */}
               {showEmojiPicker && (
                 <div className="emoji-picker-container">
-                  <EmojiPicker 
+                  <EmojiPicker
                     onEmojiClick={onEmojiClick}
                     width={300}
                     height={350}
@@ -1374,10 +1428,10 @@ const ChatContainer = ({ userRole = 'client' }) => {
                   />
                 </div>
               )}
-              
+
               <form onSubmit={handleSendMessage} className="chat-input-form">
                 {/* Attachment button - disabled for inquiry */}
-                <button 
+                <button
                   type="button"
                   className="chat-action-button"
                   onClick={isInquiryConversation ? undefined : openFilePicker}
@@ -1387,9 +1441,9 @@ const ChatContainer = ({ userRole = 'client' }) => {
                 >
                   <Paperclip size={20} />
                 </button>
-                
+
                 {/* Emoji button */}
-                <button 
+                <button
                   type="button"
                   className={`chat-action-button ${showEmojiPicker ? 'active' : ''}`}
                   onClick={() => setShowEmojiPicker(!showEmojiPicker)}
@@ -1398,7 +1452,7 @@ const ChatContainer = ({ userRole = 'client' }) => {
                 >
                   <Smile size={20} />
                 </button>
-                
+
                 <div className="chat-input-wrapper">
                   <textarea
                     ref={textareaRef}
@@ -1411,13 +1465,13 @@ const ChatContainer = ({ userRole = 'client' }) => {
                     rows={1}
                   />
                 </div>
-                
-                <button 
+
+                <button
                   type="submit"
                   className="chat-send-button"
                   disabled={
-                    (isInquiryConversation 
-                      ? !newMessage.trim() 
+                    (isInquiryConversation
+                      ? !newMessage.trim()
                       : (!newMessage.trim() && attachments.length === 0)
                     ) || sending || isInquiryLimitReached
                   }
