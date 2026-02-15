@@ -169,6 +169,7 @@ const ClientBookings = () => {
               paymentStatus: rental.payment_status,
               ownerName: rental.equipment?.photographer_profile?.business_name || 'Equipment Owner',
               ownerPhone: rental.equipment?.photographer_profile?.phone || 'Contact via platform',
+              ownerUserId: rental.equipment?.photographer_profile?.user_id || null,
               createdAt: rental.created_at,
               notes: rental.notes
             }));
@@ -749,6 +750,14 @@ const ClientBookings = () => {
                                 </button>
                               </>
                             )}
+                            {(booking.status === 'confirmed' || booking.status === 'completed' || booking.status === 'work_completed') && (
+                              <button
+                                className="btn btn-outline-primary btn-sm"
+                                onClick={() => navigate(`/client/chat/${booking.photographerId}`)}
+                              >
+                                💬 Message Photographer
+                              </button>
+                            )}
                             {/* Cancel button for pending bookings only */}
                             {booking.status === 'pending' && (
                               <button
@@ -899,9 +908,9 @@ const ClientBookings = () => {
                                 </Link>
                                 <button
                                   className="btn btn-outline-primary btn-sm"
-                                  onClick={() => alert(`Contact: ${rental.ownerPhone}`)}
+                                  onClick={() => rental.ownerUserId ? navigate(`/client/chat/${rental.ownerUserId}`) : alert(`Contact: ${rental.ownerPhone}`)}
                                 >
-                                  📞 Contact Owner
+                                  💬 Message Owner
                                 </button>
                                 {rental.status === 'active' && (
                                   <button

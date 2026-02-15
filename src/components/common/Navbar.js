@@ -4,6 +4,7 @@ import { useState, useEffect } from "react"
 import { Link, useNavigate, useLocation } from "react-router-dom"
 import { useAuth } from "../../context/AuthContext"
 import NotificationDropdown from "../NotificationDropdown"
+import ChatBadge from "../ChatBadge"
 
 const Navbar = () => {
   const { user, isAuthenticated, logout } = useAuth()
@@ -176,7 +177,10 @@ const Navbar = () => {
 
             <div className="d-flex align-items-center gap-3">
               {isAuthenticated && (
-                <NotificationDropdown />
+                <>
+                  <ChatBadge />
+                  <NotificationDropdown />
+                </>
               )}
               {isAuthenticated ? (
                 <div className="dropdown">

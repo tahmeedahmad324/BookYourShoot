@@ -390,7 +390,7 @@ def get_my_rentals(
             raise HTTPException(status_code=401, detail="Unauthorized")
         
         query = supabase.table('equipment_rental').select(
-            '*, equipment!equipment_rental_equipment_id_fkey(*, photographer_profile!equipment_photographer_id_fkey(business_name, city))'
+            '*, equipment!equipment_rental_equipment_id_fkey(*, photographer_profile!equipment_photographer_id_fkey(user_id, business_name, city))'
         ).eq('renter_id', user_id)
         
         if status:

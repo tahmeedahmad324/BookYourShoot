@@ -319,6 +319,12 @@ const BookingRequest = () => {
                     <span className="me-3">⭐ {photographer.rating} rating</span>
                     <span className="me-3">⏱️ {photographer.response_time} response time</span>
                   </div>
+                  <button
+                    className="btn btn-outline-light btn-sm mt-2"
+                    onClick={() => navigate(`/client/chat/${photographer.id}`)}
+                  >
+                    💬 Have questions? Message first
+                  </button>
                 </div>
                 <div className="col-md-4 text-md-end">
                   <div className="text-white">

@@ -365,6 +365,23 @@ export default function BookingSuccess() {
                     </button>
                   </div>
 
+                  {/* Message Photographer/Owner */}
+                  {paymentStatus?.status === 'success' && (
+                    <button
+                      onClick={() => {
+                        const photographerId = paymentStatus?.metadata?.photographer_id || rentalDetails?.ownerUserId;
+                        if (photographerId) {
+                          navigate(`/client/chat/${photographerId}`);
+                        } else {
+                          navigate('/client/chat');
+                        }
+                      }}
+                      className="btn btn-outline-primary btn-lg"
+                    >
+                      💬 {isEquipmentRental ? 'Message Equipment Owner' : 'Message Your Photographer'}
+                    </button>
+                  )}
+
                   <Link
                     to="/client/bookings"
                     className="btn btn-primary btn-lg"

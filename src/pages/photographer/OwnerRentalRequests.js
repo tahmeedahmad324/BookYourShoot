@@ -1,19 +1,20 @@
 "use client"
 
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import api from '../../api/api';
 
 const OwnerRentalRequests = () => {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [rentals, setRentals] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('all');
   const [selectedRental, setSelectedRental] = useState(null);
   const [showReturnModal, setShowReturnModal] = useState(false);
   const [processing, setProcessing] = useState(false);
-  
+
   // Dispute modal state
   const [showDisputeModal, setShowDisputeModal] = useState(false);
   const [rentalForDispute, setRentalForDispute] = useState(null);
@@ -22,7 +23,7 @@ const OwnerRentalRequests = () => {
     description: ''
   });
   const [submittingDispute, setSubmittingDispute] = useState(false);
-  
+
   const [returnForm, setReturnForm] = useState({
     damage_category: 'no_damage',
     deduction_amount: 0,
@@ -216,10 +217,10 @@ const OwnerRentalRequests = () => {
       alert('Maximum 5 photos allowed');
       return;
     }
-    
+
     const newPhotos = [...returnForm.photos, ...files];
     const newPreviews = files.map(file => URL.createObjectURL(file));
-    
+
     setReturnForm({
       ...returnForm,
       photos: newPhotos,
@@ -265,7 +266,7 @@ const OwnerRentalRequests = () => {
     // Validate deduction amount within range
     const deposit = selectedRental.security_deposit;
     const deductionPercent = (parseFloat(returnForm.deduction_amount) / deposit) * 100;
-    
+
     if (returnForm.damage_category !== 'no_damage') {
       if (deductionPercent < category.range[0] || deductionPercent > category.range[1]) {
         if (!window.confirm(`Deduction (${deductionPercent.toFixed(0)}%) is outside the suggested range (${category.range[0]}-${category.range[1]}%). Continue?`)) {
@@ -289,7 +290,7 @@ const OwnerRentalRequests = () => {
       formData.append('damage_category', returnForm.damage_category);
       formData.append('deduction_notes', returnForm.deduction_notes);
       formData.append('requires_admin_review', deductionPercent > 50 ? 'true' : 'false');
-      
+
       // Add photos
       returnForm.photos.forEach((photo, index) => {
         formData.append(`photos`, photo);
@@ -311,7 +312,7 @@ const OwnerRentalRequests = () => {
           photos: [],
           photoPreview: []
         });
-        
+
         const refundAmount = response.data.deposit_refund?.toLocaleString();
         const reviewMsg = deductionPercent > 50 ? ' (Pending admin review)' : '';
         alert(`Equipment returned! Deposit refund: Rs.${refundAmount}${reviewMsg}`);
@@ -597,6 +598,15 @@ const OwnerRentalRequests = () => {
                             ✓ Completed
                           </span>
                         )}
+                        {/* Message Renter - show for all non-cancelled rentals */}
+                        {rental.status !== 'cancelled' && rental.renter_id && (
+                          <button
+                            className="btn btn-outline-primary btn-sm w-100"
+                            onClick={() => navigate(`/photographer/chat/${rental.renter_id}`)}
+                          >
+                            💬 Message Renter
+                          </button>
+                        )}
                       </div>
                     </div>
                     <div className="card-footer bg-white border-0 pt-0">
@@ -800,9 +810,9 @@ const OwnerRentalRequests = () => {
             <div className="modal-content">
               <div className="modal-header bg-danger text-white">
                 <h5 className="modal-title">⚠️ Report an Issue</h5>
-                <button 
-                  type="button" 
-                  className="btn-close btn-close-white" 
+                <button
+                  type="button"
+                  className="btn-close btn-close-white"
                   onClick={() => {
                     setShowDisputeModal(false);
                     setRentalForDispute(null);
@@ -850,7 +860,7 @@ const OwnerRentalRequests = () => {
 
                 <div className="alert alert-warning">
                   <small>
-                    <strong>Note:</strong> Our support team will review your dispute within 24-48 hours. 
+                    <strong>Note:</strong> Our support team will review your dispute within 24-48 hours.
                     You may be asked to provide evidence such as photos or documentation.
                   </small>
                 </div>

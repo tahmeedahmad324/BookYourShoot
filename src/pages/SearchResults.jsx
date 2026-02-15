@@ -1,12 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import { useSearchParams, Link } from 'react-router-dom';
+import { useSearchParams, Link, useNavigate } from 'react-router-dom';
 import { searchPhotographers } from '../services/mockAPI';
+import { useAuth } from '../context/AuthContext';
 
 const SearchResults = () => {
   const [searchParams] = useSearchParams();
   const [photographers, setPhotographers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const navigate = useNavigate();
+  const { isAuthenticated } = useAuth();
 
   const city = searchParams.get('city') || '';
   const service = searchParams.get('service') || 'all';
@@ -54,7 +57,7 @@ const SearchResults = () => {
           <div className="text-center py-5">
             <h3 className="text-danger mb-3">Error</h3>
             <p>{error}</p>
-            <button 
+            <button
               className="btn btn-primary"
               onClick={() => window.location.reload()}
             >
@@ -129,22 +132,22 @@ const SearchResults = () => {
                           ⭐ {photographer.rating} ({photographer.reviews_count} reviews)
                         </span>
                       </div>
-                      
+
                       <div className="info-row">
                         <span className="info-label">Experience:</span>
                         <span className="info-value">{photographer.experience} years</span>
                       </div>
-                      
+
                       <div className="info-row">
                         <span className="info-label">Specialty:</span>
                         <span className="info-value">{photographer.specialty.join(', ')}</span>
                       </div>
-                      
+
                       <div className="info-row">
                         <span className="info-label">Rate:</span>
                         <span className="info-value">Rs. {photographer.hourly_rate}/hour</span>
                       </div>
-                      
+
                       <div className="info-row">
                         <span className="info-label">Response Time:</span>
                         <span className="info-value">{photographer.response_time}</span>
@@ -163,20 +166,31 @@ const SearchResults = () => {
                       )}
                     </div>
                   </div>
-                  
+
                   <div className="card-footer bg-white border-0">
                     <div className="d-grid gap-2">
-                      <Link 
+                      <Link
                         to={`/photographer/${photographer.id}`}
                         className="btn btn-outline-primary"
                       >
                         View Profile
                       </Link>
-                      {photographer.availability && (
-                        <button className="btn btn-primary">
-                          Book Now
-                        </button>
-                      )}
+                      <div className="d-flex gap-2">
+                        {photographer.availability && (
+                          <button className="btn btn-primary flex-grow-1">
+                            Book Now
+                          </button>
+                        )}
+                        {isAuthenticated && (
+                          <button
+                            className="btn btn-outline-secondary"
+                            onClick={() => navigate(`/client/chat/${photographer.id}`)}
+                            title="Send a message"
+                          >
+                            💬
+                          </button>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </div>
