@@ -25,7 +25,8 @@ class CreateConversationRequest(BaseModel):
 
 
 class CreateDirectConversationRequest(BaseModel):
-    photographer_id: str = Field(..., description="Photographer ID to chat with")
+    photographer_id: Optional[str] = Field(None, description="Photographer ID to chat with (for clients)")
+    target_user_id: Optional[str] = Field(None, description="Target user ID to chat with (any direction)")
     title: Optional[str] = Field(None, description="Optional conversation title")
 
 
@@ -141,25 +142,25 @@ def create_direct_conversation(
     """
     try:
         user_id = current_user.get("id")
-        photographer_id = payload.photographer_id
+        # Support both photographer_id (legacy) and target_user_id (new bidirectional)
+        target_id = payload.target_user_id or payload.photographer_id
         
-        # Verify photographer exists and is actually a photographer
-        photographer_resp = supabase.table('users')\
+        if not target_id:
+            raise HTTPException(status_code=400, detail="Either target_user_id or photographer_id is required")
+        
+        # Verify target user exists
+        target_resp = supabase.table('users')\
             .select('id, full_name, role')\
-            .eq('id', photographer_id)\
+            .eq('id', target_id)\
             .execute()
         
-        if not photographer_resp.data:
-            raise HTTPException(status_code=404, detail="Photographer not found")
+        if not target_resp.data:
+            raise HTTPException(status_code=404, detail="User not found")
         
-        photographer = photographer_resp.data[0]
-        
-        # Allow messaging photographers and admins
-        if photographer['role'] not in ['photographer', 'admin']:
-            raise HTTPException(status_code=400, detail="User is not a photographer")
+        target_user = target_resp.data[0]
         
         # Prevent messaging yourself
-        if photographer_id == user_id:
+        if target_id == user_id:
             raise HTTPException(status_code=400, detail="Cannot message yourself")
         
         # Check if a direct conversation already exists between these two users
@@ -172,7 +173,7 @@ def create_direct_conversation(
         if existing_participants.data:
             conversation_ids = [p['conversation_id'] for p in existing_participants.data]
             
-            # Check which of these conversations also has the photographer as participant
+            # Check which of these conversations also has the target user as participant
             for conv_id in conversation_ids:
                 # Get conversation details
                 conv_check = supabase.table('conversations')\
@@ -182,16 +183,16 @@ def create_direct_conversation(
                     .execute()
                 
                 if conv_check.data:
-                    # Check if photographer is in this conversation
-                    photographer_participant = supabase.table('conversation_participants')\
+                    # Check if target user is in this conversation
+                    target_participant = supabase.table('conversation_participants')\
                         .select('*')\
                         .eq('conversation_id', conv_id)\
-                        .eq('user_id', photographer_id)\
+                        .eq('user_id', target_id)\
                         .execute()
                     
-                    if photographer_participant.data:
+                    if target_participant.data:
                         # Found existing direct conversation
-                        logger.info(f"✅ Found existing direct conversation {conv_id} between {user_id} and {photographer_id}")
+                        logger.info(f"✅ Found existing direct conversation {conv_id} between {user_id} and {target_id}")
                         return {
                             "success": True,
                             "data": conv_check.data[0],
@@ -202,7 +203,7 @@ def create_direct_conversation(
         # No existing conversation found, create new one
         conversation = {
             "booking_id": None,  # Direct conversation, no booking
-            "title": payload.title or f"Chat with {photographer['full_name']}",
+            "title": payload.title or f"Chat with {target_user['full_name']}",
             "is_group": False,
             "conversation_type": "INQUIRY"  # Start as inquiry, can upgrade later
         }
@@ -223,22 +224,25 @@ def create_direct_conversation(
             },
             {
                 "conversation_id": conversation_id,
-                "user_id": photographer_id,
-                "role": photographer['role'].upper()
+                "user_id": target_id,
+                "role": target_user['role'].upper()
             }
         ]
         
         supabase.table('conversation_participants').insert(participants).execute()
         
-        logger.info(f"✅ Created direct conversation {conversation_id} between {user_id} and {photographer_id}")
+        logger.info(f"✅ Created direct conversation {conversation_id} between {user_id} and {target_id}")
         
-        # Create notification for photographer
+        # Create notification for the target user
+        target_role = target_user['role']
+        chat_link = f"/{target_role}/chat?conversation={conversation_id}"
+        
         notification_data = {
-            "user_id": photographer_id,
+            "user_id": target_id,
             "title": "New Message Request",
-            "message": f"{current_user.get('full_name', 'A client')} wants to chat with you!",
+            "message": f"{current_user.get('full_name', 'Someone')} wants to chat with you!",
             "type": "message",
-            "link": f"/photographer/chat?conversation={conversation_id}",
+            "link": chat_link,
             "read": False
         }
         
@@ -251,7 +255,14 @@ def create_direct_conversation(
             "success": True,
             "data": conv_resp.data[0],
             "message": "New conversation created",
-            "is_new": True
+            "is_new": True,
+            "other_user": {
+                "user_id": target_id,
+                "name": target_user.get('full_name', 'Unknown'),
+                "email": target_user.get('email'),
+                "profile_picture_url": target_user.get('profile_picture_url'),
+                "user_role": target_user.get('role')
+            }
         }
     
     except HTTPException:

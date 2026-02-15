@@ -15,19 +15,19 @@ const PhotographerProfile = () => {
       try {
         setLoading(true);
         setError(null);
-        
+
         console.log('Fetching photographer with ID:', id);
-        
+
         // Fetch photographer from API
         const response = await photographerAPI.getById(id);
-        
+
         console.log('API Response:', response);
-        
+
         if (response.success && response.data) {
           const photographerData = response.data;
-          
+
           console.log('Photographer Data:', photographerData);
-          
+
           // Transform API data to match component expectations
           setPhotographer({
             id: photographerData.id,
@@ -50,7 +50,7 @@ const PhotographerProfile = () => {
             awards: photographerData.awards || ["Best Wedding Photographer 2023", "Portrait Excellence Award 2022"],
             portfolio: photographerData.portfolio || [
               "/images/portfolio/wedding-1.jpg",
-              "/images/portfolio/wedding-2.jpg", 
+              "/images/portfolio/wedding-2.jpg",
               "/images/portfolio/portrait-1.jpg",
               "/images/portfolio/portrait-2.jpg",
               "/images/portfolio/event-1.jpg",
@@ -58,7 +58,7 @@ const PhotographerProfile = () => {
             ],
             availability: photographerData.availability || {
               monday: "Available",
-              tuesday: "Available", 
+              tuesday: "Available",
               wednesday: "Busy",
               thursday: "Available",
               friday: "Available",
@@ -73,7 +73,7 @@ const PhotographerProfile = () => {
                 startingPrice: photographerData.hourly_rate * 8 || 30000
               },
               {
-                name: "Portrait Photography", 
+                name: "Portrait Photography",
                 description: "Professional portraits for individuals and families",
                 duration: "1-3 hours",
                 startingPrice: photographerData.hourly_rate * 2 || 8000
@@ -81,7 +81,7 @@ const PhotographerProfile = () => {
               {
                 name: "Event Photography",
                 description: "Corporate events, birthdays, and special occasions",
-                duration: "3-8 hours", 
+                duration: "3-8 hours",
                 startingPrice: photographerData.hourly_rate * 4 || 15000
               }
             ],
@@ -96,7 +96,7 @@ const PhotographerProfile = () => {
               },
               {
                 id: 2,
-                clientName: "Bilal Ahmed", 
+                clientName: "Bilal Ahmed",
                 rating: 5,
                 date: "2024-09-20",
                 comment: "Professional and creative. Captured our family portraits beautifully.",
@@ -106,7 +106,7 @@ const PhotographerProfile = () => {
                 id: 3,
                 clientName: "Fatima Raza",
                 rating: 4,
-                date: "2024-08-10", 
+                date: "2024-08-10",
                 comment: "Great photographer, very cooperative and understanding.",
                 service: "Event Photography"
               }
@@ -172,7 +172,7 @@ const PhotographerProfile = () => {
   const getStarRating = (rating) => {
     const stars = [];
     const fullStars = Math.floor(rating);
-    
+
     for (let i = 0; i < fullStars; i++) {
       stars.push('⭐');
     }
@@ -189,8 +189,8 @@ const PhotographerProfile = () => {
         <div className="gradient-header rounded-3 p-4 mb-4">
           <div className="row align-items-center">
             <div className="col-md-2 text-center">
-              <div className="rounded-circle bg-white bg-opacity-20 d-flex align-items-center justify-content-center mx-auto" 
-                   style={{ width: '120px', height: '120px', fontSize: '3rem' }}>
+              <div className="rounded-circle bg-white bg-opacity-20 d-flex align-items-center justify-content-center mx-auto"
+                style={{ width: '120px', height: '120px', fontSize: '3rem' }}>
                 📸
               </div>
             </div>
@@ -223,14 +223,6 @@ const PhotographerProfile = () => {
                 <div className="small opacity-75">Starting from</div>
                 <div className="h2 fw-bold">PKR {photographer.hourly_rate}/hr</div>
               </div>
-              <div className="d-grid gap-2">
-                <Link to={`/booking/request/${photographer.id}`} className="btn btn-light" onClick={() => window.scrollTo(0, 0)}>
-                  📅 Book Now
-                </Link>
-                <Link to={`/client/chat/${photographer.id}`} className="btn btn-outline-light" onClick={() => window.scrollTo(0, 0)}>
-                  💬 Chat
-                </Link>
-              </div>
             </div>
           </div>
         </div>
@@ -238,7 +230,7 @@ const PhotographerProfile = () => {
         {/* Navigation Tabs */}
         <ul className="nav nav-tabs mb-4" role="tablist">
           <li className="nav-item">
-            <button 
+            <button
               className={`nav-link ${activeTab === 'about' ? 'active' : ''}`}
               onClick={() => setActiveTab('about')}
             >
@@ -246,7 +238,7 @@ const PhotographerProfile = () => {
             </button>
           </li>
           <li className="nav-item">
-            <button 
+            <button
               className={`nav-link ${activeTab === 'portfolio' ? 'active' : ''}`}
               onClick={() => setActiveTab('portfolio')}
             >
@@ -254,7 +246,7 @@ const PhotographerProfile = () => {
             </button>
           </li>
           <li className="nav-item">
-            <button 
+            <button
               className={`nav-link ${activeTab === 'services' ? 'active' : ''}`}
               onClick={() => setActiveTab('services')}
             >
@@ -262,7 +254,7 @@ const PhotographerProfile = () => {
             </button>
           </li>
           <li className="nav-item">
-            <button 
+            <button
               className={`nav-link ${activeTab === 'reviews' ? 'active' : ''}`}
               onClick={() => setActiveTab('reviews')}
             >
@@ -270,7 +262,7 @@ const PhotographerProfile = () => {
             </button>
           </li>
           <li className="nav-item">
-            <button 
+            <button
               className={`nav-link ${activeTab === 'availability' ? 'active' : ''}`}
               onClick={() => setActiveTab('availability')}
             >
@@ -366,7 +358,7 @@ const PhotographerProfile = () => {
               <div className="card border-0 shadow-sm">
                 <div className="card-body p-4">
                   <h4 className="fw-bold mb-4">Portfolio Gallery</h4>
-                  
+
                   {/* Main Image */}
                   <div className="text-center mb-4">
                     <div className="rounded bg-light p-5" style={{ minHeight: '400px' }}>
@@ -381,24 +373,23 @@ const PhotographerProfile = () => {
                   <div className="row g-2">
                     {photographer.portfolio.map((image, index) => (
                       <div key={index} className="col-6 col-md-4 col-lg-2">
-                    <div 
-                      className={`rounded bg-light p-3 cursor-pointer ${
-                        selectedImageIndex === index ? 'border-3 border-primary' : 'border-2 border-light'
-                      }`}
-                      onClick={() => setSelectedImageIndex(index)}
-                      style={{ 
-                        minHeight: '100px', 
-                        display: 'flex', 
-                        alignItems: 'center', 
-                        justifyContent: 'center',
-                        fontSize: '2rem'
-                      }}
-                    >
-                      📸
-                    </div>
+                        <div
+                          className={`rounded bg-light p-3 cursor-pointer ${selectedImageIndex === index ? 'border-3 border-primary' : 'border-2 border-light'
+                            }`}
+                          onClick={() => setSelectedImageIndex(index)}
+                          style={{
+                            minHeight: '100px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            fontSize: '2rem'
+                          }}
+                        >
+                          📸
+                        </div>
+                      </div>
+                    ))}
                   </div>
-                ))}
-              </div>
 
                   <div className="mt-4">
                     <h6>Portfolio Categories:</h6>
@@ -507,8 +498,8 @@ const PhotographerProfile = () => {
                       <div className="card-body p-4">
                         <div className="row align-items-start mb-3">
                           <div className="col-auto">
-                            <div className="rounded-circle bg-light d-flex align-items-center justify-content-center" 
-                                 style={{ width: '50px', height: '50px', fontSize: '1.5rem' }}>
+                            <div className="rounded-circle bg-light d-flex align-items-center justify-content-center"
+                              style={{ width: '50px', height: '50px', fontSize: '1.5rem' }}>
                               👤
                             </div>
                           </div>
@@ -542,9 +533,8 @@ const PhotographerProfile = () => {
                       {Object.entries(photographer.availability).map(([day, status]) => (
                         <div key={day} className="list-group-item d-flex justify-content-between align-items-center px-0">
                           <span className="text-capitalize fw-semibold">{day}</span>
-                          <span className={`status-badge ${
-                            status === 'Available' ? 'status-available' : 'status-unavailable'
-                          }`}>
+                          <span className={`status-badge ${status === 'Available' ? 'status-available' : 'status-unavailable'
+                            }`}>
                             {status}
                           </span>
                         </div>

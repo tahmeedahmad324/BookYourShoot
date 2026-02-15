@@ -340,7 +340,7 @@ const ChatContainer = ({ userRole = 'client' }) => {
     }
   }, [selectedConversation?.id, messages, currentUserId, markMessageAsRead]);
 
-  // Handle URL-based conversation selection or photographer ID
+  // Handle URL-based conversation selection or user ID
   useEffect(() => {
     const handleUrlParameter = async () => {
       if (!urlConversationId || !authToken) return;
@@ -348,7 +348,7 @@ const ChatContainer = ({ userRole = 'client' }) => {
       // Skip if we already processed this exact URL parameter
       if (lastProcessedUrlRef.current === urlConversationId) return;
 
-      // First, try to find it as an existing conversation ID (only if we have conversations)
+      // First, try to find it as an existing conversation ID
       if (conversations.length > 0) {
         const conv = conversations.find(c => c.id === urlConversationId);
         if (conv) {
@@ -356,16 +356,34 @@ const ChatContainer = ({ userRole = 'client' }) => {
           lastProcessedUrlRef.current = urlConversationId;
           return;
         }
+
+        // If not found as a conversation ID, check if the URL param is a user ID
+        // Search by other_user.user_id - this is how the backend populates it
+        const existingConv = conversations.find(c => {
+          return c.other_user?.user_id === urlConversationId ||
+            c.participants?.some(p => p.user_id === urlConversationId);
+        });
+        if (existingConv) {
+          console.log('✅ Found existing conversation with user:', urlConversationId, '→', existingConv.id);
+          setSelectedConversation(existingConv);
+          lastProcessedUrlRef.current = urlConversationId;
+          navigate(`/${userRole}/chat/${existingConv.id}`, { replace: true });
+          return;
+        }
+      } else {
+        // Conversations haven't loaded yet - wait for them
+        // (conversations.length change will re-trigger this effect)
+        console.log('⏳ Waiting for conversations to load before processing URL parameter...');
+        return;
       }
 
-      // If not found in conversations (or no conversations exist), 
-      // it might be a photographer ID - try to create a direct conversation
+      // No existing conversation found in loaded list - create via API
       try {
-        console.log('🔍 URL parameter not found in conversations, attempting to create direct conversation with photographer:', urlConversationId);
+        console.log('🔍 No existing conversation found, creating direct conversation with user:', urlConversationId);
 
         const response = await axios.post(
           'http://localhost:8000/api/chat/conversations/direct',
-          { photographer_id: urlConversationId },
+          { target_user_id: urlConversationId },
           { headers: { 'Authorization': `Bearer ${authToken}` } }
         );
 
@@ -373,30 +391,35 @@ const ChatContainer = ({ userRole = 'client' }) => {
           const conversation = response.data.data;
           console.log('✅ Direct conversation created/found:', conversation.id);
 
-          // Mark both the photographer ID and conversation ID as processed
           lastProcessedUrlRef.current = urlConversationId;
 
-          // Add to conversations list if it's new
           if (response.data.is_new) {
-            setConversations(prev => [conversation, ...prev]);
+            // For a brand new conversation, enrich with other_user info
+            const enrichedConv = {
+              ...conversation,
+              other_user: response.data.other_user || {
+                user_id: urlConversationId,
+                name: 'User'
+              },
+              participants: response.data.participants || []
+            };
+            setConversations(prev => [enrichedConv, ...prev]);
+            setSelectedConversation(enrichedConv);
           } else {
-            // Update existing conversation in list
-            setConversations(prev => prev.map(c =>
-              c.id === conversation.id ? conversation : c
-            ));
+            // API returned an existing conversation - find the enriched version from our list
+            const fullConv = conversations.find(c => c.id === conversation.id);
+            if (fullConv) {
+              setSelectedConversation(fullConv);
+            } else {
+              setSelectedConversation(conversation);
+            }
           }
 
-          // Select the conversation
-          setSelectedConversation(conversation);
-
-          // Update URL to use conversation ID instead of photographer ID
-          // Also mark the new URL as processed to prevent re-triggering
           lastProcessedUrlRef.current = conversation.id;
           navigate(`/${userRole}/chat/${conversation.id}`, { replace: true });
         }
       } catch (err) {
         console.error('❌ Error creating/finding direct conversation:', err.response?.data?.detail || err.message);
-        // Mark as processed to prevent infinite retries
         lastProcessedUrlRef.current = urlConversationId;
       }
     };

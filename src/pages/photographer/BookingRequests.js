@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { bookingAPI } from '../../api/api';
 import { toast } from 'react-toastify';
 
 const BookingRequests = () => {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [bookings, setBookings] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('all');
@@ -164,9 +165,9 @@ const BookingRequests = () => {
     {
       id: 103,
       type: "photography_booking",
-      clientId: "client789",
-      clientName: "Fatima Zahra",
-      clientEmail: "fatima.z@email.com",
+      clientId: "257f9b67-99fa-44ce-ae67-6229c36380b5",
+      clientName: "Test Client",
+      clientEmail: "client@test.com",
       clientPhone: "+92-333-4567890",
       clientImage: "👩",
       serviceType: "Event Photography",
@@ -243,7 +244,7 @@ const BookingRequests = () => {
       completed: { color: 'info', icon: '🎉', text: 'Completed' },
       returned: { color: 'secondary', icon: '✓', text: 'Returned' }
     };
-    
+
     const config = statusConfig[status] || statusConfig.pending;
     return (
       <span className={`badge bg-${config.color} d-inline-flex align-items-center`}>
@@ -259,7 +260,7 @@ const BookingRequests = () => {
       medium: { color: 'warning', icon: '⚡', text: 'Medium Priority' },
       low: { color: 'info', icon: '📅', text: 'Low Priority' }
     };
-    
+
     const config = urgencyConfig[urgency] || urgencyConfig.low;
     return (
       <span className={`badge bg-${config.color} d-inline-flex align-items-center`}>
@@ -274,10 +275,10 @@ const BookingRequests = () => {
     if (booking.status === 'pending' || booking.status === 'rejected') {
       return null; // No payment for pending/rejected
     }
-    
+
     const advancePaid = booking.advancePaid || 0;
     const remainingAmount = booking.remainingAmount || booking.advanceRequired || 0;
-    
+
     if (advancePaid > 0 && remainingAmount > 0) {
       return (
         <span className="badge bg-info d-inline-flex align-items-center">
@@ -286,7 +287,7 @@ const BookingRequests = () => {
         </span>
       );
     }
-    
+
     if (booking.paymentStatus === 'fully_paid' || remainingAmount === 0) {
       return (
         <span className="badge bg-success d-inline-flex align-items-center">
@@ -295,7 +296,7 @@ const BookingRequests = () => {
         </span>
       );
     }
-    
+
     return (
       <span className="badge bg-warning d-inline-flex align-items-center">
         <span className="me-1">⏳</span>
@@ -310,12 +311,12 @@ const BookingRequests = () => {
 
   const handleAcceptBooking = async (bookingId) => {
     if (!window.confirm('Are you sure you want to accept this booking?')) return;
-    
+
     setProcessingAction(bookingId);
     try {
       await bookingAPI.updateStatus(bookingId, 'accepted');
-      setBookings(prev => prev.map(booking => 
-        booking.id === bookingId 
+      setBookings(prev => prev.map(booking =>
+        booking.id === bookingId
           ? { ...booking, status: 'confirmed' }
           : booking
       ));
@@ -324,8 +325,8 @@ const BookingRequests = () => {
       console.error('Error accepting booking:', error);
       toast.error(error.message || 'Failed to accept booking');
       // Still update locally for demo
-      setBookings(prev => prev.map(booking => 
-        booking.id === bookingId 
+      setBookings(prev => prev.map(booking =>
+        booking.id === bookingId
           ? { ...booking, status: 'confirmed' }
           : booking
       ));
@@ -337,12 +338,12 @@ const BookingRequests = () => {
   const handleRejectBooking = async (bookingId) => {
     const reason = prompt('Please provide a reason for rejection (optional):');
     if (!window.confirm('Are you sure you want to reject this booking?')) return;
-    
+
     setProcessingAction(bookingId);
     try {
       await bookingAPI.updateStatus(bookingId, 'rejected', reason);
-      setBookings(prev => prev.map(booking => 
-        booking.id === bookingId 
+      setBookings(prev => prev.map(booking =>
+        booking.id === bookingId
           ? { ...booking, status: 'rejected', rejectionReason: reason || 'Not available' }
           : booking
       ));
@@ -351,8 +352,8 @@ const BookingRequests = () => {
       console.error('Error rejecting booking:', error);
       toast.error(error.message || 'Failed to reject booking');
       // Still update locally for demo
-      setBookings(prev => prev.map(booking => 
-        booking.id === bookingId 
+      setBookings(prev => prev.map(booking =>
+        booking.id === bookingId
           ? { ...booking, status: 'rejected', rejectionReason: reason || 'Not available' }
           : booking
       ));
@@ -361,28 +362,32 @@ const BookingRequests = () => {
     }
   };
 
-  const handleSendMessage = (bookingId) => {
-    const message = prompt('Enter your message to the client:');
-    if (message) {
-      toast.success(`Message sent to client: "${message}"`);
+  const handleSendMessage = (booking) => {
+    // Navigate to photographer chat with the client ID
+    // This will open existing conversation or create a new one
+    const clientId = booking.clientId;
+    if (clientId) {
+      navigate(`/photographer/chat/${clientId}`);
+    } else {
+      toast.error('Unable to find client information for this booking.');
     }
   };
 
   const handleMarkCompleted = async (bookingId) => {
     if (!window.confirm('Mark this booking as work completed? The client will be notified to pay the remaining amount.')) return;
-    
+
     setProcessingAction(bookingId);
     try {
       const result = await bookingAPI.markWorkCompleted(bookingId);
-      
-      setBookings(prev => prev.map(booking => 
-        booking.id === bookingId 
+
+      setBookings(prev => prev.map(booking =>
+        booking.id === bookingId
           ? { ...booking, status: 'work_completed', workCompleted: true }
           : booking
       ));
-      
+
       toast.success(result.message || 'Work marked as completed! Client will be notified to pay the remaining 50%.');
-      
+
       // Show next steps
       if (result.next_steps) {
         console.log('Next steps:', result.next_steps);
@@ -391,8 +396,8 @@ const BookingRequests = () => {
       console.error('Error marking work completed:', error);
       toast.error(error.message || 'Failed to mark work as completed');
       // Still update locally for demo
-      setBookings(prev => prev.map(booking => 
-        booking.id === bookingId 
+      setBookings(prev => prev.map(booking =>
+        booking.id === bookingId
           ? { ...booking, status: 'work_completed', workCompleted: true }
           : booking
       ));
@@ -403,11 +408,11 @@ const BookingRequests = () => {
 
   const formatDateTime = (date, time) => {
     const dateObj = new Date(date);
-    return dateObj.toLocaleDateString('en-US', { 
-      weekday: 'short', 
-      year: 'numeric', 
-      month: 'short', 
-      day: 'numeric' 
+    return dateObj.toLocaleDateString('en-US', {
+      weekday: 'short',
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric'
     }) + ' at ' + time;
   };
 
@@ -489,25 +494,25 @@ const BookingRequests = () => {
         <div className="card border-0 shadow-sm mb-4">
           <div className="card-body">
             <div className="btn-group w-100" role="group">
-              <button 
+              <button
                 className={`btn ${filter === 'all' ? 'btn-primary' : 'btn-outline-primary'}`}
                 onClick={() => setFilter('all')}
               >
                 All Requests ({bookings.length})
               </button>
-              <button 
+              <button
                 className={`btn ${filter === 'pending' ? 'btn-primary' : 'btn-outline-primary'}`}
                 onClick={() => setFilter('pending')}
               >
                 Pending ({bookings.filter(b => b.status === 'pending').length})
               </button>
-              <button 
+              <button
                 className={`btn ${filter === 'confirmed' ? 'btn-primary' : 'btn-outline-primary'}`}
                 onClick={() => setFilter('confirmed')}
               >
                 Confirmed ({bookings.filter(b => b.status === 'confirmed').length})
               </button>
-              <button 
+              <button
                 className={`btn ${filter === 'rejected' ? 'btn-primary' : 'btn-outline-primary'}`}
                 onClick={() => setFilter('rejected')}
               >
@@ -524,7 +529,7 @@ const BookingRequests = () => {
               <div className="text-muted mb-3" style={{ fontSize: '3rem' }}>📋</div>
               <h4 className="fw-bold mb-3">No {filter === 'all' ? '' : filter} Requests Found</h4>
               <p className="text-muted mb-4">
-                {filter !== 'all' 
+                {filter !== 'all'
                   ? 'No booking requests in this category'
                   : 'No booking requests available'
                 }
@@ -542,13 +547,13 @@ const BookingRequests = () => {
                       <span className="badge bg-info">🎥 Equipment Rental</span>
                     </div>
                   )}
-                  
+
                   <div className="row align-items-start">
                     {/* Client Info */}
                     <div className="col-md-3">
                       <div className="d-flex align-items-center mb-3">
-                        <div className="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center me-3" 
-                             style={{ width: '50px', height: '50px', fontSize: '1.5rem' }}>
+                        <div className="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center me-3"
+                          style={{ width: '50px', height: '50px', fontSize: '1.5rem' }}>
                           {booking.clientImage}
                         </div>
                         <div>
@@ -557,7 +562,7 @@ const BookingRequests = () => {
                           <div className="text-muted small">{booking.clientPhone}</div>
                         </div>
                       </div>
-                      
+
                       {/* Client Profile Info */}
                       <div className="small text-muted">
                         <div className="d-flex justify-content-between mb-1">
@@ -681,14 +686,14 @@ const BookingRequests = () => {
                       <div className="d-flex flex-column gap-2">
                         {booking.status === 'pending' && (
                           <>
-                            <button 
+                            <button
                               className="btn btn-success"
                               onClick={() => handleAcceptBooking(booking.id)}
                               disabled={processingAction === booking.id}
                             >
                               {processingAction === booking.id ? '⏳ Processing...' : '✅ Accept Booking'}
                             </button>
-                            <button 
+                            <button
                               className="btn btn-outline-danger"
                               onClick={() => handleRejectBooking(booking.id)}
                               disabled={processingAction === booking.id}
@@ -699,13 +704,13 @@ const BookingRequests = () => {
                         )}
                         {booking.status === 'confirmed' && (
                           <>
-                            <button 
+                            <button
                               className="btn btn-primary"
                               onClick={() => setSelectedBooking(booking)}
                             >
                               📋 View Details
                             </button>
-                            <button 
+                            <button
                               className="btn btn-success"
                               onClick={() => handleMarkCompleted(booking.id)}
                               disabled={processingAction === booking.id}
@@ -714,20 +719,20 @@ const BookingRequests = () => {
                             </button>
                           </>
                         )}
-                        <button 
+                        <button
                           className="btn btn-outline-primary"
-                          onClick={() => handleSendMessage(booking.id)}
+                          onClick={() => handleSendMessage(booking)}
                         >
                           💬 Message Client
                         </button>
-                        <Link 
+                        <Link
                           to={`/client/${booking.clientId}`}
                           className="btn btn-outline-secondary btn-sm"
                         >
                           👤 View Client Profile
                         </Link>
                       </div>
-                      
+
                       <div className="mt-2">
                         <small className="text-muted">
                           Requested {new Date(booking.createdAt).toLocaleDateString()}
@@ -773,9 +778,9 @@ const BookingRequests = () => {
             <div className="modal-content">
               <div className="modal-header">
                 <h5 className="modal-title">📋 Booking Details</h5>
-                <button 
-                  type="button" 
-                  className="btn-close" 
+                <button
+                  type="button"
+                  className="btn-close"
                   onClick={() => setSelectedBooking(null)}
                 ></button>
               </div>
@@ -872,17 +877,17 @@ const BookingRequests = () => {
                 </div>
               </div>
               <div className="modal-footer">
-                <button 
-                  type="button" 
-                  className="btn btn-secondary" 
+                <button
+                  type="button"
+                  className="btn btn-secondary"
                   onClick={() => setSelectedBooking(null)}
                 >
                   Close
                 </button>
                 {selectedBooking.status === 'confirmed' && (
-                  <button 
-                    type="button" 
-                    className="btn btn-success" 
+                  <button
+                    type="button"
+                    className="btn btn-success"
                     onClick={() => {
                       handleMarkCompleted(selectedBooking.id);
                       setSelectedBooking(null);
@@ -892,10 +897,10 @@ const BookingRequests = () => {
                     {processingAction === selectedBooking.id ? '⏳ Processing...' : '✅ Mark Work Completed'}
                   </button>
                 )}
-                <button 
-                  type="button" 
-                  className="btn btn-primary" 
-                  onClick={() => handleSendMessage(selectedBooking.id)}
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  onClick={() => handleSendMessage(selectedBooking)}
                 >
                   💬 Message Client
                 </button>

@@ -38,8 +38,6 @@ import ReviewSubmission from "./pages/client/ReviewSubmission"
 import AlbumBuilderFresh from "./pages/client/AlbumBuilderFresh"
 import ReelGenerator from "./pages/client/ReelGenerator"
 import MusicDiscoveryUI from "./pages/client/MusicDiscoveryUI"
-import PaymentTestPage from "./pages/PaymentTestPage"
-import EscrowDemoPage from "./pages/EscrowDemoPage"
 import BookingSummaryDemo from "./pages/BookingSummaryDemo"
 import NotificationSettings from "./pages/NotificationSettings"
 // import ChatTest from "./pages/test/ChatTest"  // File not found - commented out
@@ -85,385 +83,383 @@ function App() {
       <GlobalWebSocketProvider>
         <VoiceCallProvider>
           <Router>
-          <ScrollToTop />
-          <div className="App">
-            <Navbar />
-            <GlobalVoiceCallModal />
-            <main className="min-vh-100">
-              <Routes>
-                {/* Public Routes */}
-                <Route path="/" element={<Landing />} />
-                <Route path="/landing-old" element={<LandingPage />} />
-              <Route path="/login" element={<Login />} />
-              <Route path="/register" element={<Register />} />
-              <Route path="/register/cnic" element={<CNICUpload />} />
-              <Route path="/verify-otp" element={<OTPVerification />} />
-              <Route path="/forgot-password" element={<ForgotPassword />} />
-              <Route path="/search" element={<PhotographerSearch />} />
-              <Route path="/profile" element={<Profile />} />
-              <Route path="/search-results" element={<SearchResults />} />
-              <Route path="/terms" element={<TermsAndConditions />} />
-              <Route path="/privacy" element={<PrivacyPolicy />} />
-              <Route path="/support" element={<Support />} />
-              <Route path="/contact" element={<Contact />} />
-              <Route path="/payment-test" element={<PaymentTestPage />} />
-              <Route path="/escrow-demo" element={<EscrowDemoPage />} />
-              <Route path="/booking-summary-demo" element={<BookingSummaryDemo />} />
-              {/* <Route path="/test/chat" element={<ChatTest />} /> */}
-              <Route
-                path="/settings/notifications"
-                element={
-                  <ProtectedRoute allowedRoles={["client", "photographer", "admin"]}>
-                    <NotificationSettings />
-                  </ProtectedRoute>
-                }
-              />
+            <ScrollToTop />
+            <div className="App">
+              <Navbar />
+              <GlobalVoiceCallModal />
+              <main className="min-vh-100">
+                <Routes>
+                  {/* Public Routes */}
+                  <Route path="/" element={<Landing />} />
+                  <Route path="/landing-old" element={<LandingPage />} />
+                  <Route path="/login" element={<Login />} />
+                  <Route path="/register" element={<Register />} />
+                  <Route path="/register/cnic" element={<CNICUpload />} />
+                  <Route path="/verify-otp" element={<OTPVerification />} />
+                  <Route path="/forgot-password" element={<ForgotPassword />} />
+                  <Route path="/search" element={<PhotographerSearch />} />
+                  <Route path="/profile" element={<Profile />} />
+                  <Route path="/search-results" element={<SearchResults />} />
+                  <Route path="/terms" element={<TermsAndConditions />} />
+                  <Route path="/privacy" element={<PrivacyPolicy />} />
+                  <Route path="/support" element={<Support />} />
+                  <Route path="/contact" element={<Contact />} />
+                  <Route path="/booking-summary-demo" element={<BookingSummaryDemo />} />
+                  {/* <Route path="/test/chat" element={<ChatTest />} /> */}
+                  <Route
+                    path="/settings/notifications"
+                    element={
+                      <ProtectedRoute allowedRoles={["client", "photographer", "admin"]}>
+                        <NotificationSettings />
+                      </ProtectedRoute>
+                    }
+                  />
 
-              {/* Public photographer profile (accessible to all) */}
-              <Route path="/photographer/:id" element={<PhotographerProfile />} />
+                  {/* Public photographer profile (accessible to all) */}
+                  <Route path="/photographer/:id" element={<PhotographerProfile />} />
 
-              {/* Protected Client Routes */}
-              <Route
-                path="/client/dashboard"
-                element={
-                  <ProtectedRoute allowedRoles={["client"]}>
-                    <ClientDashboard />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/booking/request/:id"
-                element={
-                  <ProtectedRoute allowedRoles={["client"]}>
-                    <BookingRequest />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/booking/success"
-                element={
-                  <ProtectedRoute allowedRoles={["client"]}>
-                    <BookingSuccess />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/client/bookings"
-                element={
-                  <ProtectedRoute allowedRoles={["client"]}>
-                    <ClientBookings />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/client/my-rentals"
-                element={
-                  <ProtectedRoute allowedRoles={["client", "photographer"]}>
-                    <ClientRentals />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/client/payments"
-                element={
-                  <ProtectedRoute allowedRoles={["client"]}>
-                    <ClientPayments />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/client/payment-success/:bookingId"
-                element={
-                  <ProtectedRoute allowedRoles={["client"]}>
-                    <PaymentSuccess />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/payment/:bookingId"
-                element={
-                  <ProtectedRoute allowedRoles={["client"]}>
-                    <RemainingPayment />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/client/chat"
-                element={
-                  <ProtectedRoute allowedRoles={["client"]}>
-                    <ClientChat />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/client/chat/:id"
-                element={
-                  <ProtectedRoute allowedRoles={["client"]}>
-                    <ClientChat />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/client/messages"
-                element={
-                  <ProtectedRoute allowedRoles={["client"]}>
-                    <ClientMessages />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/client/review/:id"
-                element={
-                  <ProtectedRoute allowedRoles={["client"]}>
-                    <ReviewSubmission />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/client/album-builder"
-                element={
-                  <ProtectedRoute allowedRoles={["client"]}>
-                    <AlbumBuilderFresh />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/client/reel-generator"
-                element={
-                  <ProtectedRoute allowedRoles={["client"]}>
-                    <ReelGenerator />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/client/music-discovery"
-                element={
-                  <ProtectedRoute allowedRoles={["client"]}>
-                    <MusicDiscoveryUI />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/client/music-suggestion"
-                element={<Navigate to="/client/music-discovery" replace />}
-              />
-              <Route
-                path="/client/profile"
-                element={
-                  <ProtectedRoute allowedRoles={["client"]}>
-                    <ClientProfile />
-                  </ProtectedRoute>
-                }
-              />
+                  {/* Protected Client Routes */}
+                  <Route
+                    path="/client/dashboard"
+                    element={
+                      <ProtectedRoute allowedRoles={["client"]}>
+                        <ClientDashboard />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/booking/request/:id"
+                    element={
+                      <ProtectedRoute allowedRoles={["client"]}>
+                        <BookingRequest />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/booking/success"
+                    element={
+                      <ProtectedRoute allowedRoles={["client"]}>
+                        <BookingSuccess />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/client/bookings"
+                    element={
+                      <ProtectedRoute allowedRoles={["client"]}>
+                        <ClientBookings />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/client/my-rentals"
+                    element={
+                      <ProtectedRoute allowedRoles={["client", "photographer"]}>
+                        <ClientRentals />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/client/payments"
+                    element={
+                      <ProtectedRoute allowedRoles={["client"]}>
+                        <ClientPayments />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/client/payment-success/:bookingId"
+                    element={
+                      <ProtectedRoute allowedRoles={["client"]}>
+                        <PaymentSuccess />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/payment/:bookingId"
+                    element={
+                      <ProtectedRoute allowedRoles={["client"]}>
+                        <RemainingPayment />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/client/chat"
+                    element={
+                      <ProtectedRoute allowedRoles={["client"]}>
+                        <ClientChat />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/client/chat/:id"
+                    element={
+                      <ProtectedRoute allowedRoles={["client"]}>
+                        <ClientChat />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/client/messages"
+                    element={
+                      <ProtectedRoute allowedRoles={["client"]}>
+                        <ClientMessages />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/client/review/:id"
+                    element={
+                      <ProtectedRoute allowedRoles={["client"]}>
+                        <ReviewSubmission />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/client/album-builder"
+                    element={
+                      <ProtectedRoute allowedRoles={["client"]}>
+                        <AlbumBuilderFresh />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/client/reel-generator"
+                    element={
+                      <ProtectedRoute allowedRoles={["client"]}>
+                        <ReelGenerator />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/client/music-discovery"
+                    element={
+                      <ProtectedRoute allowedRoles={["client"]}>
+                        <MusicDiscoveryUI />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/client/music-suggestion"
+                    element={<Navigate to="/client/music-discovery" replace />}
+                  />
+                  <Route
+                    path="/client/profile"
+                    element={
+                      <ProtectedRoute allowedRoles={["client"]}>
+                        <ClientProfile />
+                      </ProtectedRoute>
+                    }
+                  />
 
-              {/* Protected Photographer Routes */}
-              <Route
-                path="/photographer/profile-setup"
-                element={
-                  <ProtectedRoute allowedRoles={["photographer"]}>
-                    <PhotographerProfileSetup />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/photographer/dashboard"
-                element={
-                  <ProtectedRoute allowedRoles={["photographer"]}>
-                    <PhotographerDashboard />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/photographer/profile"
-                element={
-                  <ProtectedRoute allowedRoles={["photographer"]}>
-                    <PhotographerProfilePage />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/photographer/bookings"
-                element={
-                  <ProtectedRoute allowedRoles={["photographer"]}>
-                    <BookingRequests />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/photographer/messages"
-                element={
-                  <ProtectedRoute allowedRoles={["photographer"]}>
-                    <PhotographerMessages />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/photographer/chat"
-                element={
-                  <ProtectedRoute allowedRoles={["photographer"]}>
-                    <PhotographerChat />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/photographer/chat/:id"
-                element={
-                  <ProtectedRoute allowedRoles={["photographer"]}>
-                    <PhotographerChat />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/photographer/payments"
-                element={
-                  <ProtectedRoute allowedRoles={["photographer"]}>
-                    <PhotographerPayments />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/photographer/equipment"
-                element={
-                  <ProtectedRoute allowedRoles={["photographer", "client"]}>
-                    <EquipmentList />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/photographer/equipment/:id"
-                element={
-                  <ProtectedRoute allowedRoles={["photographer", "client"]}>
-                    <EquipmentDetail />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/photographer/my-equipment-listings"
-                element={
-                  <ProtectedRoute allowedRoles={["photographer"]}>
-                    <MyEquipmentListings />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/photographer/rental-requests"
-                element={
-                  <ProtectedRoute allowedRoles={["photographer"]}>
-                    <OwnerRentalRequests />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/photographer/travel"
-                element={
-                  <ProtectedRoute allowedRoles={["photographer"]}>
-                    <TravelEstimator />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/photographer/earnings"
-                element={
-                  <ProtectedRoute allowedRoles={["photographer"]}>
-                    <PhotographerEarnings />
-                  </ProtectedRoute>
-                }
-              />
+                  {/* Protected Photographer Routes */}
+                  <Route
+                    path="/photographer/profile-setup"
+                    element={
+                      <ProtectedRoute allowedRoles={["photographer"]}>
+                        <PhotographerProfileSetup />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/photographer/dashboard"
+                    element={
+                      <ProtectedRoute allowedRoles={["photographer"]}>
+                        <PhotographerDashboard />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/photographer/profile"
+                    element={
+                      <ProtectedRoute allowedRoles={["photographer"]}>
+                        <PhotographerProfilePage />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/photographer/bookings"
+                    element={
+                      <ProtectedRoute allowedRoles={["photographer"]}>
+                        <BookingRequests />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/photographer/messages"
+                    element={
+                      <ProtectedRoute allowedRoles={["photographer"]}>
+                        <PhotographerMessages />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/photographer/chat"
+                    element={
+                      <ProtectedRoute allowedRoles={["photographer"]}>
+                        <PhotographerChat />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/photographer/chat/:id"
+                    element={
+                      <ProtectedRoute allowedRoles={["photographer"]}>
+                        <PhotographerChat />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/photographer/payments"
+                    element={
+                      <ProtectedRoute allowedRoles={["photographer"]}>
+                        <PhotographerPayments />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/photographer/equipment"
+                    element={
+                      <ProtectedRoute allowedRoles={["photographer", "client"]}>
+                        <EquipmentList />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/photographer/equipment/:id"
+                    element={
+                      <ProtectedRoute allowedRoles={["photographer", "client"]}>
+                        <EquipmentDetail />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/photographer/my-equipment-listings"
+                    element={
+                      <ProtectedRoute allowedRoles={["photographer"]}>
+                        <MyEquipmentListings />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/photographer/rental-requests"
+                    element={
+                      <ProtectedRoute allowedRoles={["photographer"]}>
+                        <OwnerRentalRequests />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/photographer/travel"
+                    element={
+                      <ProtectedRoute allowedRoles={["photographer"]}>
+                        <TravelEstimator />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/photographer/earnings"
+                    element={
+                      <ProtectedRoute allowedRoles={["photographer"]}>
+                        <PhotographerEarnings />
+                      </ProtectedRoute>
+                    }
+                  />
 
-              {/* Protected Admin Routes */}
-              <Route
-                path="/admin/dashboard"
-                element={
-                  <ProtectedRoute allowedRoles={["admin"]}>
-                    <AdminDashboard />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/admin/verifications"
-                element={
-                  <ProtectedRoute allowedRoles={["admin"]}>
-                    <AdminVerifications />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/admin/complaints"
-                element={
-                  <ProtectedRoute allowedRoles={["admin"]}>
-                    <AdminComplaints />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/admin/equipment-disputes"
-                element={
-                  <ProtectedRoute allowedRoles={["admin"]}>
-                    <AdminEquipmentDisputes />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/admin/payments"
-                element={
-                  <ProtectedRoute allowedRoles={["admin"]}>
-                    <AdminPaymentManagement />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/admin/webhooks"
-                element={
-                  <ProtectedRoute allowedRoles={["admin"]}>
-                    <WebhookSimulator />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/admin/settings"
-                element={
-                  <ProtectedRoute allowedRoles={["admin"]}>
-                    <AdminSettings />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/admin/reported-reviews"
-                element={
-                  <ProtectedRoute allowedRoles={["admin"]}>
-                    <AdminReportedReviews />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/admin/platform-settings"
-                element={
-                  <ProtectedRoute allowedRoles={["admin"]}>
-                    <AdminPlatformSettings />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/admin/payouts"
-                element={
-                  <ProtectedRoute allowedRoles={["admin"]}>
-                    <AdminPayouts />
-                  </ProtectedRoute>
-                }
-              />
+                  {/* Protected Admin Routes */}
+                  <Route
+                    path="/admin/dashboard"
+                    element={
+                      <ProtectedRoute allowedRoles={["admin"]}>
+                        <AdminDashboard />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/admin/verifications"
+                    element={
+                      <ProtectedRoute allowedRoles={["admin"]}>
+                        <AdminVerifications />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/admin/complaints"
+                    element={
+                      <ProtectedRoute allowedRoles={["admin"]}>
+                        <AdminComplaints />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/admin/equipment-disputes"
+                    element={
+                      <ProtectedRoute allowedRoles={["admin"]}>
+                        <AdminEquipmentDisputes />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/admin/payments"
+                    element={
+                      <ProtectedRoute allowedRoles={["admin"]}>
+                        <AdminPaymentManagement />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/admin/webhooks"
+                    element={
+                      <ProtectedRoute allowedRoles={["admin"]}>
+                        <WebhookSimulator />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/admin/settings"
+                    element={
+                      <ProtectedRoute allowedRoles={["admin"]}>
+                        <AdminSettings />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/admin/reported-reviews"
+                    element={
+                      <ProtectedRoute allowedRoles={["admin"]}>
+                        <AdminReportedReviews />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/admin/platform-settings"
+                    element={
+                      <ProtectedRoute allowedRoles={["admin"]}>
+                        <AdminPlatformSettings />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/admin/payouts"
+                    element={
+                      <ProtectedRoute allowedRoles={["admin"]}>
+                        <AdminPayouts />
+                      </ProtectedRoute>
+                    }
+                  />
 
-              {/* Fallback Routes */}
-              <Route path="/client" element={<Navigate to="/client/dashboard" replace />} />
-              <Route path="/photographer" element={<Navigate to="/photographer/dashboard" replace />} />
-              <Route path="/admin" element={<Navigate to="/admin/dashboard" replace />} />
+                  {/* Fallback Routes */}
+                  <Route path="/client" element={<Navigate to="/client/dashboard" replace />} />
+                  <Route path="/photographer" element={<Navigate to="/photographer/dashboard" replace />} />
+                  <Route path="/admin" element={<Navigate to="/admin/dashboard" replace />} />
 
-              {/* 404 Page */}
-              <Route path="*" element={<Navigate to="/" replace />} />
-            </Routes>
-          </main>
-          <Footer />
-          <AIChatbotV2 />
-        </div>
+                  {/* 404 Page */}
+                  <Route path="*" element={<Navigate to="/" replace />} />
+                </Routes>
+              </main>
+              <Footer />
+              <AIChatbotV2 />
+            </div>
           </Router>
         </VoiceCallProvider>
       </GlobalWebSocketProvider>
