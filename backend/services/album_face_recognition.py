@@ -23,15 +23,16 @@ class FaceRecognitionService:
     - Safe album creation logic
     """
     
-    def __init__(self, similarity_threshold: float = 0.6):
+    def __init__(self, similarity_threshold: float = 0.20):
         """
         Initialize face recognition service
         
         Args:
-            similarity_threshold: Cosine similarity threshold (0.58-0.65 recommended)
-                                0.6 = balanced (recommended)
-                                0.65 = strict (fewer false positives)
-                                0.58 = lenient (catch more matches)
+            similarity_threshold: Cosine similarity threshold
+                                0.60+ = Strict (high quality only)
+                                0.35-0.45 = Moderate (preprocessed photos)
+                                0.20-0.30 = Very permissive (catches difficult angles)
+                                < 0.20 = May include false positives
         """
         self.threshold = similarity_threshold
         self.face_app = None
@@ -52,6 +53,7 @@ class FaceRecognitionService:
     def initialize_insightface(self) -> bool:
         """
         Initialize InsightFace model (lazy loading)
+        REQUIRES: InsightFace 0.7.3+ (needs Visual Studio Build Tools on Windows)
         
         Returns:
             True if successful, False if InsightFace not available
@@ -62,7 +64,7 @@ class FaceRecognitionService:
         try:
             from insightface.app import FaceAnalysis
             
-            logger.info("📦 Loading InsightFace (ArcFace, CPU)...")
+            logger.info("📦 Loading InsightFace 0.7.3+ (ArcFace, CPU)...")
             
             # Initialize face analysis (detection + recognition)  
             self.face_app = FaceAnalysis(
@@ -80,6 +82,8 @@ class FaceRecognitionService:
             return False
         except Exception as e:
             logger.error(f"❌ InsightFace initialization failed: {e}")
+            logger.error(f"   Error type: {type(e).__name__}")
+            logger.error("   HINT: InsightFace 0.7.3+ requires Visual Studio Build Tools on Windows")
             return False
     
     def get_reference_embedding(self, image_path: str, person_name: str, strict: bool = True) -> Optional[np.ndarray]:
@@ -101,15 +105,13 @@ class FaceRecognitionService:
         try:
             logger.info(f"🔍 Extracting embedding for {person_name}: {Path(image_path).name}")
             
-            # Load and preprocess image
+            # Load image (preprocessed version for better matching)
             img = cv2.imread(image_path)
             if img is None:
                 logger.error(f"❌ Cannot load image: {image_path}")
                 return None
             
-            # Apply light normalization (same as preprocessing)
-            img = self._normalize_illumination(img)
-            
+            # Image is already preprocessed, use directly
             # Detect faces with InsightFace
             faces = self.face_app.get(img)
             
@@ -118,9 +120,12 @@ class FaceRecognitionService:
                 self.stats['no_face_count'] += 1
                 return None
             
-            if strict and len(faces) > 1:
-                logger.warning(f"⚠️ Multiple faces ({len(faces)}) in {person_name}'s reference photo")
-                logger.warning("   💡 Recommendation: Use single-person photos for better accuracy")
+            # STRICT: Reject if multiple faces (Google Photos style)
+            if len(faces) > 1:
+                logger.error(f"❌ REJECTED: Multiple faces ({len(faces)}) detected in {person_name}'s reference photo")
+                logger.error("   📌 REQUIREMENT: Upload photo with EXACTLY ONE face")
+                self.stats['no_face_count'] += 1
+                return None
             
             # Use largest/best face
             best_face = max(faces, key=lambda f: (f.bbox[2] - f.bbox[0]) * (f.bbox[3] - f.bbox[1]))
@@ -151,44 +156,36 @@ class FaceRecognitionService:
         self, 
         image_paths: List[str], 
         person_name: str,
-        average: bool = True
+        average: bool = False
     ) -> Optional[np.ndarray]:
         """
-        Get embeddings from multiple reference photos of same person
-        Averages embeddings for better accuracy (recommended)
+        Get embedding from single reference photo (STRICT - NO AVERAGING)
+        Google Photos style: ONE clean reference per person
         
         Args:
-            image_paths: List of reference image paths for same person
+            image_paths: List with SINGLE reference image path
             person_name: Name of person
-            average: If True, return averaged embedding (recommended)
+            average: IGNORED - no averaging allowed in strict mode
             
         Returns:
-            Single 512-D embedding (averaged if multiple photos)
+            Single 512-D embedding (NO averaging)
         """
-        embeddings = []
-        
-        logger.info(f"👤 Processing {len(image_paths)} reference photo(s) for {person_name}")
-        
-        for i, path in enumerate(image_paths, 1):
-            logger.info(f"   📸 Photo {i}/{len(image_paths)}: {Path(path).name}")
-            emb = self.get_reference_embedding(path, f"{person_name} (photo {i})", strict=True)
-            if emb is not None:
-                embeddings.append(emb)
-        
-        if len(embeddings) == 0:
-            logger.error(f"❌ No valid embeddings extracted for {person_name}")
+        if len(image_paths) != 1:
+            logger.error(f"❌ STRICT MODE: Expected 1 reference photo for {person_name}, got {len(image_paths)}")
+            logger.error("   📌 Upload exactly ONE clear photo per person")
             return None
         
-        if average and len(embeddings) > 1:
-            # Average embeddings for robustness
-            avg_embedding = np.mean(embeddings, axis=0)
-            # Renormalize after averaging
-            avg_embedding = avg_embedding / np.linalg.norm(avg_embedding)
-            logger.info(f"✅ Averaged {len(embeddings)} embeddings for {person_name}")
-            return avg_embedding
+        logger.info(f"👤 Processing SINGLE reference photo for {person_name}")
+        logger.info(f"   📸 Photo: {Path(image_paths[0]).name}")
         
-        logger.info(f"✅ Using single embedding for {person_name}")
-        return embeddings[0]
+        emb = self.get_reference_embedding(image_paths[0], person_name, strict=True)
+        
+        if emb is None:
+            logger.error(f"❌ Failed to extract embedding for {person_name}")
+            return None
+        
+        logger.info(f"✅ Single clean embedding extracted for {person_name}")
+        return emb
     
     def find_people_in_event_photos(
         self,
@@ -219,8 +216,11 @@ class FaceRecognitionService:
         results["Unknown"] = []
         
         logger.info(f"\n🔍 Searching for {len(reference_embeddings)} people in {len(event_photo_paths)} photos...")
-        logger.info(f"Similarity threshold: {self.threshold}")
+        logger.info(f"Similarity threshold: {self.threshold} (0.20 = maximum recall for difficult photos)")
         logger.info(f"People to find: {list(reference_embeddings.keys())}")
+        
+        # Enable debug logging to see actual similarity scores
+        debug = True
         
         for i, photo_path in enumerate(event_photo_paths):
             try:
@@ -229,16 +229,14 @@ class FaceRecognitionService:
                 elif i % 50 == 0:  # Log every 50 photos
                     logger.info(f"Progress: {i+1}/{len(event_photo_paths)} photos processed")
                 
-                # Load and preprocess image
+                # Load image (preprocessed version for better matching)
                 img = cv2.imread(photo_path)
                 if img is None:
                     if debug:
                         logger.debug(f"   ⚠️ Cannot load {Path(photo_path).name}")
                     continue
                 
-                # Apply same normalization as references
-                img = self._normalize_illumination(img)
-                
+                # Image is already preprocessed, use directly
                 # Detect all faces in photo (once per photo)
                 faces = self.face_app.get(img)
                 
@@ -264,11 +262,19 @@ class FaceRecognitionService:
                     face_emb = face.embedding / np.linalg.norm(face.embedding)
                     
                     # Compare with each reference person
+                    best_match_sim = 0
+                    best_match_person = None
+                    
                     for person_name, ref_embedding in reference_embeddings.items():
                         similarity = self._cosine_similarity(ref_embedding, face_emb)
                         
                         if debug:
-                            logger.debug(f"      {person_name} vs Face{face_idx+1}: {similarity:.3f}")
+                            logger.info(f"      {person_name} vs Face{face_idx+1}: {similarity:.3f}")
+                        
+                        # Track best match
+                        if similarity > best_match_sim:
+                            best_match_sim = similarity
+                            best_match_person = person_name
                         
                         # Check if match found
                         if similarity >= self.threshold:
@@ -276,8 +282,12 @@ class FaceRecognitionService:
                             self.stats['matches_found'] += 1
                             
                             if debug:
-                                logger.info(f"   ✅ Found {person_name} (sim={similarity:.3f})")
+                                logger.info(f"   ✅ MATCH: {person_name} (sim={similarity:.3f})")
                             break  # Move to next face (person already found)
+                    
+                    # Log best score even if below threshold
+                    if best_match_sim < self.threshold and debug:
+                        logger.warning(f"   ❌ NO MATCH: Best was {best_match_person} (sim={best_match_sim:.3f}, threshold={self.threshold})")
                 
                 # Add photo to appropriate albums
                 if people_found_in_photo:
@@ -300,8 +310,15 @@ class FaceRecognitionService:
         # Log final results
         logger.info(f"\n📊 Search Results:")
         for person_name, photos in results.items():
-            if person_name != "Unknown" or len(photos) > 0:
+            if person_name != "Unknown":
                 logger.info(f"   {person_name}: {len(photos)} photo(s)")
+            elif len(photos) > 0:
+                logger.info(f"   Unknown: {len(photos)} photo(s) - NO MATCHES FOUND")
+        
+        # Remove Unknown album if user doesn't want unmatched photos
+        if "Unknown" in results and len(results["Unknown"]) > 0:
+            logger.warning(f"\n⚠️ {len(results['Unknown'])} photos had NO MATCHES (not added to any album)")
+            logger.warning(f"   If threshold {self.threshold} is too strict, consider lowering it.")
         
         return results
     

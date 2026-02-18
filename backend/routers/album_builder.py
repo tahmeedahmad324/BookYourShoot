@@ -18,7 +18,7 @@ import logging
 
 from backend.auth import get_current_user
 from backend.services.album_preprocessing import ImagePreprocessor
-from backend.services.album_face_recognition import FaceRecognitionService, OpenCVFaceRecognitionService
+from backend.services.album_face_recognition import FaceRecognitionService
 
 logger = logging.getLogger(__name__)
 
@@ -43,23 +43,17 @@ def get_preprocessor():
     return preprocessor
 
 def get_face_service():
-    """Get singleton face recognition service"""
+    """Get singleton face recognition service - STRICT INSIGHTFACE ONLY"""
     global face_service 
     if face_service is None:
-        try:
-            # Try real InsightFace service first
-            face_service = FaceRecognitionService(similarity_threshold=0.55)
-            if face_service.initialize_insightface():
-                logger.info("✅ Using InsightFace service")
-            else:
-                raise ImportError("InsightFace not available")
-        except (ImportError, Exception) as e:
-            # Fall back to OpenCV-based service (actual face recognition, not mock)
-            logger.info(f"InsightFace not available ({e}), using OpenCV face recognition")
-            face_service = OpenCVFaceRecognitionService(similarity_threshold=0.50)
-            face_service.initialize_insightface()
-            logger.info("✅ Using OpenCV Face Recognition (Haar + histogram matching)")
-    return face_service
+        # Very permissive threshold for challenging Google Images
+        # Threshold 0.20 = Maximum recall (catches difficult angles/poses)
+        face_service = FaceRecognitionService(similarity_threshold=0.20)
+        if not face_service.initialize_insightface():
+            logger.error("❌ CRITICAL: InsightFace not available")
+            logger.error("   Install: pip install insightface onnxruntime")
+            raise RuntimeError("InsightFace required for album builder (no fallback allowed)")
+        logger.info("✅ Using InsightFace service (threshold=0.78, STRICT mode)")
     return face_service
 
 
@@ -134,84 +128,86 @@ async def upload_reference_photos(
     os.makedirs(ref_dir, exist_ok=True)
     
     try:
-        # Process and save reference photos
-        processed_files = []
+        # DUAL-PATH: Save originals + create preprocessed versions
+        uploaded_files = []  # (filename, original_path, preprocessed_path)
         failed_files = []
+        
+        preprocessed_dir = os.path.join(ref_dir, "preprocessed")
+        os.makedirs(preprocessed_dir, exist_ok=True)
         
         for i, file in enumerate(reference_files):
             try:
-                # Save uploaded file
+                # Save ORIGINAL file (for albums later)
                 filename = f"ref_{i:03d}_{file.filename}"
-                temp_path = os.path.join(ref_dir, filename)
+                original_path = os.path.join(ref_dir, filename)
                 
-                with open(temp_path, "wb") as buffer:
+                with open(original_path, "wb") as buffer:
                     content = await file.read()
                     buffer.write(content)
                 
-                # Preprocess with strict validation
-                processed_output_dir = os.path.join(ref_dir, "processed")
-                os.makedirs(processed_output_dir, exist_ok=True)
-                processed_path, metadata = preprocessor.preprocess_reference_photo(temp_path, processed_output_dir)
+                # Create PREPROCESSED version (for AI matching)
+                preprocessed_path, metadata = preprocessor.preprocess_reference_photo(original_path, preprocessed_dir)
                 
-                if processed_path:
-                    processed_files.append((file.filename, processed_path))
-                    logger.info(f"   ✅ Processed: {file.filename}")
+                if preprocessed_path:
+                    uploaded_files.append((file.filename, original_path, preprocessed_path))
+                    logger.info(f"   ✅ Saved: {file.filename} (original + preprocessed for AI)")
                 else:
                     failed_files.append(file.filename)
-                    logger.warning(f"   ❌ Failed: {file.filename}")
+                    logger.warning(f"   ❌ Preprocessing failed: {file.filename}")
                 
             except Exception as e:
                 logger.error(f"   ❌ Error processing {file.filename}: {e}")
                 failed_files.append(file.filename)
         
-        if len(processed_files) == 0:
+        if len(uploaded_files) == 0:
             raise HTTPException(
                 status_code=400, 
-                detail="No valid reference photos processed. Please upload clear, front-facing photos."
+                detail="No valid reference photos uploaded. Please upload clear, front-facing photos."
             )
         
-        # Map photos to people (simple strategy: distribute evenly)
-        # In a real UI, user would assign photos to specific people
-        photos_per_person = len(processed_files) // len(names)
-        remainder = len(processed_files) % len(names)
+        # STRICT MODE: ONE photo per person (Google Photos style)
+        # NO auto-distribution - MUST match count
+        if len(uploaded_files) != len(names):
+            raise HTTPException(
+                status_code=400,
+                detail=f"STRICT MODE: Upload exactly {len(names)} photo(s) for {len(names)} person(s). Got {len(uploaded_files)} valid photos."
+            )
         
         reference_embeddings = {}
         photo_assignments = {}
         
-        start_idx = 0
+        # One-to-one mapping: photo[i] → person[i]
         for i, person_name in enumerate(names):
-            # Each person gets at least photos_per_person photos
-            count = photos_per_person + (1 if i < remainder else 0)
-            person_photos = processed_files[start_idx:start_idx + count]
-            start_idx += count
+            person_file = uploaded_files[i]  # (filename, original_path, preprocessed_path)
             
-            if len(person_photos) == 0:
-                continue
-            
-            # Extract embeddings for this person
-            photo_paths = [photo[1] for photo in person_photos]
+            # Extract embedding from PREPROCESSED version (better AI matching)
+            preprocessed_path = person_file[2]
             embedding = face_service.get_multiple_reference_embeddings(
-                photo_paths, person_name, average=True
+                [preprocessed_path], person_name, average=False  # NO AVERAGING
             )
             
             if embedding is not None:
                 reference_embeddings[person_name] = embedding.tolist()  # Convert to JSON-serializable
-                photo_assignments[person_name] = [photo[0] for photo in person_photos]  # Original filenames
-                logger.info(f"   ✅ {person_name}: {len(person_photos)} photo(s)")
+                photo_assignments[person_name] = [person_file[0]]  # Original filename
+                logger.info(f"   ✅ {person_name}: 1 photo (preprocessed for AI, original saved)")
             else:
-                logger.warning(f"   ❌ {person_name}: No valid embedding extracted")
+                logger.error(f"   ❌ {person_name}: Failed validation (check: exactly 1 face?)")
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Reference photo for {person_name} validation failed. Ensure photo has exactly ONE clear face."
+                )
         
         # Update session
         session["reference_photos"] = reference_embeddings
         session["photo_assignments"] = photo_assignments
         session["reference_dir"] = ref_dir
         session["step"] = 2
-        session["processed_count"] = len(processed_files)
+        session["processed_count"] = len(uploaded_files)
         session["failed_count"] = len(failed_files)
         
         response_data = {
             "success": True,
-            "processed_photos": len(processed_files),
+            "processed_photos": len(uploaded_files),
             "failed_photos": len(failed_files),
             "people_registered": len(reference_embeddings),
             "photo_assignments": photo_assignments,
@@ -220,9 +216,9 @@ async def upload_reference_photos(
         
         if len(failed_files) > 0:
             response_data["failed_files"] = failed_files
-            response_data["message"] = f"Processed {len(processed_files)} photos. {len(failed_files)} failed validation."
+            response_data["message"] = f"Processed {len(uploaded_files)} photos (originals saved + preprocessed for AI). {len(failed_files)} failed."
         else:
-            response_data["message"] = f"All {len(processed_files)} reference photos processed successfully"
+            response_data["message"] = f"All {len(uploaded_files)} reference photos processed (originals + preprocessed for AI)"
         
         logger.info(f"✅ Step 1 complete: {len(reference_embeddings)} people registered")
         return response_data
@@ -269,29 +265,30 @@ async def upload_event_photos(
     os.makedirs(event_dir, exist_ok=True)
     
     try:
-        # Process event photos (flexible preprocessing) 
-        processed_files = []
+        # DUAL-PATH: Save originals + create preprocessed versions
+        uploaded_files = []  # [(original_path, preprocessed_path)]
         failed_files = []
+        
+        preprocessed_dir = os.path.join(event_dir, "preprocessed")
+        os.makedirs(preprocessed_dir, exist_ok=True)
         
         for i, file in enumerate(event_files):
             try:
-                # Save uploaded file 
+                # Save ORIGINAL file (for albums later)
                 filename = f"event_{i:04d}_{file.filename}"
-                temp_path = os.path.join(event_dir, filename)
+                original_path = os.path.join(event_dir, filename)
                 
-                with open(temp_path, "wb") as buffer:
+                with open(original_path, "wb") as buffer:
                     content = await file.read()
                     buffer.write(content)
                 
-                # Preprocess with flexible validation
-                processed_output_dir = os.path.join(event_dir, "processed")
-                os.makedirs(processed_output_dir, exist_ok=True)
-                processed_path, metadata = preprocessor.preprocess_event_photo(temp_path, processed_output_dir)
+                # Create PREPROCESSED version (for AI matching)
+                preprocessed_path, metadata = preprocessor.preprocess_event_photo(original_path, preprocessed_dir)
                 
-                if processed_path:
-                    processed_files.append(processed_path)
+                if preprocessed_path:
+                    uploaded_files.append((original_path, preprocessed_path))
                     if i % 100 == 0:  # Log progress every 100 files
-                        logger.info(f"   Processed: {i+1}/{len(event_files)}")
+                        logger.info(f"   Processed: {i+1}/{len(event_files)} (originals + preprocessed)")
                 else:
                     failed_files.append(file.filename)
                 
@@ -299,33 +296,35 @@ async def upload_event_photos(
                 logger.error(f"   ❌ Error processing {file.filename}: {e}")
                 failed_files.append(file.filename)
         
-        if len(processed_files) == 0:
+        if len(uploaded_files) == 0:
             raise HTTPException(
                 status_code=400,
-                detail="No valid event photos processed"
+                detail="No valid event photos uploaded"
             )
         
-        # Update session
-        session["event_photos"] = processed_files
+        # Update session with BOTH paths
+        session["event_photos"] = uploaded_files  # [(original, preprocessed)]
+        session["event_originals"] = [f[0] for f in uploaded_files]  # Original paths
+        session["event_preprocessed"] = [f[1] for f in uploaded_files]  # Preprocessed paths
         session["event_dir"] = event_dir
         session["step"] = 3
-        session["event_processed_count"] = len(processed_files)
+        session["event_processed_count"] = len(uploaded_files)
         session["event_failed_count"] = len(failed_files)
         
         response_data = {
             "success": True,
-            "processed_photos": len(processed_files),
+            "processed_photos": len(uploaded_files),
             "failed_photos": len(failed_files),
             "next_step": "build_album"
         }
         
         if len(failed_files) > 0:
             response_data["failed_files"] = failed_files[:10]  # Show first 10 failed files
-            response_data["message"] = f"Processed {len(processed_files)} photos. {len(failed_files)} failed."
+            response_data["message"] = f"Processed {len(uploaded_files)} photos (originals saved + preprocessed for AI). {len(failed_files)} failed."
         else:
-            response_data["message"] = f"All {len(event_files)} event photos processed successfully"
+            response_data["message"] = f"All {len(event_files)} event photos processed (originals + preprocessed for AI)"
         
-        logger.info(f"✅ Step 2 complete: {len(processed_files)} event photos ready")
+        logger.info(f"✅ Step 2 complete: {len(uploaded_files)} event photos ready (dual-path: originals + preprocessed)")
         return response_data
         
     except Exception as e:
@@ -366,15 +365,38 @@ async def build_album(
         for name, embedding_list in session["reference_photos"].items():
             reference_embeddings[name] = np.array(embedding_list)
         
-        # Run face recognition search
-        logger.info("🔍 Searching for people in event photos...")
+        # Run face recognition on PREPROCESSED photos (threshold 0.20 for maximum recall)
+        logger.info("🔍 Searching using PREPROCESSED photos (threshold 0.20 - maximum recall)...")
+        logger.info(f"📊 Total event photos to search: {len(session['event_preprocessed'])}")
+        
+        # Match using preprocessed versions
+        preprocessed_paths = session["event_preprocessed"]
+        original_paths = session["event_originals"]
+        
         start_time = time.time()
         
-        search_results = face_service.find_people_in_event_photos(
+        search_results_preprocessed = face_service.find_people_in_event_photos(
             reference_embeddings=reference_embeddings,
-            event_photo_paths=session["event_photos"],
-            debug=False  # Set to True for detailed logging
+            event_photo_paths=preprocessed_paths,
+            debug=True  # Enable detailed logging to see match quality
         )
+        
+        # MAP BACK: Convert preprocessed paths to ORIGINAL paths
+        preprocessed_to_original = dict(zip(preprocessed_paths, original_paths))
+        
+        search_results = {}
+        for person_name, preprocessed_photo_list in search_results_preprocessed.items():
+            # Convert each preprocessed path back to original
+            original_photo_list = [
+                preprocessed_to_original.get(p, p) for p in preprocessed_photo_list
+            ]
+            search_results[person_name] = original_photo_list
+            logger.info(f"   📸 {person_name}: Mapped {len(original_photo_list)} preprocessed → originals")
+        
+        # REMOVE "Unknown" album - user only wants matched photos
+        if "Unknown" in search_results:
+            logger.info(f"🗑️ Removing 'Unknown' album ({len(search_results['Unknown'])} unmatched photos)")
+            del search_results["Unknown"]
         
         search_time = time.time() - start_time
         
