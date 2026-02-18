@@ -68,38 +68,12 @@ export const AuthProvider = ({ children }) => {
   useEffect(() => {
     console.log('[AuthContext] useEffect initializing...');
 
-    // Check for mock user first
-    const mockUserData = localStorage.getItem('mock_user');
-    if (mockUserData) {
-      try {
-        const mockUser = JSON.parse(mockUserData);
-        console.log('[AuthContext] Found mock_user in localStorage:', mockUser);
-        setUser(mockUser);
-        setLoading(false);
-        return;
-      } catch (e) {
-        localStorage.removeItem('mock_user');
-      }
-    }
-
-    // Check for alternative auth storage (userRole, userId, userName)
-    const userRole = localStorage.getItem('userRole');
-    const userId = localStorage.getItem('userId');
-    const userName = localStorage.getItem('userName');
-
-    if (userRole && userId) {
-      // Reconstruct user from alternative storage
-      console.log('[AuthContext] Found userRole/userId in localStorage');
-      setUser({
-        id: userId,
-        email: `${userRole}@test.com`,
-        full_name: userName || 'Test User',
-        role: userRole,
-        is_mock: true
-      });
-      setLoading(false);
-      return;
-    }
+    // Clear any old mock user data (migration to real auth)
+    localStorage.removeItem('mock_user');
+    localStorage.removeItem('userRole');
+    localStorage.removeItem('userId');
+    localStorage.removeItem('userName');
+    console.log('[AuthContext] Cleared any legacy mock user data');
 
     // Check for real user stored in sessionStorage (from login)
     const realUserData = sessionStorage.getItem('real_user');
@@ -145,13 +119,7 @@ export const AuthProvider = ({ children }) => {
       console.log('Auth state changed:', event);
       setSession(session);
 
-      // Skip if using mock authentication
-      const mockUserData = localStorage.getItem('mock_user');
-      const userRole = localStorage.getItem('userRole');
-      if (mockUserData || userRole) {
-        console.log('[AuthContext] Mock auth detected, skipping Supabase state change');
-        return; // Don't override mock auth
-      }
+      // Always use real Supabase authentication (no mock bypass)
 
       if (session?.user) {
         // Fetch complete user profile from our database
@@ -179,62 +147,59 @@ export const AuthProvider = ({ children }) => {
 
   // Get current session token for API calls
   const getToken = async () => {
-    // Check if using mock account
-    const mockUser = localStorage.getItem('mock_user');
-    if (mockUser) {
-      const userData = JSON.parse(mockUser);
-      // Return mock token format that backend expects in DEV_MODE
-      return `mock-jwt-token-${userData.role}`;
+    // If logged in with mock account, return mock token
+    if (user?.is_mock) {
+      const mockToken = `mock-jwt-token-${user.role}`;
+      console.log('[AuthContext] getToken() - Using mock token for test account');
+      return mockToken;
     }
-
-    // Real Supabase session
+    
+    // Otherwise get real Supabase token
+    console.log('[AuthContext] getToken() - Fetching real Supabase token');
     const { data: { session } } = await supabase.auth.getSession();
-    return session?.access_token || null;
+    
+    if (!session?.access_token) {
+      console.warn('[AuthContext] No Supabase session available');
+      return null;
+    }
+    
+    console.log('[AuthContext] Real token obtained from Supabase');
+    return session.access_token;
   };
 
   const login = async (userData) => {
     console.log('[AuthContext] login() called with:', userData);
 
     // Handle both real Supabase sessions and mock accounts
-    if (userData.is_mock) {
-      // Mock account - set user directly
-      console.log('[AuthContext] Mock account detected, setting user');
-      setUser(userData);
-      // Store in BOTH formats for compatibility
-      localStorage.setItem('mock_user', JSON.stringify(userData));
-      localStorage.setItem('userRole', userData.role);
-      localStorage.setItem('userId', userData.id);
-      localStorage.setItem('userName', userData.full_name || userData.name || 'User');
-    } else {
-      // Real Supabase session - set user and persist in sessionStorage
-      console.log('[AuthContext] Real account, setting user and storing in sessionStorage');
-      setUser(userData);
-      // Store real user data temporarily to prevent loss during navigation
-      sessionStorage.setItem('real_user', JSON.stringify(userData));
-    }
+    // Always use real Supabase session
+    console.log('[AuthContext] Setting user from Supabase session');
+    setUser(userData);
+    // Store user data temporarily to prevent loss during navigation
+    sessionStorage.setItem('real_user', JSON.stringify(userData));
   };
 
   const logout = async () => {
     try {
-      // Check if mock account
-      const mockUser = localStorage.getItem('mock_user');
-      if (mockUser) {
-        // Clear mock data
-        localStorage.removeItem('mock_user');
-      } else {
-        // Real Supabase logout
-        await supabase.auth.signOut();
+      // If mock account, just clear state
+      if (user?.is_mock) {
+        console.log('[AuthContext] Logging out mock account');
+        setUser(null);
+        sessionStorage.removeItem('real_user');
+        return;
       }
-
+      
+      // Otherwise use real Supabase logout
+      await supabase.auth.signOut();
       setUser(null);
       setSession(null);
 
-      // Clear ALL user-related storage (both mock and real)
+      // Clear ALL user-related storage
       localStorage.removeItem('user');
       localStorage.removeItem('token');
       localStorage.removeItem('userId');
       localStorage.removeItem('userRole');
       localStorage.removeItem('userName');
+      localStorage.removeItem('mock_user');
       sessionStorage.removeItem('user');
       sessionStorage.removeItem('token');
       sessionStorage.removeItem('real_user');

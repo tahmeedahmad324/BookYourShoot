@@ -128,11 +128,14 @@ def test_insightface():
         print("📦 Importing InsightFace...")
         from insightface.app import FaceAnalysis
         import onnxruntime
+        import insightface
         print(f"   ✅ InsightFace imported successfully")
+        print(f"   ✅ InsightFace version: {getattr(insightface, '__version__', 'unknown')}")
         print(f"   ✅ ONNX Runtime version: {onnxruntime.__version__}")
         
         print("\n🔧 Initializing face detection model...")
-        app = FaceAnalysis(name="buffalo_l", providers=["CPUExecutionProvider"])
+        # Compatible with InsightFace 0.2.1 (doesn't support providers argument)
+        app = FaceAnalysis(name="buffalo_l")
         app.prepare(ctx_id=0, det_size=(640, 640))
         print("   ✅ Model initialized successfully")
         

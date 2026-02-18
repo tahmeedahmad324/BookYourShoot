@@ -23,23 +23,9 @@ export const VoiceCallProvider = ({ children }) => {
   
   const durationIntervalRef = useRef(null);
   
-  // Get current user ID
+  // Get current user ID from auth context
   const currentUserId = React.useMemo(() => {
-    const storedUserId = localStorage.getItem('userId');
-    if (storedUserId) return storedUserId;
     if (user?.id) return user.id;
-    
-    const token = localStorage.getItem('token');
-    if (token && token.startsWith('mock-jwt-token')) {
-      const parts = token.split('-');
-      const role = parts[parts.length - 1];
-      const mockUserIds = {
-        'client': '257f9b67-99fa-44ce-ae67-6229c36380b5',
-        'photographer': '21bf398a-e012-4c4d-9b55-caeac7ec6dc7',
-        'admin': '5fb7a96b-3dd0-4d44-9631-c07a256292ee'
-      };
-      return mockUserIds[role] || null;
-    }
     return null;
   }, [user?.id]);
 

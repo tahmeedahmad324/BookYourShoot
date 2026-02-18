@@ -42,28 +42,15 @@ const ChatContainer = ({ userRole = 'client' }) => {
 
   // Get actual user ID (memoized to prevent recalculation on every render)
   const currentUserId = useMemo(() => {
-    // Try localStorage first (for mock users)
-    const storedUserId = localStorage.getItem('userId');
-    if (storedUserId) {
-      return storedUserId;
-    }
-
-    // Try user context
+    // First priority: user from auth context (real Supabase user)
     if (user?.id) {
       return user.id;
     }
 
-    // Fallback - extract from token if it's a mock token
-    const token = localStorage.getItem('token');
-    if (token && token.startsWith('mock-jwt-token')) {
-      const parts = token.split('-');
-      const role = parts[parts.length - 1];
-      const mockUserIds = {
-        'client': '257f9b67-99fa-44ce-ae67-6229c36380b5',
-        'photographer': '21bf398a-e012-4c4d-9b55-caeac7ec6dc7',
-        'admin': '5fb7a96b-3dd0-4d44-9631-c07a256292ee'
-      };
-      return mockUserIds[role] || null;
+    // Fallback to localStorage if set (shouldn't be needed with proper auth flow)
+    const storedUserId = localStorage.getItem('userId');
+    if (storedUserId) {
+      return storedUserId;
     }
 
     return null;

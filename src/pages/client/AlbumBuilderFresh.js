@@ -1,6 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { Container, Row, Col, Card, Form, Button, Alert, ProgressBar, Badge, Spinner } from 'react-bootstrap';
 import axios from 'axios';
+import { useAuth } from '../../context/AuthContext';
 
 /**
  * AI Album Builder - STRICT Pipeline Implementation
@@ -14,6 +15,9 @@ import axios from 'axios';
  * Updated: Cancel session functionality added
  */
 function AlbumBuilderFresh() {
+  // Auth
+  const { getToken } = useAuth();
+  
   // Session
   const [sessionId, setSessionId] = useState(null);
   const [currentStep, setCurrentStep] = useState(0);
@@ -172,12 +176,15 @@ function AlbumBuilderFresh() {
   const clearMessages = () => { setError(null); setSuccess(null); };
   
 
-  const getAuthHeaders = () => ({
-    headers: {
-      'Authorization': `Bearer ${localStorage.getItem('token')}`,
-      'Content-Type': 'multipart/form-data'
-    }
-  });
+  const getAuthHeaders = async (contentType = 'multipart/form-data') => {
+    const token = await getToken();
+    return {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': contentType
+      }
+    };
+  };
 
   // ============================================================================
   // STEP 0: START SESSION
@@ -188,7 +195,7 @@ function AlbumBuilderFresh() {
     setLoading(true);
     
     try {
-      const token = localStorage.getItem('token');
+      const token = await getToken();
       const response = await axios.post(
         `${API_BASE}/start-session`,
         {},
@@ -327,7 +334,7 @@ function AlbumBuilderFresh() {
       const response = await axios.post(
         `${API_BASE}/upload-references/${sessionId}`,
         formData,
-        getAuthHeaders()
+        await getAuthHeaders()
       );
       
       setProgress(100);
@@ -406,17 +413,18 @@ function AlbumBuilderFresh() {
       const response = await axios.post(
         `${API_BASE}/upload-events/${sessionId}`,
         formData,
-        getAuthHeaders()
+        await getAuthHeaders()
       );
       
       setProgress(50);
       setProgressText('Running AI face recognition...');
       
       // Now build albums
+      const token = await getToken();
       const buildResponse = await axios.post(
         `${API_BASE}/build-album/${sessionId}`,
         {},
-        { headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}`, 'Content-Type': 'application/json' } }
+        { headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' } }
       );
       
       setProgress(90);
@@ -452,10 +460,11 @@ function AlbumBuilderFresh() {
       setLoading(true);
       setProgressText('Preparing download...');
       
+      const token = await getToken();
       const response = await axios.get(
         `${API_BASE}/download-albums/${sessionId}`,
         {
-          headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` },
+          headers: { 'Authorization': `Bearer ${token}` },
           responseType: 'blob'
         }
       );
@@ -486,9 +495,10 @@ function AlbumBuilderFresh() {
     // Cleanup old session
     if (sessionId) {
       try {
+        const token = await getToken();
         await axios.delete(
           `${API_BASE}/cleanup-session/${sessionId}`,
-          { headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` } }
+          { headers: { 'Authorization': `Bearer ${token}` } }
         );
       } catch (e) { /* ignore */ }
     }
@@ -515,9 +525,10 @@ function AlbumBuilderFresh() {
     // Cleanup old session
     if (sessionId) {
       try {
+        const token = await getToken();
         await axios.delete(
           `${API_BASE}/cleanup-session/${sessionId}`,
-          { headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` } }
+          { headers: { 'Authorization': `Bearer ${token}` } }
         );
       } catch (e) { /* ignore */ }
     }

@@ -53,7 +53,7 @@ class FaceRecognitionService:
     def initialize_insightface(self) -> bool:
         """
         Initialize InsightFace model (lazy loading)
-        REQUIRES: InsightFace 0.7.3+ (needs Visual Studio Build Tools on Windows)
+        Compatible with InsightFace 0.2.1 (older stable version)
         
         Returns:
             True if successful, False if InsightFace not available
@@ -63,14 +63,14 @@ class FaceRecognitionService:
         
         try:
             from insightface.app import FaceAnalysis
+            import insightface
             
-            logger.info("📦 Loading InsightFace 0.7.3+ (ArcFace, CPU)...")
+            version = getattr(insightface, '__version__', '0.2.1')
+            logger.info(f"📦 Loading InsightFace {version} (ArcFace, CPU)...")
             
-            # Initialize face analysis (detection + recognition)  
-            self.face_app = FaceAnalysis(
-                name="buffalo_l",  # Lightweight + accurate model
-                providers=["CPUExecutionProvider"]  # CPU only
-            )
+            # Initialize face analysis (detection + recognition)
+            # Note: InsightFace 0.2.1 doesn't support 'providers' argument
+            self.face_app = FaceAnalysis(name="buffalo_l")  # Lightweight + accurate model
             self.face_app.prepare(ctx_id=0, det_size=(640, 640))
             
             self.initialized = True
@@ -83,7 +83,7 @@ class FaceRecognitionService:
         except Exception as e:
             logger.error(f"❌ InsightFace initialization failed: {e}")
             logger.error(f"   Error type: {type(e).__name__}")
-            logger.error("   HINT: InsightFace 0.7.3+ requires Visual Studio Build Tools on Windows")
+            logger.error(f"   Traceback: {str(e)}")
             return False
     
     def get_reference_embedding(self, image_path: str, person_name: str, strict: bool = True) -> Optional[np.ndarray]:
