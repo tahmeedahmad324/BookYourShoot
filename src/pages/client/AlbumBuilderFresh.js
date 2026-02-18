@@ -11,6 +11,7 @@ import axios from 'axios';
  * 2. Upload event photos (20-1000) with preview, remove option
  * 3. AI Processing with STRICT threshold (0.78)
  * 4. View albums on website + download
+ * Updated: Cancel session functionality added
  */
 function AlbumBuilderFresh() {
   // Session
@@ -40,7 +41,7 @@ function AlbumBuilderFresh() {
   const [progress, setProgress] = useState(0);
   const [progressText, setProgressText] = useState('');
 
-  const API_BASE = 'http://localhost:5000/api/album-builder';
+  const API_BASE = 'http://localhost:8000/api/album-builder';
 
   // ============================================================================
   // STYLES - Pastel colors matching website
@@ -169,6 +170,7 @@ function AlbumBuilderFresh() {
   const showError = (msg) => { setError(msg); setLoading(false); };
   const showSuccess = (msg) => { setSuccess(msg); setTimeout(() => setSuccess(null), 5000); };
   const clearMessages = () => { setError(null); setSuccess(null); };
+  
 
   const getAuthHeaders = () => ({
     headers: {
@@ -474,6 +476,39 @@ function AlbumBuilderFresh() {
       setLoading(false);
       setProgressText('');
     }
+  };
+  
+  const cancelSession = async () => {
+    if (!window.confirm('Are you sure you want to cancel? All progress will be lost.')) {
+      return;
+    }
+    
+    // Cleanup old session
+    if (sessionId) {
+      try {
+        await axios.delete(
+          `${API_BASE}/cleanup-session/${sessionId}`,
+          { headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` } }
+        );
+      } catch (e) { /* ignore */ }
+    }
+    
+    // Reset all state
+    setSessionId(null);
+    setCurrentStep(0);
+    setPeople([]);
+    setCurrentPersonName('');
+    setCurrentPersonFiles([]);
+    setCurrentPersonPreviews([]);
+    setReferencesProcessed(false);
+    setEventFiles([]);
+    setEventPreviews([]);
+    setEventsProcessed(false);
+    setAlbums(null);
+    setProgress(0);
+    setProgressText('');
+    clearMessages();
+    showSuccess('Session cancelled successfully');
   };
   
   const startNewSession = async () => {
@@ -830,9 +865,18 @@ function AlbumBuilderFresh() {
                   
                   {/* Action Buttons */}
                   <div className="d-flex justify-content-between align-items-center">
-                    <Button style={styles.secondaryBtn} onClick={() => setCurrentStep(0)}>
-                      ← Back
-                    </Button>
+                    <div className="d-flex gap-2">
+                      <Button style={styles.secondaryBtn} onClick={() => setCurrentStep(0)}>
+                        ← Back
+                      </Button>
+                      <Button 
+                        variant="outline-danger" 
+                        onClick={cancelSession}
+                        style={{ borderRadius: '10px', fontSize: '14px' }}
+                      >
+                        ✕ Cancel Session
+                      </Button>
+                    </div>
                     
                     <Button
                       style={styles.successBtn}
@@ -941,9 +985,18 @@ function AlbumBuilderFresh() {
                   
                   {/* Action Buttons */}
                   <div className="d-flex justify-content-between align-items-center">
-                    <Button style={styles.secondaryBtn} onClick={() => setCurrentStep(1)}>
-                      ← Back to People
-                    </Button>
+                    <div className="d-flex gap-2">
+                      <Button style={styles.secondaryBtn} onClick={() => setCurrentStep(1)}>
+                        ← Back to People
+                      </Button>
+                      <Button 
+                        variant="outline-danger" 
+                        onClick={cancelSession}
+                        style={{ borderRadius: '10px', fontSize: '14px' }}
+                      >
+                        ✕ Cancel Session
+                      </Button>
+                    </div>
                     
                     <Button
                       style={styles.successBtn}
