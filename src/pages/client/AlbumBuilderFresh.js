@@ -1,15 +1,15 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { Container, Row, Col, Card, Form, Button, Alert, ProgressBar, Badge, Spinner } from 'react-bootstrap';
 import axios from 'axios';
 
 /**
- * AI Album Builder - Complete Redesign
+ * AI Album Builder - STRICT Pipeline Implementation
  * 
  * Flow:
  * 0. Welcome screen with rules/steps explanation
- * 1. Add people (1-5) with names, preview, delete option
+ * 1. Add people (unlimited) with 1 photo each, preview, delete option
  * 2. Upload event photos (20-1000) with preview, remove option
- * 3. AI Processing with progress bar
+ * 3. AI Processing with STRICT threshold (0.78)
  * 4. View albums on website + download
  */
 function AlbumBuilderFresh() {
@@ -22,6 +22,7 @@ function AlbumBuilderFresh() {
   const [currentPersonName, setCurrentPersonName] = useState('');
   const [currentPersonFiles, setCurrentPersonFiles] = useState([]);
   const [currentPersonPreviews, setCurrentPersonPreviews] = useState([]);
+  const personFileInputRef = useRef(null);
   const [referencesProcessed, setReferencesProcessed] = useState(false);
   
   // Step 2: Event photos
@@ -211,25 +212,30 @@ function AlbumBuilderFresh() {
     const files = Array.from(e.target.files);
     if (files.length === 0) return;
     
-    // Limit to 3 photos per person
-    const selectedFiles = files.slice(0, 3);
-    setCurrentPersonFiles(selectedFiles);
+    // STRICT MODE: Only 1 photo per person
+    const selectedFile = files[0];
     
-    // Create previews
-    const previews = selectedFiles.map(file => URL.createObjectURL(file));
-    setCurrentPersonPreviews(previews);
+    // Revoke old preview if exists
+    if (currentPersonPreviews.length > 0) {
+      currentPersonPreviews.forEach(url => URL.revokeObjectURL(url));
+    }
+    
+    setCurrentPersonFiles([selectedFile]);
+    
+    // Create preview
+    const preview = URL.createObjectURL(selectedFile);
+    setCurrentPersonPreviews([preview]);
   };
   
-  const removeCurrentPersonPhoto = (index) => {
-    const newFiles = [...currentPersonFiles];
-    const newPreviews = [...currentPersonPreviews];
-    
-    URL.revokeObjectURL(newPreviews[index]);
-    newFiles.splice(index, 1);
-    newPreviews.splice(index, 1);
-    
-    setCurrentPersonFiles(newFiles);
-    setCurrentPersonPreviews(newPreviews);
+  const clearCurrentPersonPhoto = () => {
+    // Revoke preview URLs
+    currentPersonPreviews.forEach(url => URL.revokeObjectURL(url));
+    setCurrentPersonFiles([]);
+    setCurrentPersonPreviews([]);
+    // Clear file input
+    if (personFileInputRef.current) {
+      personFileInputRef.current.value = '';
+    }
   };
   
   const addPerson = () => {
@@ -238,15 +244,11 @@ function AlbumBuilderFresh() {
       return;
     }
     if (currentPersonFiles.length === 0) {
-      showError('Please select at least one photo');
-      return;
-    }
-    if (people.length >= 5) {
-      showError('Maximum 5 people allowed');
+      showError('Please select a photo (STRICT: 1 photo per person)');
       return;
     }
     
-    // Add person to list
+    // Add person to list (unlimited people allowed)
     setPeople([...people, {
       name: currentPersonName.trim(),
       files: currentPersonFiles,
@@ -257,6 +259,10 @@ function AlbumBuilderFresh() {
     setCurrentPersonName('');
     setCurrentPersonFiles([]);
     setCurrentPersonPreviews([]);
+    // Clear file input
+    if (personFileInputRef.current) {
+      personFileInputRef.current.value = '';
+    }
     
     showSuccess(`Added ${currentPersonName}! You can add more people or proceed.`);
   };
@@ -267,6 +273,25 @@ function AlbumBuilderFresh() {
     newPeople[index].previews.forEach(url => URL.revokeObjectURL(url));
     newPeople.splice(index, 1);
     setPeople(newPeople);
+  };
+  
+  const replacePersonPhoto = (index, e) => {
+    const files = Array.from(e.target.files);
+    if (files.length === 0) return;
+    
+    const selectedFile = files[0];
+    const newPeople = [...people];
+    
+    // Revoke old preview
+    newPeople[index].previews.forEach(url => URL.revokeObjectURL(url));
+    
+    // Create new preview
+    const preview = URL.createObjectURL(selectedFile);
+    newPeople[index].files = [selectedFile];
+    newPeople[index].previews = [preview];
+    
+    setPeople(newPeople);
+    showSuccess(`Photo updated for ${newPeople[index].name}!`);
   };
   
   const preprocessReferences = async () => {
@@ -593,7 +618,7 @@ function AlbumBuilderFresh() {
                         <div className="text-center p-4" style={{ background: '#faf5ff', borderRadius: '16px' }}>
                           <div className="mb-3" style={{ fontSize: '2.5rem' }}>👤</div>
                           <h6 className="fw-bold mb-2" style={{ color: '#7c3aed' }}>1. Add People</h6>
-                          <p className="text-muted small mb-0">Upload 1-3 clear photos per person (max 5 people)</p>
+                          <p className="text-muted small mb-0">Upload <strong>1 clear photo per person</strong> (unlimited people)</p>
                         </div>
                       </Col>
                       <Col md={4}>
@@ -616,18 +641,18 @@ function AlbumBuilderFresh() {
                   {/* Tips */}
                   <div className="mb-5 p-4" style={{ background: '#f3f4f6', borderRadius: '16px' }}>
                     <h6 className="fw-bold mb-3" style={{ color: '#4b5563' }}>
-                      💡 Tips for Best Results
+                      💡 Tips for Best Results (STRICT Mode)
                     </h6>
                     <Row>
                       <Col md={6}>
                         <ul className="text-muted small mb-0">
-                          <li>Use clear, front-facing photos for references</li>
-                          <li>Good lighting helps AI recognition</li>
+                          <li><strong>EXACTLY 1 face per photo</strong> (no group photos)</li>
+                          <li>Clear, front-facing photos work best</li>
                         </ul>
                       </Col>
                       <Col md={6}>
                         <ul className="text-muted small mb-0">
-                          <li>One face per reference photo works best</li>
+                          <li>Good lighting helps AI recognition</li>
                           <li>Higher quality photos = better accuracy</li>
                         </ul>
                       </Col>
@@ -661,7 +686,7 @@ function AlbumBuilderFresh() {
                   <div className="d-flex align-items-center justify-content-between mb-4">
                     <div>
                       <h4 className="fw-bold mb-1" style={{ color: '#1f2937' }}>Add People to Find</h4>
-                      <p className="text-muted mb-0">Upload clear photos and name each person (max 5 people)</p>
+                      <p className="text-muted mb-0"><strong>STRICT MODE:</strong> Upload <strong>1 clear photo per person</strong> (unlimited people)</p>
                     </div>
                     <Badge style={styles.stepBadge}>Step 1 of 3</Badge>
                   </div>
@@ -670,7 +695,7 @@ function AlbumBuilderFresh() {
                   {people.length > 0 && (
                     <div className="mb-4">
                       <h6 className="fw-semibold mb-3" style={{ color: '#4b5563' }}>
-                        👥 Added People ({people.length}/5)
+                        👥 Added People ({people.length})
                       </h6>
                       <Row className="g-3">
                         {people.map((person, index) => (
@@ -687,23 +712,31 @@ function AlbumBuilderFresh() {
                                   ✕
                                 </Button>
                               </div>
-                              <div className="d-flex gap-2">
-                                {person.previews.map((url, pIdx) => (
-                                  <img
-                                    key={pIdx}
-                                    src={url}
-                                    alt={`${person.name} ${pIdx + 1}`}
-                                    style={{
-                                      width: '50px',
-                                      height: '50px',
-                                      objectFit: 'cover',
-                                      borderRadius: '8px',
-                                      border: '2px solid #ddd6fe'
-                                    }}
-                                  />
-                                ))}
+                              <div className="d-flex gap-2 align-items-center mb-2">
+                                <img
+                                  src={person.previews[0]}
+                                  alt={person.name}
+                                  style={{
+                                    width: '60px',
+                                    height: '60px',
+                                    objectFit: 'cover',
+                                    borderRadius: '8px',
+                                    border: '2px solid #ddd6fe'
+                                  }}
+                                />
+                                <small className="text-success fw-semibold">✅ Ready</small>
                               </div>
-                              <small className="text-muted">{person.files.length} photo(s)</small>
+                              <div className="mt-2">
+                                <label className="btn btn-sm btn-outline-secondary w-100" style={{ borderRadius: '8px', fontSize: '0.75rem' }}>
+                                  🔄 Replace Photo
+                                  <input
+                                    type="file"
+                                    accept="image/*"
+                                    onChange={(e) => replacePersonPhoto(index, e)}
+                                    style={{ display: 'none' }}
+                                  />
+                                </label>
+                              </div>
                             </div>
                           </Col>
                         ))}
@@ -712,11 +745,16 @@ function AlbumBuilderFresh() {
                   )}
                   
                   {/* Add New Person Form */}
-                  {people.length < 5 && !referencesProcessed && (
+                  {!referencesProcessed && (
                     <div className="p-4 mb-4" style={{ background: '#faf5ff', borderRadius: '16px', border: '2px solid #e9d5ff' }}>
                       <h6 className="fw-semibold mb-3" style={{ color: '#7c3aed' }}>
                         ➕ Add New Person
                       </h6>
+                      
+                      <Alert variant="info" className="mb-3 small">
+                        ✅ Each photo must have <strong>EXACTLY 1 face</strong> (no group photos)<br/>
+                        ✅ Clear, front-facing photos work best
+                      </Alert>
                       
                       <Row className="g-3 align-items-end">
                         <Col md={4}>
@@ -730,11 +768,11 @@ function AlbumBuilderFresh() {
                           />
                         </Col>
                         <Col md={5}>
-                          <Form.Label className="small fw-semibold text-muted">Photo(s) - up to 3</Form.Label>
+                          <Form.Label className="small fw-semibold text-muted">Photo (1 clear face shot)</Form.Label>
                           <Form.Control
                             type="file"
-                            multiple
                             accept="image/*"
+                            ref={personFileInputRef}
                             onChange={handlePersonPhotoSelect}
                             style={{ borderRadius: '10px', border: '2px solid #e5e7eb' }}
                           />
@@ -751,32 +789,39 @@ function AlbumBuilderFresh() {
                         </Col>
                       </Row>
                       
-                      {/* Current Person Photo Previews */}
+                      {/* Current Person Photo Preview */}
                       {currentPersonPreviews.length > 0 && (
                         <div className="mt-3">
-                          <small className="text-muted fw-semibold">Selected Photos:</small>
-                          <div className="d-flex gap-2 mt-2 flex-wrap">
-                            {currentPersonPreviews.map((url, index) => (
-                              <div key={index} style={{ position: 'relative' }}>
-                                <img
-                                  src={url}
-                                  alt={`Preview ${index + 1}`}
-                                  style={{
-                                    width: '80px',
-                                    height: '80px',
-                                    objectFit: 'cover',
-                                    borderRadius: '10px',
-                                    border: '2px solid #c4b5fd'
-                                  }}
-                                />
-                                <button
-                                  style={styles.deleteBtn}
-                                  onClick={() => removeCurrentPersonPhoto(index)}
-                                >
-                                  <span style={{ color: 'white', fontSize: '12px' }}>✕</span>
-                                </button>
+                          <div className="d-flex align-items-center justify-content-between mb-2">
+                            <small className="text-success fw-semibold">✅ Selected Photo:</small>
+                            <Button
+                              variant="link"
+                              size="sm"
+                              className="text-danger p-0"
+                              onClick={clearCurrentPersonPhoto}
+                              title="Remove this photo"
+                            >
+                              ✕ Remove
+                            </Button>
+                          </div>
+                          <div className="d-flex gap-2 mt-2">
+                            <img
+                              src={currentPersonPreviews[0]}
+                              alt="Preview"
+                              style={{
+                                width: '100px',
+                                height: '100px',
+                                objectFit: 'cover',
+                                borderRadius: '10px',
+                                border: '3px solid #10b981'
+                              }}
+                            />
+                            <div className="d-flex align-items-center text-muted small">
+                              <div>
+                                {currentPersonFiles[0]?.name}<br/>
+                                <span className="text-success">Ready to add</span>
                               </div>
-                            ))}
+                            </div>
                           </div>
                         </div>
                       )}
@@ -844,7 +889,7 @@ function AlbumBuilderFresh() {
                       </h5>
                       <p className="text-muted mb-0">
                         {eventFiles.length > 0 
-                          ? `${Math.round(eventFiles.reduce((a, f) => a + f.size, 0) / 1024 / 1024)} MB total`
+                          ? `${(eventFiles.reduce((a, f) => a + f.size, 0) / 1024 / 1024).toFixed(2)} MB total`
                           : 'Select 20-1000 photos from your event'
                         }
                       </p>

@@ -7,7 +7,7 @@ Run this before using Module 6 features
 def test_imports():
     print("="*60)
     print("  Smart Album Builder - ResNet-50 Dependency Check")
-    print("="*60 + "\n")
+    print("="*60 + "\nwell i have")
     
     all_passed = True
     
