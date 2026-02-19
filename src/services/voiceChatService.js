@@ -20,35 +20,39 @@ class VoiceChatService {
     this.remoteUserId = null;
     this.authToken = null;
     this.callLogMessageId = null;  // Track the call log message for updates
+    this.qualityMonitorInterval = null;  // Quality monitoring interval
     
-    // ICE servers for NAT traversal
+    // ICE servers for NAT traversal (optimized for stability)
     this.iceServers = {
       iceServers: [
         { urls: 'stun:stun.l.google.com:19302' },
         { urls: 'stun:stun1.l.google.com:19302' },
-        { urls: 'stun:stun2.l.google.com:19302' },
-        { urls: 'stun:stun3.l.google.com:19302' },
-        { urls: 'stun:stun4.l.google.com:19302' }
+        // Add more STUN servers as fallback
+        { urls: 'stun:stun.services.mozilla.com' }
       ],
-      iceCandidatePoolSize: 10
+      iceCandidatePoolSize: 10,
+      // Additional configuration for better voice quality
+      bundlePolicy: 'max-bundle',        // Bundle all media into one connection
+      rtcpMuxPolicy: 'require',           // Multiplex RTP and RTCP
+      iceTransportPolicy: 'all'           // Try all connection types
     };
     
-    // Audio constraints for better quality
+    // Audio constraints optimized for maximum voice call stability
     this.audioConstraints = {
       audio: {
-        echoCancellation: { exact: true },
-        noiseSuppression: { exact: true },
-        autoGainControl: { exact: true },
-        channelCount: { ideal: 2 },  // Stereo if supported
-        sampleRate: { ideal: 48000 },  // High quality sample rate
-        sampleSize: { ideal: 16 },
-        latency: { ideal: 0.01 },  // Low latency (10ms)
-        // Advanced constraints for better quality
-        googEchoCancellation: { exact: true },
-        googNoiseSuppression: { exact: true },
-        googAutoGainControl: { exact: true },
-        googHighpassFilter: { exact: true },
-        googTypingNoiseDetection: { exact: true }
+        echoCancellation: true,
+        noiseSuppression: true,
+        autoGainControl: true,
+        channelCount: 1,  // Mono for voice (better stability)
+        sampleRate: 16000,  // 16kHz (speech optimized, very stable)
+        sampleSize: 16,
+        // Chrome-specific optimizations
+        googEchoCancellation: true,
+        googNoiseSuppression: true,
+        googAutoGainControl: true,
+        googHighpassFilter: true,
+        // Jitter buffer
+        googAudioMirroring: false
       },
       video: false
     };
@@ -68,25 +72,28 @@ class VoiceChatService {
   }
 
   /**
-   * Optimize SDP for higher audio quality
-   * Prefers Opus codec with maximum bitrate and stereo
+   * Optimize SDP for stable voice call quality
+   * Prefers Opus codec with voice-optimized settings
    */
   optimizeAudioSDP(sdp) {
     let optimizedSdp = sdp;
     
-    // Set Opus codec parameters for maximum quality
+    // Set Opus codec parameters optimized for voice calls with maximum stability
     const opusParams = [
-      'maxaveragebitrate=510000',  // Maximum bitrate (510 kbps)
-      'maxplaybackrate=48000',      // 48kHz sample rate
-      'stereo=1',                   // Enable stereo
-      'sprop-stereo=1',             // Signal stereo capability
-      'cbr=0',                      // Variable bitrate for better quality
-      'useinbandfec=1',             // Forward error correction
-      'usedtx=0'                    // Disable discontinuous transmission for quality
+      'maxaveragebitrate=32000',    // 32 kbps (very stable for voice)
+      'maxplaybackrate=16000',      // 16kHz sample rate (speech optimized)
+      'stereo=0',                   // Mono (better stability)
+      'sprop-stereo=0',             // No stereo
+      'cbr=1',                      // Constant bitrate (most stable)
+      'useinbandfec=1',             // Forward error correction (critical for stability)
+      'usedtx=0',                   // Disable discontinuous transmission
+      'ptime=20',                   // 20ms packet time (standard)
+      'minptime=10',                // Min 10ms
+      'maxptime=40'                 // Max 40ms (shorter for lower latency)
     ].join(';');
     
     // Find the Opus codec line and add/update parameters
-    const opusMatch = optimizedSdp.match(/a=rtpmap:(\d+) opus\/48000\/2/);
+    const opusMatch = optimizedSdp.match(/a=rtpmap:(\d+) opus\/\d+(?:\/\d+)?/);
     if (opusMatch) {
       const payloadType = opusMatch[1];
       
@@ -97,12 +104,24 @@ class VoiceChatService {
       );
       
       // Add optimized fmtp line after rtpmap
+      const rtpmapLine = optimizedSdp.match(new RegExp(`a=rtpmap:${payloadType}.*\\r\\n`))[0];
       optimizedSdp = optimizedSdp.replace(
-        `a=rtpmap:${payloadType} opus/48000/2\r\n`,
-        `a=rtpmap:${payloadType} opus/48000/2\r\na=fmtp:${payloadType} ${opusParams}\r\n`
+        rtpmapLine,
+        `${rtpmapLine}a=fmtp:${payloadType} ${opusParams}\r\n`
       );
       
-      console.log('🎵 Optimized Opus codec for maximum quality');
+      // Add bandwidth limit for stability (32 kbps application bandwidth)
+      if (!optimizedSdp.includes('b=AS:')) {
+        optimizedSdp = optimizedSdp.replace(
+          /(m=audio \d+ [^\r\n]+\r\n)/,
+          '$1b=AS:32\r\nb=TIAS:32000\r\n'
+        );
+      }
+      
+      console.log('🎵 Optimized Opus codec for maximum voice stability');
+      console.log('   - Bitrate: 32 kbps (constant)');
+      console.log('   - FEC: Enabled (packet loss recovery)');
+      console.log('   - Mode: Mono, 16kHz');
     }
     
     return optimizedSdp;
@@ -115,25 +134,38 @@ class VoiceChatService {
     this.currentUserId = userId;
     this.authToken = token;  // Store for API calls
     
+    // Debug: Check token
+    console.log(`🔍 Initializing voice WebSocket for user ${userId}`);
+    console.log(`🔑 Token: ${token ? token.substring(0, 20) + '...' : 'NULL'}`);
+    
+    if (!token) {
+      console.error('❌ Cannot initialize voice WebSocket: token is null/undefined');
+      return;
+    }
+    
     // Use the existing chat WebSocket for signaling
     const wsUrl = `ws://localhost:8000/ws/voice?token=${token}`;
+    console.log(`🔌 Connecting to: ${wsUrl.substring(0, 50)}...`);
     this.ws = new WebSocket(wsUrl);
     
     this.ws.onopen = () => {
       console.log('✅ Voice signaling connected');
+      console.log(`   User ID: ${userId}`);
+      console.log(`   ReadyState: ${this.ws.readyState}`);
     };
     
     this.ws.onmessage = async (event) => {
       const data = JSON.parse(event.data);
+      console.log('📨 Voice signaling message received:', data.type);
       await this.handleSignalingMessage(data);
     };
     
     this.ws.onerror = (error) => {
-      console.error('Voice signaling error:', error);
+      console.error('❌ Voice signaling error:', error);
     };
     
-    this.ws.onclose = () => {
-      console.log('Voice signaling disconnected');
+    this.ws.onclose = (event) => {
+      console.log(`🔌 Voice signaling disconnected - Code: ${event.code}, Reason: ${event.reason || 'No reason'}`);
     };
   }
 
@@ -288,17 +320,39 @@ class VoiceChatService {
       // Create peer connection
       this.peerConnection = new RTCPeerConnection(this.iceServers);
       
-      // Set up connection state monitoring
+      // Set up connection state monitoring with enhanced recovery
       this.peerConnection.onconnectionstatechange = () => {
-        console.log('📞 Connection state:', this.peerConnection.connectionState);
-        if (this.peerConnection.connectionState === 'failed') {
-          console.error('Connection failed, attempting restart');
+        const state = this.peerConnection.connectionState;
+        console.log('📞 Connection state:', state);
+        
+        if (state === 'failed') {
+          console.error('⚠️ Connection failed, attempting ICE restart');
           this.peerConnection.restartIce();
+        } else if (state === 'disconnected') {
+          console.warn('⚠️ Connection disconnected, waiting for recovery...');
+          // Give it 5 seconds to reconnect before ending call
+          setTimeout(() => {
+            if (this.peerConnection && this.peerConnection.connectionState === 'disconnected') {
+              console.error('❌ Connection recovery failed, ending call');
+              this.endCall();
+            }
+          }, 5000);
+        } else if (state === 'connected') {
+          console.log('✅ Peer connection established successfully');
+          // Start monitoring audio quality
+          this.startQualityMonitoring();
         }
       };
       
       this.peerConnection.oniceconnectionstatechange = () => {
-        console.log('📞 ICE state:', this.peerConnection.iceConnectionState);
+        const state = this.peerConnection.iceConnectionState;
+        console.log('📞 ICE connection state:', state);
+        
+        if (state === 'failed') {
+          console.error('❌ ICE connection failed');
+        } else if (state === 'connected' || state === 'completed') {
+          console.log('✅ ICE connection successful');
+        }
       };
       
       // Add local stream
@@ -395,17 +449,39 @@ class VoiceChatService {
       // Create peer connection
       this.peerConnection = new RTCPeerConnection(this.iceServers);
       
-      // Set up connection state monitoring
+      // Set up connection state monitoring with enhanced recovery
       this.peerConnection.onconnectionstatechange = () => {
-        console.log('📞 Connection state:', this.peerConnection.connectionState);
-        if (this.peerConnection.connectionState === 'failed') {
-          console.error('Connection failed, attempting restart');
+        const state = this.peerConnection.connectionState;
+        console.log('📞 Connection state:', state);
+        
+        if (state === 'failed') {
+          console.error('⚠️ Connection failed, attempting ICE restart');
           this.peerConnection.restartIce();
+        } else if (state === 'disconnected') {
+          console.warn('⚠️ Connection disconnected, waiting for recovery...');
+          // Give it 5 seconds to reconnect before ending call
+          setTimeout(() => {
+            if (this.peerConnection && this.peerConnection.connectionState === 'disconnected') {
+              console.error('❌ Connection recovery failed, ending call');
+              this.endCall();
+            }
+          }, 5000);
+        } else if (state === 'connected') {
+          console.log('✅ Peer connection established successfully');
+          // Start monitoring audio quality
+          this.startQualityMonitoring();
         }
       };
       
       this.peerConnection.oniceconnectionstatechange = () => {
-        console.log('📞 ICE state:', this.peerConnection.iceConnectionState);
+        const state = this.peerConnection.iceConnectionState;
+        console.log('📞 ICE connection state:', state);
+        
+        if (state === 'failed') {
+          console.error('❌ ICE connection failed');
+        } else if (state === 'connected' || state === 'completed') {
+          console.log('✅ ICE connection successful');
+        }
       };
       
       // Add local stream
@@ -640,12 +716,23 @@ class VoiceChatService {
   playRemoteAudio(stream) {
     if (!this.remoteAudio) {
       this.remoteAudio = new Audio();
-      // Optimize for high quality playback
+      // Optimize for voice call playback
       this.remoteAudio.volume = 1.0; // Full volume
       this.remoteAudio.autoplay = true;
+      // Reduce audio latency
+      if ('setSinkId' in this.remoteAudio) {
+        this.remoteAudio.setSinkId('default').catch(e => console.warn('setSinkId failed:', e));
+      }
     }
     this.remoteAudio.srcObject = stream;
-    this.remoteAudio.play().catch(err => console.error('Failed to play remote audio:', err));
+    // Play with error handling
+    this.remoteAudio.play().catch(err => {
+      console.error('Failed to play remote audio:', err);
+      // Retry once after a short delay
+      setTimeout(() => {
+        this.remoteAudio.play().catch(e => console.error('Retry failed:', e));
+      }, 100);
+    });
   }
 
   /**
@@ -832,9 +919,97 @@ class VoiceChatService {
   }
 
   /**
+   * Start monitoring audio quality statistics
+   */
+  startQualityMonitoring() {
+    // Clear any existing monitor
+    if (this.qualityMonitorInterval) {
+      clearInterval(this.qualityMonitorInterval);
+    }
+    
+    // Monitor every 3 seconds
+    this.qualityMonitorInterval = setInterval(async () => {
+      if (!this.peerConnection) return;
+      
+      try {
+        const stats = await this.peerConnection.getStats();
+        stats.forEach(report => {
+          if (report.type === 'inbound-rtp' && report.kind === 'audio') {
+            const packetsLost = report.packetsLost || 0;
+            const packetsReceived = report.packetsReceived || 0;
+            const jitter = report.jitter || 0;
+            
+            if (packetsReceived > 0) {
+              const lossPercent = ((packetsLost / (packetsLost + packetsReceived)) * 100).toFixed(2);
+              console.log(`📊 Audio Quality: Packet Loss: ${lossPercent}%, Jitter: ${(jitter * 1000).toFixed(2)}ms, Packets: ${packetsReceived}`);
+              
+              // Warn if quality is degrading
+              if (lossPercent > 5) {
+                console.warn(`⚠️ High packet loss detected: ${lossPercent}%`);
+              }
+              if (jitter > 0.1) {
+                console.warn(`⚠️ High jitter detected: ${(jitter * 1000).toFixed(2)}ms`);
+              }
+            }
+          }
+        });
+      } catch (error) {
+        console.error('Error monitoring quality:', error);
+      }
+    }, 3000);
+  }
+
+  /**
+   * Start monitoring audio quality statistics
+   */
+  startQualityMonitoring() {
+    // Clear any existing monitor
+    if (this.qualityMonitorInterval) {
+      clearInterval(this.qualityMonitorInterval);
+    }
+    
+    // Monitor every 3 seconds
+    this.qualityMonitorInterval = setInterval(async () => {
+      if (!this.peerConnection) return;
+      
+      try {
+        const stats = await this.peerConnection.getStats();
+        stats.forEach(report => {
+          if (report.type === 'inbound-rtp' && report.kind === 'audio') {
+            const packetsLost = report.packetsLost || 0;
+            const packetsReceived = report.packetsReceived || 0;
+            const jitter = report.jitter || 0;
+            
+            if (packetsReceived > 0) {
+              const lossPercent = ((packetsLost / (packetsLost + packetsReceived)) * 100).toFixed(2);
+              console.log(`📊 Audio Quality: Packet Loss: ${lossPercent}%, Jitter: ${(jitter * 1000).toFixed(2)}ms, Packets: ${packetsReceived}`);
+              
+              // Warn if quality is degrading
+              if (lossPercent > 5) {
+                console.warn(`⚠️ High packet loss detected: ${lossPercent}%`);
+              }
+              if (jitter > 0.1) {
+                console.warn(`⚠️ High jitter detected: ${(jitter * 1000).toFixed(2)}ms`);
+              }
+            }
+          }
+        });
+      } catch (error) {
+        console.error('Error monitoring quality:', error);
+      }
+    }, 3000);
+  }
+
+  /**
    * Cleanup resources
    */
   cleanup() {
+    // Stop quality monitoring
+    if (this.qualityMonitorInterval) {
+      clearInterval(this.qualityMonitorInterval);
+      this.qualityMonitorInterval = null;
+    }
+    
     // Stop local stream
     if (this.localStream) {
       this.localStream.getTracks().forEach(track => track.stop());
