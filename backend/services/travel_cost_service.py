@@ -373,6 +373,7 @@ class TravelCostService:
         Master estimate method. Follows the "Bus First, Calculate Second" strategy.
 
         Returns a full estimate with one_way and round_trip breakdowns.
+        Checks photographer distance limits before calculating.
         """
         from_city = from_city.strip().title()
         to_city = to_city.strip().title()
@@ -384,13 +385,24 @@ class TravelCostService:
         # --- Step A: Get distance & duration ---
         distance_data = self._resolve_distance(from_city, to_city)
 
-        # --- Step B: Get bus fare (primary source) ---
-        bus_fare = self.get_bus_fare(from_city, to_city)
-
-        # --- Step C: Get photographer settings ---
+        # --- Step B: Get photographer settings and check max distance ---
         photog_settings = None
         if photographer_id:
             photog_settings = self.get_photographer_settings(photographer_id)
+            
+            # Check max travel distance limit
+            if photog_settings:
+                max_distance = float(photog_settings.get("max_travel_distance_km", 500))
+                if distance_data["distance_km"] > max_distance:
+                    return {
+                        "error": "distance_limit_exceeded",
+                        "message": f"Photographer does not travel beyond {max_distance} km. Distance required: {distance_data['distance_km']:.0f} km",
+                        "max_allowed_km": max_distance,
+                        "requested_km": distance_data["distance_km"],
+                    }
+
+        # --- Step C: Get bus fare (primary source) ---
+        bus_fare = self.get_bus_fare(from_city, to_city)
 
         # --- Step D: Build estimate ---
         return self._build_estimate(
@@ -399,6 +411,7 @@ class TravelCostService:
             distance_data=distance_data,
             bus_fare=bus_fare,
             photog_settings=photog_settings,
+            event_duration_hours=0,  # Will be provided from frontend later if needed
         )
 
     # ------------------------------------------------------------------
@@ -448,8 +461,16 @@ class TravelCostService:
         distance_data: Dict,
         bus_fare: Optional[Dict],
         photog_settings: Optional[Dict],
+        event_duration_hours: float = 0,
     ) -> Dict[str, Any]:
-        """Assemble the full cost breakdown."""
+        """
+        Assemble the full cost breakdown.
+        
+        Handles travel_mode_preference:
+        - 'auto': Choose cheaper between bus fare and distance-based
+        - 'public_transport': Prefer bus fare, fallback to distance-based
+        - 'personal_vehicle': Always use distance-based calculation
+        """
 
         distance_km = distance_data["distance_km"]
         duration_minutes = distance_data["duration_minutes"]
@@ -460,20 +481,50 @@ class TravelCostService:
         accommodation_fee = float(photog_settings["accommodation_fee"]) if photog_settings else DEFAULT_ACCOMMODATION_FEE
         min_charge = float(photog_settings["min_charge"]) if photog_settings else DEFAULT_MIN_CHARGE
         per_hour = float(photog_settings.get("per_hour_rate", 0)) if photog_settings else 0
+        travel_mode_pref = (
+            photog_settings.get("travel_mode_preference", "auto") 
+            if photog_settings else "auto"
+        )
+
+        # Determine which cost source to use based on preference
+        use_bus_fare = False
+        source = "unknown"
+        
+        if travel_mode_pref == "personal_vehicle":
+            # Always distance-based for personal vehicle
+            use_bus_fare = False
+            source = f"personal_vehicle_{distance_data['source']}"
+        elif travel_mode_pref == "public_transport":
+            # Prefer bus fare if available
+            use_bus_fare = bool(bus_fare)
+            if use_bus_fare:
+                source = "manual_bus_fare_public_transport"
+            else:
+                source = f"distance_based_public_transport_{distance_data['source']}"
+        else:  # auto mode
+            # Compare both and choose cheaper
+            if bus_fare:
+                # Calculate both options
+                distance_cost = max(distance_km * per_km, min_charge) + DEFAULT_LOCAL_TAXI_COST + DEFAULT_HANDLING_FEE
+                bus_cost = bus_fare["one_way_amount"] + DEFAULT_LOCAL_TAXI_COST + DEFAULT_HANDLING_FEE
+                
+                # Use bus fare if it's cheaper or equal
+                use_bus_fare = bus_cost <= distance_cost
+                source = "manual_bus_fare_auto_selected" if use_bus_fare else "distance_based_auto_selected"
+            else:
+                use_bus_fare = False
+                source = f"calculated_{distance_data['source']}"
 
         # ---------- ONE-WAY BREAKDOWN ----------
         one_way_items: List[Dict] = []
 
-        if bus_fare:
-            # Primary: use known bus fare
-            source = "manual_bus_fare"
+        if use_bus_fare and bus_fare:
             one_way_items.append({
                 "label": f"Bus Fare ({bus_fare['provider']})",
                 "amount": bus_fare["one_way_amount"],
             })
         else:
-            # Secondary: distance-based calculation
-            source = f"calculated_{distance_data['source']}"
+            # Distance-based calculation
             travel_allowance = max(distance_km * per_km, min_charge)
             one_way_items.append({
                 "label": "Travel Allowance (distance-based)",
@@ -506,7 +557,7 @@ class TravelCostService:
         round_trip_items: List[Dict] = []
 
         # Double the transport cost
-        if bus_fare:
+        if use_bus_fare and bus_fare:
             round_trip_items.append({
                 "label": f"Return Bus Fare ({bus_fare['provider']})",
                 "amount": bus_fare["one_way_amount"] * 2,
@@ -534,9 +585,12 @@ class TravelCostService:
             "amount": DEFAULT_HANDLING_FEE,
         })
 
-        # Accommodation if trip is long
-        needs_overnight = duration_hours > OVERNIGHT_THRESHOLD_HOURS
+        # Improved accommodation logic: Use total trip duration
+        # Total = (travel_time_hours * 2 for round trip) + event_duration_hours
+        total_trip_hours = (duration_hours * 2) + event_duration_hours
+        needs_overnight = total_trip_hours > 12  # More realistic: 12 hour threshold
         requires_accom = photog_settings.get("requires_accommodation", False) if photog_settings else False
+        
         if needs_overnight or requires_accom:
             round_trip_items.append({
                 "label": "Overnight Accommodation",
@@ -552,6 +606,8 @@ class TravelCostService:
             "distance_km": round(distance_km, 1),
             "duration_minutes": int(duration_minutes),
             "duration_display": f"{int(duration_hours)}h {int(duration_minutes % 60)}m",
+            "travel_mode_used": "public_transport" if use_bus_fare else "personal_vehicle",
+            "travel_mode_preference": travel_mode_pref,
             "estimates": {
                 "one_way": {
                     "total": round(one_way_total, 0),

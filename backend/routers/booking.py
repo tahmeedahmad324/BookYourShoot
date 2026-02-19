@@ -134,6 +134,12 @@ class CreateBookingRequest(BaseModel):
     notes: str = None
     price: float = None
     optimization_score: Optional[dict] = None  # Store optimization results
+    # Travel cost fields
+    event_city: Optional[str] = None
+    service_price: Optional[float] = None  # Base service price (without travel)
+    travel_cost: Optional[float] = None  # Travel cost submitted by frontend
+    travel_type: Optional[str] = None  # 'one_way' or 'round_trip'
+    travel_breakdown_json: Optional[dict] = None  # Full breakdown from frontend
 
 
 @router.post("/")
@@ -144,8 +150,14 @@ def create_booking(payload: CreateBookingRequest, current_user: dict = Depends(g
     This endpoint persists the optimization result into a real booking
     Status flow: REQUESTED → ACCEPTED → PAID → COMPLETED
     Implements availability locking to prevent double booking
+    
+    SECURITY: Validates travel cost server-side to prevent frontend tampering
     """
     try:
+        from backend.services.travel_cost_service import travel_cost_service
+        from datetime import datetime, timezone
+        import json
+        
         # Extract user id from verified user object
         user_id = None
         if isinstance(current_user, dict):
@@ -157,7 +169,7 @@ def create_booking(payload: CreateBookingRequest, current_user: dict = Depends(g
             raise HTTPException(status_code=401, detail="Unauthorized")
 
         # Verify photographer exists
-        photographer = supabase.table('photographer_profile').select('id, verified').eq('id', payload.photographer_id).limit(1).execute()
+        photographer = supabase.table('photographer_profile').select('id, verified, user_id').eq('id', payload.photographer_id).limit(1).execute()
         if not photographer.data:
             raise HTTPException(status_code=404, detail="Photographer not found")
         
@@ -180,6 +192,75 @@ def create_booking(payload: CreateBookingRequest, current_user: dict = Depends(g
                 detail="Photographer already has a booking on this date (double booking prevented)"
             )
 
+        # ========== SERVER-SIDE TRAVEL COST VALIDATION ==========
+        travel_snapshot = None
+        validated_travel_cost = 0
+        
+        if payload.event_city and payload.service_price is not None:
+            # Get photographer location for comparison
+            photographer_user = supabase.table('users').select('city').eq('id', photographer['data'][0]['user_id']).limit(1).execute()
+            photographer_city = photographer_user.data[0]['city'] if photographer_user.data else 'Unknown'
+            
+            # Check for same-city booking
+            if payload.event_city.lower() != photographer_city.lower():
+                # Inter-city booking: Recalculate server-side
+                server_estimate = travel_cost_service.calculate_estimate(
+                    from_city=photographer_city,
+                    to_city=payload.event_city,
+                    photographer_id=payload.photographer_id
+                )
+                
+                # Check for errors (like distance limit exceeded)
+                if "error" in server_estimate:
+                    raise HTTPException(
+                        status_code=400,
+                        detail=server_estimate.get("message", "Travel estimate error")
+                    )
+                
+                # Get the appropriate travel cost based on travel_type
+                travel_type = payload.travel_type or 'one_way'
+                server_travel_cost = server_estimate['estimates'][travel_type]['total']
+                
+                # Verify frontend cost matches server calculation (allow 5% tolerance for rounding)
+                frontend_travel_cost = payload.travel_cost or 0
+                tolerance = server_travel_cost * 0.05
+                
+                if abs(frontend_travel_cost - server_travel_cost) > tolerance:
+                    # Reject and ask client to re-confirm
+                    raise HTTPException(
+                        status_code=400,
+                        detail=f"Travel cost mismatch. Frontend: PKR {frontend_travel_cost}, Server calculated: PKR {server_travel_cost}. Please refresh and re-confirm booking."
+                    )
+                
+                # Store the validated server-calculated snapshot
+                travel_snapshot = {
+                    "from_city": server_estimate['from_city'],
+                    "to_city": server_estimate['to_city'],
+                    "distance_km": server_estimate['distance_km'],
+                    "duration_minutes": server_estimate['duration_minutes'],
+                    "travel_type": travel_type,
+                    "travel_mode_used": server_estimate.get('travel_mode_used', 'unknown'),
+                    "source": server_estimate['source'],
+                    "total": int(server_travel_cost),
+                    "breakdown": server_estimate['estimates'][travel_type]['breakdown']
+                }
+                
+                validated_travel_cost = server_travel_cost
+            else:
+                # Same-city booking: No travel cost
+                travel_snapshot = {
+                    "from_city": photographer_city,
+                    "to_city": payload.event_city,
+                    "distance_km": 0,
+                    "duration_minutes": 0,
+                    "travel_type": "same_city",
+                    "travel_mode_used": "none",
+                    "source": "same_city",
+                    "total": 0,
+                    "breakdown": []
+                }
+                validated_travel_cost = 0
+
         # Calculate financial splits (100% upfront payment, held in escrow)
         # Client pays full amount, released to photographer after work completion
         total_amount = payload.price if payload.price else 0
@@ -190,15 +271,22 @@ def create_booking(payload: CreateBookingRequest, current_user: dict = Depends(g
             "client_id": user_id,
             "photographer_id": payload.photographer_id,  # References photographer_profile.id
             "event_date": payload.event_date,
+            "event_city": payload.event_city,
             "location": payload.location,
             "event_type": payload.event_type,
             "notes": payload.notes,
             "price": payload.price,
+            "service_price": payload.service_price,
+            "travel_cost": validated_travel_cost,  # Server-validated travel cost
             "advance_payment": total_amount,  # Full payment upfront
             "remaining_payment": 0,  # No remaining payment
             "platform_fee": platform_fee,
             "photographer_earning": photographer_earning,
-            "status": "requested"  # Initial status in workflow
+            "status": "requested",  # Initial status in workflow
+            # Travel snapshot for audit trail
+            "travel_breakdown_json": travel_snapshot,
+            "travel_calculated_at": datetime.now(timezone.utc).isoformat(),
+            "travel_source_used": travel_snapshot['source'] if travel_snapshot else None,
         }
         
         # Store optimization metadata if provided (for tracking/explainability)

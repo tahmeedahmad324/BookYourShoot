@@ -224,7 +224,7 @@ const BookingRequest = () => {
       const travelCost = travelEstimate?.estimates?.[travelType]?.total || 0
       const totalPrice = calculatedPrice + travelCost
 
-      // Create booking data
+      // Create booking data with travel snapshot and breakdown
       const newBookingData = {
         id: `BOOK-${Date.now()}`,
         photographerId: String(photographer.id),
@@ -232,7 +232,7 @@ const BookingRequest = () => {
         photographerEmail: photographer.email || `photographer-${photographer.id}@bookyourshoot.com`,
         clientId: user.id,
         clientName: data.clientName,
-        clientEmail: data.clientEmail || user.email, // Use form email, fallback to auth email
+        clientEmail: data.clientEmail || user.email,
         service: data.serviceType,
         date: data.eventDate,
         time: data.eventTime,
@@ -242,6 +242,18 @@ const BookingRequest = () => {
         price: totalPrice,
         servicePrice: calculatedPrice,
         travelCost: travelCost,
+        // Travel cost snapshot for audit trail (sent to backend for server-side validation)
+        travel_breakdown_json: travelEstimate?.estimates?.[travelType]?.breakdown ? {
+          from_city: photographer.location,
+          to_city: eventCity,
+          distance_km: travelEstimate.distance_km,
+          duration_minutes: travelEstimate.duration_minutes,
+          travel_type: travelType,
+          travel_mode_used: travelEstimate.travel_mode_used,
+          source: travelEstimate.source,
+          total: travelCost,
+          breakdown: travelEstimate.estimates[travelType].breakdown,
+        } : null,
         travelDetails: travelEstimate ? {
           from_city: photographer.location,
           to_city: eventCity,
@@ -249,6 +261,7 @@ const BookingRequest = () => {
           duration_minutes: travelEstimate.duration_minutes,
           source: travelEstimate.source,
           travel_type: travelType,
+          travel_mode_used: travelEstimate.travel_mode_used,
         } : null,
         advancePayment: totalPrice * 0.5, // Standard 50% advance
         remainingPayment: totalPrice * 0.5, // 50% after work
@@ -781,8 +794,13 @@ const BookingRequest = () => {
                         ))}
                       </div>
                     )}
-                    <div className="small text-muted mt-1">
-                      <span className="badge bg-secondary">{travelEstimate.source?.replace(/_/g, ' ')}</span>
+                    <div className="small text-muted mt-2">
+                      <div className="mb-1">
+                        <span className="badge bg-secondary">{travelEstimate.source?.replace(/_/g, ' ')}</span>
+                      </div>
+                      <div className="small">
+                        Travel Mode: <strong>{travelEstimate.travel_mode_used === 'public_transport' ? '🚌 Public Transport' : '🚗 Personal Vehicle'}</strong>
+                      </div>
                     </div>
                   </div>
                 )}
