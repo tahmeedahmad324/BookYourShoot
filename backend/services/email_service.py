@@ -119,18 +119,37 @@ class EmailService:
                             <p><strong>Service:</strong> {service_type}</p>
                             <p><strong>Date:</strong> {date}</p>
                             <p><strong>Time:</strong> {time}</p>
+                            <p><strong>Event City:</strong> {event_city}</p>
                             <p><strong>Location:</strong> {location}</p>
                             <p><strong>Photographer:</strong> {photographer_name}</p>
                         </div>
                         
+                        <div style="background: #f3e5f5; padding: 15px; border-radius: 8px; margin: 20px 0;">
+                            <h3 style="margin-top: 0; color: #7B1FA2;">Travel Details</h3>
+                            <p style="margin-top: 10px; margin-bottom: 5px;"><strong>Travel Mode:</strong> {travel_mode_display}</p>
+                            <p style="margin: 5px 0;"><strong>Travel Cost:</strong> PKR {travel_cost}</p>
+                            <p style="margin: 5px 0; font-size: 13px; color: #555;">{travel_breakdown_text}</p>
+                            {accommodation_note}
+                        </div>
+                        
                         <div style="background: #e8f5e9; padding: 15px; border-radius: 8px; margin: 20px 0;">
-                            <p style="margin: 0 0 10px 0; color: #1A73E8;">
-                                <strong>💵 Total Amount:</strong> PKR {amount}
-                            </p>
-                            <p style="margin: 0; color: #2e7d32;">
+                            <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+                                <span><strong>Service Cost:</strong></span>
+                                <span>PKR {service_price}</span>
+                            </div>
+                            <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+                                <span><strong>Travel Cost:</strong></span>
+                                <span>PKR {travel_cost}</span>
+                            </div>
+                            <hr style="margin: 10px 0; border: none; border-top: 1px solid #2e7d32;">
+                            <div style="display: flex; justify-content: space-between; font-size: 18px;">
+                                <strong>Total Amount:</strong>
+                                <strong style="color: #2e7d32;">PKR {amount}</strong>
+                            </div>
+                            <p style="margin: 8px 0 0 0; color: #2e7d32; font-size: 14px;">
                                 <strong>💰 Payment Status:</strong> Full amount paid and securely held in escrow until work is completed.
                             </p>
-                            <p style="margin: 10px 0 0 0; color: #666; font-size: 14px;">
+                            <p style="margin: 5px 0 0 0; color: #666; font-size: 13px;">
                                 <em>Payment will be released to photographer after session completion</em>
                             </p>
                         </div>
@@ -155,10 +174,21 @@ class EmailService:
                 - Service: {service_type}
                 - Date: {date}
                 - Time: {time}
+                - Event City: {event_city}
                 - Location: {location}
                 - Photographer: {photographer_name}
                 
-                Total Amount: PKR {amount}
+                Travel Details:
+                - Travel Mode: {travel_mode_display}
+                - Travel Cost: PKR {travel_cost}
+                - Details: {travel_breakdown_text}
+                {accommodation_note}
+                
+                Cost Breakdown:
+                - Service Cost: PKR {service_price}
+                - Travel Cost: PKR {travel_cost}
+                - Total Amount: PKR {amount}
+                
                 Payment Status: Full amount paid and held in escrow
                 Payment Release: After session completion
                 
@@ -192,11 +222,20 @@ class EmailService:
                                 <span>Service:</span>
                                 <span>{service_type}</span>
                             </div>
-                            <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
+                            <div style="display: flex; justify-content: space-between; margin-bottom: 15px;">
                                 <span>Photographer:</span>
                                 <span>{photographer_name}</span>
                             </div>
                             <hr style="margin: 15px 0;">
+                            <h4 style="margin: 10px 0 15px 0; color: #1A73E8;">Cost Breakdown</h4>
+                            <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+                                <span>Service Cost:</span>
+                                <span>PKR {service_cost}</span>
+                            </div>
+                            <div style="display: flex; justify-content: space-between; margin-bottom: 10px; padding-bottom: 10px; border-bottom: 1px solid #eee;">
+                                <span>Travel Cost:</span>
+                                <span>PKR {travel_cost}</span>
+                            </div>
                             <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
                                 <span>Subtotal:</span>
                                 <span>PKR {subtotal}</span>
@@ -211,6 +250,8 @@ class EmailService:
                                 <strong style="color: #1A73E8;">PKR {total}</strong>
                             </div>
                         </div>
+                        
+                        {travel_breakdown_section}
                         
                         <div style="background: #fff3e0; padding: 15px; border-radius: 8px;">
                             <p style="margin: 0; color: #e65100;">
@@ -232,9 +273,15 @@ class EmailService:
                 Service: {service_type}
                 Photographer: {photographer_name}
                 
+                Cost Breakdown:
+                - Service Cost: PKR {service_cost}
+                - Travel Cost: PKR {travel_cost}
+                
                 Subtotal: PKR {subtotal}
                 Platform Fee (10%): PKR {platform_fee}
                 Total Paid: PKR {total}
+                
+                {travel_breakdown_text}
                 
                 Payment Status: Secured in escrow. Will be released after work confirmation.
                 
@@ -445,6 +492,20 @@ class EmailService:
                             <p><strong>Date:</strong> {date}</p>
                         </div>
                         
+                        <div style="background: #f3e5f5; padding: 15px; border-radius: 8px; margin: 20px 0;">
+                            <h4 style="margin: 0 0 10px 0; color: #7B1FA2;">Cost Breakdown</h4>
+                            <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+                                <span>Service Cost:</span>
+                                <span>PKR {service_cost}</span>
+                            </div>
+                            <div style="display: flex; justify-content: space-between; margin-bottom: 10px; padding-bottom: 10px; border-bottom: 1px solid #e1bee7;">
+                                <span>Travel Cost:</span>
+                                <span>PKR {travel_cost}</span>
+                            </div>
+                            <p style="margin: 5px 0; font-size: 13px; color: #555;"><strong>Travel Details:</strong></p>
+                            <p style="margin: 5px 0; font-size: 12px; color: #555;">{travel_breakdown_text}</p>
+                        </div>
+                        
                         <div style="background: #e3f2fd; padding: 15px; border-radius: 8px; margin: 20px 0;">
                             <p style="margin: 0; color: #1565c0;">
                                 <strong>💡 Next Step:</strong> After your session is complete, confirm work completion to release payment to the photographer.
@@ -472,6 +533,11 @@ class EmailService:
                 - Service: {service_type}
                 - Photographer: {photographer_name}
                 - Date: {date}
+                
+                Cost Breakdown:
+                - Service Cost: PKR {service_cost}
+                - Travel Cost: PKR {travel_cost}
+                - Travel Details: {travel_breakdown_text}
                 
                 Next Step: After your session is complete, confirm work completion to release payment to the photographer.
                 
@@ -675,13 +741,26 @@ class EmailService:
                             <p><strong>Service:</strong> {service_type}</p>
                             <p><strong>Date:</strong> {date}</p>
                             <p><strong>Time:</strong> {time}</p>
+                            <p><strong>Event City:</strong> {event_city}</p>
                             <p><strong>Location:</strong> {location}</p>
-                            <p><strong>Total Amount:</strong> PKR {total_amount}</p>
+                        </div>
+                        
+                        <div style="background: #fff3e0; padding: 20px; border-radius: 8px; margin: 20px 0;">
+                            <h3 style="margin-top: 0; color: #e65100;">Travel Information ✈️</h3>
+                            <p style="margin: 5px 0;"><strong>Travel Mode:</strong> {travel_mode_display}</p>
+                            <p style="margin: 5px 0;"><strong>Distance:</strong> {travel_distance_km} km</p>
+                            <p style="margin: 5px 0;"><strong>Travel Allowance:</strong> PKR {travel_cost}</p>
+                            <p style="margin: 10px 0 5px 0; font-size: 13px; color: #555;"><strong>Breakdown:</strong></p>
+                            <p style="margin: 5px 0; font-size: 12px; color: #555;">{travel_breakdown_text}</p>
+                            {accommodation_warning}
                         </div>
                         
                         <div style="background: #e3f2fd; padding: 15px; border-radius: 8px;">
+                            <p style="margin: 0 0 8px 0; color: #1565c0;">
+                                <strong>💵 Payment Status:</strong> Client paid full amount upfront - securely held in escrow.
+                            </p>
                             <p style="margin: 0; color: #1565c0;">
-                                <strong>💡 Payment Status:</strong> Client paid full amount upfront - securely held in escrow. You'll receive PKR {your_earnings} (after 10% platform fee) once work is completed.
+                                <strong>💰 Your Earnings:</strong> You'll receive PKR {your_earnings} (after 10% platform fee) once work is completed.
                             </p>
                         </div>
                         
@@ -699,17 +778,24 @@ class EmailService:
                 
                 Great news! You have a new booking.
                 
-                Client Paid 50% Advance: PKR {advance_amount} (Secured in Escrow)
+                Client Paid Full Amount: PKR {advance_amount} (Secured in Escrow)
                 
                 Booking Details:
                 - Client: {client_name}
                 - Service: {service_type}
                 - Date: {date}
                 - Time: {time}
+                - Event City: {event_city}
                 - Location: {location}
-                - Total Amount: PKR {total_amount}
                 
-                You'll receive PKR {your_earnings} (after 10% platform fee) once fully paid.
+                Travel Information:
+                - Travel Mode: {travel_mode_display}
+                - Distance: {travel_distance_km} km
+                - Travel Allowance: PKR {travel_cost}
+                - Breakdown: {travel_breakdown_text}
+                {accommodation_warning_text}
+                
+                Your Earnings: PKR {your_earnings} (after 10% platform fee) once work is completed.
                 
                 View booking at: {dashboard_url}
                 
@@ -913,15 +999,41 @@ class EmailService:
         date: str,
         time: str,
         location: str,
-        amount: float,
+        event_city: str,
+        service_price: float,
+        travel_cost: float,
+        travel_mode_used: str = "auto",
+        travel_breakdown_json: list = None,
+        is_multi_day: bool = False,
+        amount: float = None,
         advance_paid: float = None,
         dashboard_url: str = "http://localhost:3000/client/bookings"
     ) -> Email:
         """Send booking confirmation email to client"""
+        # If amount not specified, calculate from service_price + travel_cost
+        if amount is None:
+            amount = service_price + travel_cost
         # If advance_paid not specified, assume full amount was paid
         if advance_paid is None:
             advance_paid = amount
         remaining = amount - advance_paid
+        
+        # Format travel mode for display
+        travel_mode_display = "🚌 Public Transport (Bus/Coach)" if travel_mode_used == "public_transport" else "🚗 Personal Vehicle"
+        
+        # Format travel breakdown text
+        travel_breakdown_text = ""
+        if travel_breakdown_json:
+            items = []
+            for item in travel_breakdown_json:
+                items.append(f"{item.get('label', 'Travel')}: PKR {item.get('amount', 0):,.0f}")
+            travel_breakdown_text = ", ".join(items)
+        
+        # Accommodation note if multi-day
+        accommodation_note = ""
+        if is_multi_day:
+            accommodation_note = '<p style="margin: 5px 0; color: #e65100;"><strong>⚠️ Note:</strong> Accommodation included for multi-day event.</p>'
+        accommodation_note_text = "\n- Note: Accommodation included for multi-day event." if is_multi_day else ""
         
         return self.send_email(
             to_email=client_email,
@@ -933,7 +1045,14 @@ class EmailService:
                 "service_type": service_type,
                 "date": date,
                 "time": time,
+                "event_city": event_city,
                 "location": location,
+                "service_price": f"{service_price:,.0f}",
+                "travel_cost": f"{travel_cost:,.0f}",
+                "travel_mode_display": travel_mode_display,
+                "travel_breakdown_text": travel_breakdown_text,
+                "accommodation_note": accommodation_note,
+                "accommodation_note_text": accommodation_note_text,
                 "amount": f"{amount:,.0f}",
                 "advance_paid": f"{advance_paid:,.0f}",
                 "remaining_amount": f"{remaining:,.0f}",
@@ -948,11 +1067,44 @@ class EmailService:
         transaction_id: str,
         photographer_name: str,
         service_type: str,
-        subtotal: float,
-        platform_fee: float,
-        total: float
+        service_cost: float,
+        travel_cost: float,
+        subtotal: float = None,
+        platform_fee: float = None,
+        total: float = None,
+        travel_breakdown_json: list = None
     ) -> Email:
         """Send payment receipt email"""
+        # If subtotal not specified, calculate from service_cost + travel_cost
+        if subtotal is None:
+            subtotal = service_cost + travel_cost
+        # If platform_fee not specified, calculate 10%
+        if platform_fee is None:
+            platform_fee = subtotal * 0.1
+        # If total not specified, calculate
+        if total is None:
+            total = subtotal + platform_fee
+        
+        # Format travel breakdown section for HTML
+        travel_breakdown_section = ""
+        if travel_breakdown_json:
+            travel_breakdown_section = '<div style="background: #f3e5f5; padding: 15px; border-radius: 8px; margin: 20px 0;"><h4 style="margin: 0 0 10px 0; color: #7B1FA2;">Travel Cost Breakdown</h4>'
+            for item in travel_breakdown_json:
+                label = item.get('label', 'Travel')
+                amount = item.get('amount', 0)
+                travel_breakdown_section += f'<div style="display: flex; justify-content: space-between; margin-bottom: 5px;"><span>{label}:</span><span>PKR {amount:,.0f}</span></div>'
+            travel_breakdown_section += '</div>'
+        
+        # Format travel breakdown text for plain text
+        travel_breakdown_text = ""
+        if travel_breakdown_json:
+            items = []
+            for item in travel_breakdown_json:
+                label = item.get('label', 'Travel')
+                amount = item.get('amount', 0)
+                items.append(f"  - {label}: PKR {amount:,.0f}")
+            travel_breakdown_text = "\nTravel Cost Breakdown:\n" + "\n".join(items)
+        
         return self.send_email(
             to_email=client_email,
             to_name=client_name,
@@ -963,9 +1115,13 @@ class EmailService:
                 "photographer_name": photographer_name,
                 "service_type": service_type,
                 "date": datetime.now().strftime("%B %d, %Y"),
+                "service_cost": f"{service_cost:,.0f}",
+                "travel_cost": f"{travel_cost:,.0f}",
                 "subtotal": f"{subtotal:,.0f}",
                 "platform_fee": f"{platform_fee:,.0f}",
-                "total": f"{total:,.0f}"
+                "total": f"{total:,.0f}",
+                "travel_breakdown_section": travel_breakdown_section,
+                "travel_breakdown_text": travel_breakdown_text
             }
         )
 
@@ -1061,12 +1217,30 @@ class EmailService:
         photographer_name: str,
         date: str,
         advance_amount: float,
-        remaining_amount: float,
+        remaining_amount: float = None,
+        service_cost: float = None,
+        travel_cost: float = 0,
+        travel_breakdown_json: list = None,
         dashboard_url: str = "http://localhost:3000/client/bookings",
         is_equipment_rental: bool = False
     ) -> Email:
-        """Send email when 50% advance payment is received or equipment rental payment"""
+        """Send email when full payment is received or equipment rental payment"""
         template = EmailTemplate.EQUIPMENT_RENTAL_CONFIRMATION if is_equipment_rental else EmailTemplate.ADVANCE_PAYMENT_RECEIVED
+        
+        # Format travel breakdown text
+        travel_breakdown_text = ""
+        if travel_breakdown_json and not is_equipment_rental:
+            items = []
+            for item in travel_breakdown_json:
+                items.append(f"{item.get('label', 'Travel')}: PKR {item.get('amount', 0):,.0f}")
+            travel_breakdown_text = ", ".join(items)
+        else:
+            travel_breakdown_text = f"Travel Allowance: PKR {travel_cost:,.0f}" if travel_cost > 0 and not is_equipment_rental else ""
+        
+        # If service_cost not specified, calculate
+        if service_cost is None:
+            service_cost = advance_amount - travel_cost
+        
         return self.send_email(
             to_email=client_email,
             to_name=client_name,
@@ -1078,7 +1252,10 @@ class EmailService:
                 "photographer_name": photographer_name if not is_equipment_rental else f"Equipment Owner: {photographer_name}",
                 "date": date,
                 "advance_amount": f"{advance_amount:,.0f}",
-                "remaining_amount": f"{remaining_amount:,.0f}" if not is_equipment_rental else "0",
+                "remaining_amount": f"{remaining_amount:,.0f}" if remaining_amount and not is_equipment_rental else "0",
+                "service_cost": f"{service_cost:,.0f}",
+                "travel_cost": f"{travel_cost:,.0f}",
+                "travel_breakdown_text": travel_breakdown_text,
                 "dashboard_url": dashboard_url,
                 "is_equipment_rental": is_equipment_rental
             }
@@ -1093,12 +1270,38 @@ class EmailService:
         date: str,
         time: str,
         location: str,
+        event_city: str,
         total_amount: float,
         advance_amount: float,
         your_earnings: float,
+        travel_cost: float = 0,
+        travel_mode_used: str = "auto",
+        travel_distance_km: float = 0,
+        travel_breakdown_json: list = None,
+        is_multi_day: bool = False,
         dashboard_url: str = "http://localhost:3000/photographer/bookings"
     ) -> Email:
         """Send email to photographer when new booking is made"""
+        # Format travel mode for display
+        travel_mode_display = "🚌 Public Transport (Bus/Coach)" if travel_mode_used == "public_transport" else "🚗 Personal Vehicle"
+        
+        # Format travel breakdown text
+        travel_breakdown_text = ""
+        if travel_breakdown_json:
+            items = []
+            for item in travel_breakdown_json:
+                items.append(f"{item.get('label', 'Travel')}: PKR {item.get('amount', 0):,.0f}")
+            travel_breakdown_text = ", ".join(items)
+        else:
+            travel_breakdown_text = f"Travel Allowance: PKR {travel_cost:,.0f}"
+        
+        # Accommodation warning if multi-day
+        accommodation_warning = ""
+        accommodation_warning_text = ""
+        if is_multi_day:
+            accommodation_warning = '<p style="margin: 5px 0; color: #e65100;"><strong>⚠️ Accommodation:</strong> Included for multi-day event. Make arrangements if needed.</p>'
+            accommodation_warning_text = "\n- Note: Accommodation included for multi-day event."
+        
         return self.send_email(
             to_email=photographer_email,
             to_name=photographer_name,
@@ -1109,10 +1312,17 @@ class EmailService:
                 "service_type": service_type,
                 "date": date,
                 "time": time,
+                "event_city": event_city,
                 "location": location,
                 "total_amount": f"{total_amount:,.0f}",
                 "advance_amount": f"{advance_amount:,.0f}",
                 "your_earnings": f"{your_earnings:,.0f}",
+                "travel_cost": f"{travel_cost:,.0f}",
+                "travel_mode_display": travel_mode_display,
+                "travel_distance_km": f"{travel_distance_km:.1f}",
+                "travel_breakdown_text": travel_breakdown_text,
+                "accommodation_warning": accommodation_warning,
+                "accommodation_warning_text": accommodation_warning_text,
                 "dashboard_url": dashboard_url
             }
         )

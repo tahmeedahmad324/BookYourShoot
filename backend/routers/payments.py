@@ -696,8 +696,15 @@ class SendBookingEmailRequest(BaseModel):
     booking_id: str
     service_type: str
     event_date: str
+    event_city: Optional[str] = None  # NEW: Event city for travel info
     event_time: Optional[str] = None
     location: Optional[str] = None
+    service_price: Optional[float] = None  # NEW: Service cost (separate from travel)
+    travel_cost: Optional[float] = 0  # NEW: Travel cost
+    travel_mode_used: Optional[str] = "auto"  # NEW: public_transport or personal_vehicle
+    travel_distance_km: Optional[float] = 0  # NEW: Distance for travel
+    travel_breakdown_json: Optional[list] = None  # NEW: Breakdown of travel costs
+    is_multi_day: Optional[bool] = False  # NEW: Whether booking is multi-day
     amount: float
     advance_paid: Optional[float] = None
     photographer_id: Optional[str] = None  # Used for notifications
@@ -728,10 +735,16 @@ async def send_booking_confirmation_email(request: SendBookingEmailRequest):
             date=request.event_date,
             time=request.event_time or "TBD",
             location=request.location or "TBD",
+            event_city=request.event_city or "Unknown",
+            service_price=request.service_price or 0,
+            travel_cost=request.travel_cost or 0,
+            travel_mode_used=request.travel_mode_used or "auto",
+            travel_breakdown_json=request.travel_breakdown_json,
+            is_multi_day=request.is_multi_day or False,
             amount=total_amount,
             advance_paid=advance_amount
         )
-        print(f"📧 Client email sent: {result}")
+        print(f"📧 Client booking confirmation email sent: {result}")
         
         # Also send advance payment received email for clarity
         email_service.send_advance_payment_received(
@@ -742,7 +755,10 @@ async def send_booking_confirmation_email(request: SendBookingEmailRequest):
             photographer_name=request.photographer_name,
             date=request.event_date,
             advance_amount=advance_amount,
-            remaining_amount=remaining_amount
+            remaining_amount=remaining_amount,
+            service_cost=request.service_price or 0,
+            travel_cost=request.travel_cost or 0,
+            travel_breakdown_json=request.travel_breakdown_json
         )
         
         # Create notifications for both client and photographer
@@ -889,9 +905,12 @@ class GenerateReceiptRequest(BaseModel):
     photographer_name: str
     service_type: str
     session_date: str
-    subtotal: float
-    platform_fee: float
-    total: float
+    service_cost: Optional[float] = 0  # NEW: Service cost separate from travel
+    travel_cost: Optional[float] = 0  # NEW: Travel cost
+    subtotal: Optional[float] = None  # Will be calculated if service_cost + travel_cost provided
+    platform_fee: Optional[float] = None  # Will be calculated if subtotal provided
+    total: Optional[float] = None  # Will be calculated if subtotal and platform_fee provided
+    travel_breakdown_json: Optional[list] = None  # NEW: Travel breakdown items
     status: str = "held"  # held, released, refunded
     payment_method: str = "Card"
     booking_id: str = None
@@ -900,6 +919,13 @@ class GenerateReceiptRequest(BaseModel):
 @router.post("/receipts/generate")
 def generate_receipt(payload: GenerateReceiptRequest):
     """Generate a payment receipt"""
+    # Calculate totals if not provided
+    service_cost = payload.service_cost or 0
+    travel_cost = payload.travel_cost or 0
+    subtotal = payload.subtotal or (service_cost + travel_cost)
+    platform_fee = payload.platform_fee or (subtotal * 0.1)
+    total = payload.total or (subtotal + platform_fee)
+    
     receipt = receipt_service.generate_receipt(
         transaction_id=payload.transaction_id,
         client_name=payload.client_name,
@@ -907,24 +933,27 @@ def generate_receipt(payload: GenerateReceiptRequest):
         photographer_name=payload.photographer_name,
         service_type=payload.service_type,
         session_date=payload.session_date,
-        subtotal=payload.subtotal,
-        platform_fee=payload.platform_fee,
-        total=payload.total,
+        subtotal=subtotal,
+        platform_fee=platform_fee,
+        total=total,
         status=payload.status,
         payment_method=payload.payment_method,
         booking_id=payload.booking_id
     )
     
-    # Also send email receipt
+    # Also send email receipt with travel cost breakdown
     email_service.send_payment_receipt(
         client_email=payload.client_email,
         client_name=payload.client_name,
         transaction_id=payload.transaction_id,
         photographer_name=payload.photographer_name,
         service_type=payload.service_type,
-        subtotal=payload.subtotal,
-        platform_fee=payload.platform_fee,
-        total=payload.total
+        service_cost=service_cost,
+        travel_cost=travel_cost,
+        subtotal=subtotal,
+        platform_fee=platform_fee,
+        total=total,
+        travel_breakdown_json=payload.travel_breakdown_json
     )
     
     return {

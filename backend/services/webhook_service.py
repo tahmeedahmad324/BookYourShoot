@@ -300,9 +300,12 @@ class WebhookSimulator:
             transaction_id=event.id,
             photographer_name=metadata.get("photographer_name", "Photographer"),
             service_type=metadata.get("service_type", "Photography Session"),
+            service_cost=amount * 0.9 * 0.9,  # Estimate: assume 90% is service, rest is travel
+            travel_cost=amount * 0.9 * 0.1,
             subtotal=amount * 0.9,
             platform_fee=amount * 0.1,
-            total=amount
+            total=amount,
+            travel_breakdown_json=None
         )
         
         print(f"✅ Processed checkout.session.completed for booking {booking_id}")
