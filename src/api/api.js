@@ -21,7 +21,23 @@ const getAuthHeaders = async () => {
     'Content-Type': 'application/json',
   };
 
-  // Try to get token from Supabase session first
+  // First check for mock user in sessionStorage (test accounts)
+  const mockUserData = sessionStorage.getItem('real_user');
+  if (mockUserData) {
+    try {
+      const mockUser = JSON.parse(mockUserData);
+      if (mockUser.is_mock && mockUser.role) {
+        // Generate mock token for test accounts
+        const mockToken = `mock-jwt-token-${mockUser.role}`;
+        headers['Authorization'] = `Bearer ${mockToken}`;
+        return headers;
+      }
+    } catch (e) {
+      console.error('[api.js] Failed to parse mock user:', e);
+    }
+  }
+
+  // Try to get token from Supabase session
   if (supabase) {
     const { data: { session } } = await supabase.auth.getSession();
     if (session?.access_token) {
@@ -160,6 +176,38 @@ export const photographerAPI = {
   // Get photographer public profile with reviews and equipment
   getProfile: async (photographerId) => {
     return apiRequest(`/api/profile/photographer/${photographerId}`);
+  },
+};
+
+// ==================== Travel APIs ====================
+
+export const travelAPI = {
+  getCities: async () => {
+    return apiRequest('/api/travel/cities');
+  },
+
+  estimate: async ({ from_city, to_city, photographer_id, date } = {}) => {
+    const query = new URLSearchParams();
+    if (from_city) query.append('from_city', from_city);
+    if (to_city) query.append('to_city', to_city);
+    if (photographer_id) query.append('photographer_id', photographer_id);
+    if (date) query.append('date', date);
+    return apiRequest(`/api/travel/estimate?${query.toString()}`);
+  },
+
+  getMySettings: async () => {
+    return apiRequest('/api/travel/photographer/settings');
+  },
+
+  saveMySettings: async (settings) => {
+    return apiRequest('/api/travel/photographer/settings', {
+      method: 'POST',
+      body: JSON.stringify(settings || {}),
+    });
+  },
+
+  getPhotographerTravelInfo: async (photographerId) => {
+    return apiRequest(`/api/travel/photographer/${photographerId}/settings`);
   },
 };
 
@@ -374,32 +422,6 @@ export const musicAPI = {
   // Search music
   search: async (searchQuery, limit = 20) => {
     return apiRequest(`/api/music/search?q=${encodeURIComponent(searchQuery)}&limit=${limit}`);
-  },
-};
-
-// ==================== Travel APIs ====================
-
-export const travelAPI = {
-  // Calculate travel estimate
-  calculateEstimate: async (fromCity, toCity, mode = 'car') => {
-    return apiRequest('/api/travel/estimate', {
-      method: 'POST',
-      body: JSON.stringify({
-        from_city: fromCity,
-        to_city: toCity,
-        mode,
-      }),
-    });
-  },
-
-  // Get supported cities
-  getSupportedCities: async () => {
-    return apiRequest('/api/travel/cities');
-  },
-
-  // Get quick distance
-  getQuickDistance: async (fromCity, toCity) => {
-    return apiRequest(`/api/travel/distance?from_city=${fromCity}&to_city=${toCity}`);
   },
 };
 

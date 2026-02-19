@@ -30,6 +30,22 @@ const api = axios.create({
 api.interceptors.request.use(
   async (config) => {
     try {
+      // First check for mock user in sessionStorage (test accounts)
+      const mockUserData = sessionStorage.getItem('real_user');
+      if (mockUserData) {
+        try {
+          const mockUser = JSON.parse(mockUserData);
+          if (mockUser.is_mock && mockUser.role) {
+            // Generate mock token for test accounts
+            const mockToken = `mock-jwt-token-${mockUser.role}`;
+            config.headers.Authorization = `Bearer ${mockToken}`;
+            return config;
+          }
+        } catch (e) {
+          console.error('[api service] Failed to parse mock user:', e);
+        }
+      }
+
       // Get current session from Supabase
       const { data: { session } } = await supabase.auth.getSession();
       
@@ -59,6 +75,20 @@ api.interceptors.response.use(
     // Handle 401 Unauthorized
     if (error.response?.status === 401 && !originalRequest._retry) {
       originalRequest._retry = true;
+
+      // Check if this is a mock user - don't try to refresh session
+      const mockUserData = sessionStorage.getItem('real_user');
+      if (mockUserData) {
+        try {
+          const mockUser = JSON.parse(mockUserData);
+          if (mockUser.is_mock) {
+            // For mock users, just reject the error - don't logout
+            // The 401 might be from a different issue (backend DEV_MODE not enabled, etc)
+            console.warn('[api service] Mock user got 401 - check backend DEV_MODE setting');
+            return Promise.reject(error);
+          }
+        } catch (e) {}
+      }
 
       try {
         // Try to refresh the session

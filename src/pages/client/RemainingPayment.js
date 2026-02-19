@@ -55,9 +55,18 @@ const RemainingPayment = () => {
       time: "14:00",
       duration: "4 hours",
       location: "Lahore",
-      totalAmount: 50000,
-      advancePaid: 25000,
-      remainingAmount: 25000,
+      eventCity: "Multan",
+      totalAmount: 31500,
+      servicePrice: 20000,
+      travelCost: 11500,
+      travelDetails: {
+        from_city: "Lahore",
+        to_city: "Multan",
+        distance_km: 340,
+        source: "manual_bus_fare"
+      },
+      advancePaid: 15750,
+      remainingAmount: 15750,
       status: "work_completed",
       paymentStatus: {
         advancePaid: true,
@@ -218,6 +227,30 @@ const RemainingPayment = () => {
                     <div className="fw-semibold">📍 {booking.location}</div>
                   </div>
                 </div>
+
+                {/* Price Breakdown */}
+                {booking.travelCost > 0 && (
+                  <div className="alert alert-info py-2 mb-4">
+                    <div className="small fw-bold mb-1">Price Breakdown:</div>
+                    <div className="d-flex justify-content-between small mb-1">
+                      <span>Service Price:</span>
+                      <span>Rs. {booking.servicePrice?.toLocaleString()}</span>
+                    </div>
+                    <div className="d-flex justify-content-between small mb-1">
+                      <span>Travel Cost ({booking.travelDetails?.from_city} → {booking.eventCity}):</span>
+                      <span>Rs. {booking.travelCost?.toLocaleString()}</span>
+                    </div>
+                    {booking.travelDetails?.distance_km && (
+                      <div className="text-muted" style={{ fontSize: '0.75rem' }}>
+                        Distance: ~{booking.travelDetails.distance_km.toFixed(0)} km
+                      </div>
+                    )}
+                    <div className="d-flex justify-content-between border-top pt-1 mt-1 fw-bold">
+                      <span>Total:</span>
+                      <span>Rs. {booking.totalAmount?.toLocaleString()}</span>
+                    </div>
+                  </div>
+                )}
 
                 {/* Payment Progress */}
                 <div className="bg-light rounded-3 p-3 mb-4">

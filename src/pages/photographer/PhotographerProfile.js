@@ -5,6 +5,7 @@ import { useAuth } from "../../context/AuthContext"
 import { useLocation } from "react-router-dom"
 import api from "../../services/api"
 import { supabase } from "../../supabaseClient"
+import { travelAPI } from "../../api/api"
 
 const PhotographerProfile = () => {
   const { user } = useAuth()
@@ -42,7 +43,7 @@ const PhotographerProfile = () => {
   useEffect(() => {
     const params = new URLSearchParams(location.search)
     const tab = params.get('tab')
-    if (tab && ['profile', 'services', 'portfolio', 'reviews', 'availability', 'settings'].includes(tab)) {
+    if (tab && ['profile', 'services', 'portfolio', 'reviews', 'availability', 'travel', 'settings'].includes(tab)) {
       setActiveTab(tab)
     }
   }, [location.search])
@@ -50,14 +51,13 @@ const PhotographerProfile = () => {
   // Fetch and sync real profile data from API
   useEffect(() => {
     const fetchProfile = async () => {
-      try {
-        // Check if user has an active session before making API call
-        const { data: { session } } = await supabase.auth.getSession()
-        if (!session) {
-          console.log('[PhotographerProfile] No session found, skipping API fetch')
-          return
-        }
+      // Check if user is logged in (works for both mock and real accounts)
+      if (!user) {
+        console.log('[PhotographerProfile] No user found, skipping API fetch')
+        return
+      }
 
+      try {
         const response = await api.get('/api/profile/me')
         const userData = response.data?.data?.user
         const photographerData = response.data?.data?.photographer_profile
@@ -87,6 +87,51 @@ const PhotographerProfile = () => {
       fetchProfile()
     }
   }, [user])
+
+  // Fetch travel cities (no auth required)
+  useEffect(() => {
+    const fetchCities = async () => {
+      try {
+        const citiesResponse = await travelAPI.getCities()
+        console.log('[PhotographerProfile] Cities loaded:', citiesResponse.data?.length || 0)
+        setTravelCities(citiesResponse.data || [])
+      } catch (error) {
+        console.error('[PhotographerProfile] Failed to fetch cities:', error)
+      }
+    }
+    fetchCities()
+  }, [])
+
+  // Fetch travel settings (requires auth)
+  useEffect(() => {
+    const fetchTravelSettings = async () => {
+      // Check if user is logged in (works for both mock and real accounts)
+      if (!user) {
+        console.log('[PhotographerProfile] No user found, skipping travel settings fetch')
+        return
+      }
+
+      setTravelLoading(true)
+      setTravelError("")
+      try {
+        // Fetch current travel settings
+        const settingsResponse = await travelAPI.getMySettings()
+        if (settingsResponse.data) {
+          setTravelSettings(settingsResponse.data)
+        }
+      } catch (error) {
+        console.error('[PhotographerProfile] Failed to fetch travel settings:', error)
+        setTravelError(error.message || "Failed to load travel settings")
+      } finally {
+        setTravelLoading(false)
+      }
+    }
+
+    if (user) {
+      fetchTravelSettings()
+    }
+  }, [user])
+
   const [showPasswordModal, setShowPasswordModal] = useState(false)
   const [showDeleteModal, setShowDeleteModal] = useState(false)
 
@@ -182,6 +227,22 @@ const PhotographerProfile = () => {
   const [reportingReview, setReportingReview] = useState(null)
   const [reportReason, setReportReason] = useState("")
   const [reportDescription, setReportDescription] = useState("")
+
+  // Travel preferences state
+  const [travelCities, setTravelCities] = useState([])
+  const [travelSettings, setTravelSettings] = useState({
+    is_willing_to_travel: true,
+    base_city: user?.city || "",
+    per_km_rate: 0,
+    accommodation_fee: 0,
+    min_charge: 0,
+    avoided_cities: [],
+    notes: "",
+  })
+  const [travelLoading, setTravelLoading] = useState(false)
+  const [travelSaving, setTravelSaving] = useState(false)
+  const [travelError, setTravelError] = useState("")
+  const [travelSaved, setTravelSaved] = useState(false)
 
   // Stats
   const stats = {
@@ -342,6 +403,44 @@ const PhotographerProfile = () => {
     }
   }
 
+  // Travel handlers
+  const handleTravelChange = (field, value) => {
+    setTravelSettings({ ...travelSettings, [field]: value })
+    setTravelSaved(false)
+  }
+
+  const handleAvoidedCityToggle = (cityName) => {
+    const avoided = travelSettings.avoided_cities || []
+    const updated = avoided.includes(cityName)
+      ? avoided.filter(c => c !== cityName)
+      : [...avoided, cityName]
+    setTravelSettings({ ...travelSettings, avoided_cities: updated })
+    setTravelSaved(false)
+  }
+
+  const handleSaveTravelSettings = async () => {
+    // Check if user is logged in (works for both mock and real accounts)
+    if (!user) {
+      setTravelError("Please log in to save travel settings")
+      return
+    }
+
+    setTravelSaving(true)
+    setTravelError("")
+    setTravelSaved(false)
+    try {
+      await travelAPI.saveMySettings(travelSettings)
+      setTravelSaved(true)
+      setTimeout(() => setTravelSaved(false), 3000)
+    } catch (error) {
+      console.error('[PhotographerProfile] Failed to save travel settings:', error)
+      const errorMsg = error.message || "Failed to save travel settings"
+      setTravelError(errorMsg.includes('Authorization') ? 'Please log in to save settings' : errorMsg)
+    } finally {
+      setTravelSaving(false)
+    }
+  }
+
   return (
     <div className="photographer-profile py-4">
       <div className="container">
@@ -450,6 +549,14 @@ const PhotographerProfile = () => {
                       onClick={() => setActiveTab("availability")}
                     >
                       📅 Availability
+                    </button>
+                  </li>
+                  <li className="nav-item">
+                    <button
+                      className={`nav-link text-start w-100 ${activeTab === "travel" ? "active" : ""}`}
+                      onClick={() => setActiveTab("travel")}
+                    >
+                      ✈️ Travel Preferences
                     </button>
                   </li>
                   <li className="nav-item">
@@ -1128,6 +1235,177 @@ const PhotographerProfile = () => {
                         )}
                       </div>
                     </div>
+                  </div>
+                )}
+
+                {/* Travel Preferences Tab */}
+                {activeTab === "travel" && (
+                  <div className="fade-in">
+                    <h5 className="fw-bold mb-4">✈️ Travel Preferences</h5>
+
+                    {travelError && (
+                      <div className="alert alert-danger alert-dismissible fade show" role="alert">
+                        {travelError}
+                        <button type="button" className="btn-close" onClick={() => setTravelError("")}></button>
+                      </div>
+                    )}
+
+                    {travelSaved && (
+                      <div className="alert alert-success alert-dismissible fade show" role="alert">
+                        Travel settings saved successfully!
+                        <button type="button" className="btn-close" onClick={() => setTravelSaved(false)}></button>
+                      </div>
+                    )}
+
+                    {travelLoading ? (
+                      <div className="text-center py-5">
+                        <div className="spinner-border text-primary" role="status">
+                          <span className="visually-hidden">Loading...</span>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="card bg-light border-0">
+                        <div className="card-body">
+                          {/* Willing to Travel */}
+                          <div className="mb-4">
+                            <div className="form-check form-switch">
+                              <input
+                                className="form-check-input"
+                                type="checkbox"
+                                id="willingToTravel"
+                                checked={travelSettings.is_willing_to_travel || false}
+                                onChange={(e) => handleTravelChange("is_willing_to_travel", e.target.checked)}
+                              />
+                              <label className="form-check-label fw-bold" htmlFor="willingToTravel">
+                                I'm willing to travel for bookings
+                              </label>
+                            </div>
+                            <p className="text-muted small mt-2 ms-4">
+                              If enabled, clients can book you for events outside your base city with travel cost adjustments
+                            </p>
+                          </div>
+
+                          {travelSettings.is_willing_to_travel && (
+                            <>
+                              {/* Info Alert */}
+                              <div className="alert alert-info mb-4">
+                                <strong>ℹ️ How Travel Costs Work:</strong>
+                                <p className="mb-0 mt-2">
+                                  When clients book you from a different city, the system automatically calculates travel costs based on real bus fares and distance. You don't need to set rates manually - just specify your base city!
+                                </p>
+                              </div>
+
+                              {/* Base City */}
+                              <div className="mb-4">
+                                <label className="form-label fw-bold">Base City *</label>
+                                <select
+                                  className="form-select"
+                                  value={travelSettings.base_city || ""}
+                                  onChange={(e) => handleTravelChange("base_city", e.target.value)}
+                                >
+                                  <option value="">Select your base city</option>
+                                  {travelCities.map((city) => (
+                                    <option key={city.name} value={city.name}>
+                                      {city.name}
+                                    </option>
+                                  ))}
+                                </select>
+                                <small className="text-muted">
+                                  This is where you're normally based. Travel costs are calculated from here.
+                                </small>
+                                {travelCities.length === 0 && (
+                                  <div className="text-warning mt-2">
+                                    <small>⚠️ Loading cities...</small>
+                                  </div>
+                                )}
+                              </div>
+
+                              {/* Cities I Don't Travel To */}
+                              <div className="mb-4">
+                                <label className="form-label fw-bold">Cities I Don't Travel To (Optional)</label>
+                                <div className="p-3 bg-white rounded border">
+                                  {travelCities && travelCities.length > 0 ? (
+                                    <div className="d-flex flex-wrap gap-2">
+                                      {travelCities.map((city) => (
+                                        <button
+                                          type="button"
+                                          key={city.name}
+                                          className={`btn btn-sm ${
+                                            (travelSettings.avoided_cities || []).includes(city.name)
+                                              ? "btn-danger"
+                                              : "btn-outline-secondary"
+                                          }`}
+                                          onClick={() => handleAvoidedCityToggle(city.name)}
+                                        >
+                                          {(travelSettings.avoided_cities || []).includes(city.name) ? "✕ " : ""}
+                                          {city.name}
+                                        </button>
+                                      ))}
+                                    </div>
+                                  ) : (
+                                    <p className="text-muted mb-0">Loading cities...</p>
+                                  )}
+                                </div>
+                                <small className="text-muted">
+                                  Click cities where you don't want to accept bookings. Red = Blocked.
+                                </small>
+                              </div>
+
+                              {/* Notes */}
+                              <div className="mb-4">
+                                <label className="form-label fw-bold">Travel Preferences (Optional)</label>
+                                <textarea
+                                  className="form-control"
+                                  rows="3"
+                                  value={travelSettings.notes || ""}
+                                  onChange={(e) => handleTravelChange("notes", e.target.value)}
+                                  placeholder="Example: I prefer bookings within 100km of my base city. For distant locations, I need 3 days advance notice. I can arrange my own transport if needed."
+                                />
+                                <small className="text-muted">
+                                  Share any preferences about travel distance, notice period, or special arrangements.
+                                </small>
+                              </div>
+
+                              {/* Save Button */}
+                              <div>
+                                <div className="d-flex gap-2 mb-2">
+                                  <button
+                                    className="btn btn-primary"
+                                    onClick={handleSaveTravelSettings}
+                                    disabled={travelSaving || !travelSettings.base_city}
+                                  >
+                                    {travelSaving ? (
+                                      <>
+                                        <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                                        Saving...
+                                      </>
+                                    ) : (
+                                      "💾 Save Travel Settings"
+                                    )}
+                                  </button>
+                                  {travelSaved && (
+                                    <div className="alert alert-success mb-0 py-2 px-3">
+                                      ✓ Saved successfully!
+                                    </div>
+                                  )}
+                                </div>
+                                {travelError && (
+                                  <div className="alert alert-danger mb-0">
+                                    <strong>Error:</strong> {travelError}
+                                  </div>
+                                )}
+                              </div>
+                            </>
+                          )}
+
+                          {!travelSettings.is_willing_to_travel && (
+                            <div className="alert alert-info">
+                              Enable travel willingness above to set your travel preferences and rates.
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
 

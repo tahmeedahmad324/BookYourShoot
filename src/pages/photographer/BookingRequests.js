@@ -117,11 +117,20 @@ const BookingRequests = () => {
       date: "2024-12-25",
       time: "16:00",
       duration: "6 hours",
-      location: "Lahore",
+      location: "Multan",
       venue: "Pearl Continental Hotel",
       guestCount: 200,
-      totalAmount: 35000,
-      advanceRequired: 17500,
+      totalAmount: 46500,
+      servicePrice: 35000,
+      travelCost: 11500,
+      travelDetails: {
+        from_city: "Lahore",
+        to_city: "Multan",
+        distance_km: 340,
+        duration_minutes: 408,
+        source: "calculated_osrm"
+      },
+      advanceRequired: 23250,
       specialRequests: "Capture candid moments, golden hour couple session, group photos with families",
       urgency: "high",
       createdAt: "2024-11-15",
@@ -648,6 +657,20 @@ const BookingRequests = () => {
                         <span className="text-muted small">{booking.type === 'equipment_rental' ? 'Rental Amount' : 'Total Amount'}:</span>
                         <div className="fw-bold text-primary">Rs. {booking.totalAmount.toLocaleString()}</div>
                       </div>
+                      {/* Travel Cost Info for Photography Bookings */}
+                      {booking.type === 'photography_booking' && booking.travelCost > 0 && (
+                        <div className="mb-2">
+                          <span className="text-muted small">Travel Cost:</span>
+                          <div className="fw-semibold text-info">✈️ Rs. {booking.travelCost.toLocaleString()}</div>
+                          {booking.travelDetails && (
+                            <div className="text-muted" style={{ fontSize: '0.7rem' }}>
+                              From: {booking.travelDetails.from_city}
+                              <br />
+                              ~{booking.travelDetails.distance_km?.toFixed(0)} km
+                            </div>
+                          )}
+                        </div>
+                      )}
                       {booking.type === 'equipment_rental' ? (
                         <div className="mb-2">
                           <span className="text-muted small">Security Deposit:</span>

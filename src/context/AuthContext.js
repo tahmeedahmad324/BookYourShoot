@@ -75,36 +75,52 @@ export const AuthProvider = ({ children }) => {
     localStorage.removeItem('userName');
     console.log('[AuthContext] Cleared any legacy mock user data');
 
-    // Check for real user stored in sessionStorage (from login)
-    const realUserData = sessionStorage.getItem('real_user');
-    if (realUserData) {
+    // Check for mock user stored in sessionStorage (from mock login)
+    const mockUserData = sessionStorage.getItem('real_user');
+    let isMockUser = false;
+    if (mockUserData) {
       try {
-        const realUser = JSON.parse(realUserData);
-        console.log('[AuthContext] Found real_user in sessionStorage:', realUser);
-        setUser(realUser);
-        setLoading(false);
-        // Don't return - still set up Supabase listener for session updates
+        const mockUser = JSON.parse(mockUserData);
+        // Only restore if it's actually a mock account
+        if (mockUser.is_mock) {
+          console.log('[AuthContext] Found mock user in sessionStorage:', mockUser.email);
+          setUser(mockUser);
+          setLoading(false);
+          isMockUser = true;
+        }
       } catch (e) {
+        console.error('[AuthContext] Failed to parse mock user from sessionStorage');
         sessionStorage.removeItem('real_user');
       }
     }
 
-    // Get initial session
+    // For mock users, we don't need to check Supabase session
+    // Just set up a minimal listener that won't interfere
+    if (isMockUser) {
+      console.log('[AuthContext] Mock user active - skipping Supabase session check');
+      // Still set up listener but it will be ignored for mock users
+      const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+        console.log('[AuthContext] Auth state changed (mock user active, ignoring):', event);
+        // Don't do anything - mock user takes precedence
+      });
+      return () => subscription.unsubscribe();
+    }
+
+    // For real users, check Supabase session
     supabase.auth.getSession().then(({ data: { session } }) => {
+      console.log('[AuthContext] Initial session check:', session ? 'found' : 'none');
       setSession(session);
 
       if (session?.user) {
         // Fetch user profile with role from our database
         fetchUserProfile(session.user.id, session).then(profile => {
-          // Only set user if profile exists (registration completed)
           if (profile && profile.role) {
             setUser({
               id: session.user.id,
               email: session.user.email,
-              ...profile  // Includes role, full_name, phone, city, etc.
+              ...profile
             });
           } else {
-            // Profile not found - registration incomplete
             setUser(null);
           }
           setLoading(false);
@@ -114,17 +130,26 @@ export const AuthProvider = ({ children }) => {
       }
     });
 
-    // Listen for auth changes
+    // Listen for auth changes (only for real Supabase users)
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log('Auth state changed:', event);
+      console.log('[AuthContext] Auth state changed:', event);
+      
+      // Check if there's a mock user - if so, don't override
+      const currentMockUser = sessionStorage.getItem('real_user');
+      if (currentMockUser) {
+        try {
+          const parsed = JSON.parse(currentMockUser);
+          if (parsed.is_mock) {
+            console.log('[AuthContext] Mock user exists, ignoring auth state change');
+            return; // Don't process Supabase auth changes for mock users
+          }
+        } catch (e) {}
+      }
+
       setSession(session);
 
-      // Always use real Supabase authentication (no mock bypass)
-
       if (session?.user) {
-        // Fetch complete user profile from our database
         const profile = await fetchUserProfile(session.user.id, session);
-        // Only set user if profile exists (registration completed)
         if (profile && profile.role) {
           setUser({
             id: session.user.id,
@@ -132,7 +157,6 @@ export const AuthProvider = ({ children }) => {
             ...profile
           });
         } else {
-          // Profile not found - registration incomplete
           setUser(null);
         }
       } else {

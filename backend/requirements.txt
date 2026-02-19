@@ -21,6 +21,9 @@ fpdf2>=2.7.0
 # QR Code Generation
 qrcode>=7.4.0
 
+# HTTP client for external APIs (Google Maps, etc.)
+httpx>=0.25.0
+
 # ILP Optimization for Photographer Selection
 pulp>=2.7.0
 

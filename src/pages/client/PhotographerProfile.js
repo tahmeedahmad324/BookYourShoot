@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { photographerAPI } from '../../api/api';
+import { photographerAPI, travelAPI } from '../../api/api';
 
 const PhotographerProfile = () => {
   const { id } = useParams();
@@ -9,6 +9,8 @@ const PhotographerProfile = () => {
   const [activeTab, setActiveTab] = useState('about');
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
   const [error, setError] = useState(null);
+  const [travelInfo, setTravelInfo] = useState(null);
+  const [travelLoading, setTravelLoading] = useState(false);
 
   useEffect(() => {
     const fetchPhotographer = async () => {
@@ -132,6 +134,28 @@ const PhotographerProfile = () => {
     if (id) {
       fetchPhotographer();
     }
+  }, [id]);
+
+  // Fetch travel information for photographer
+  useEffect(() => {
+    const fetchTravelInfo = async () => {
+      if (!id) return;
+      
+      setTravelLoading(true);
+      try {
+        const response = await travelAPI.getPhotographerTravelInfo(id);
+        if (response.data) {
+          setTravelInfo(response.data);
+        }
+      } catch (error) {
+        console.error('[PhotographerProfile] Failed to fetch travel info:', error);
+        // Silently fail - travel info is optional
+      } finally {
+        setTravelLoading(false);
+      }
+    };
+
+    fetchTravelInfo();
   }, [id]);
 
   if (loading) {
@@ -574,6 +598,88 @@ const PhotographerProfile = () => {
                         <span>Free revision for up to 20% of selected photos</span>
                       </li>
                     </ul>
+                  </div>
+                </div>
+              </div>
+
+              {/* Travel Policy Section */}
+              <div className="col-12 mt-4">
+                <div className="card border-0 shadow-sm">
+                  <div className="card-body p-4">
+                    <h5 className="fw-bold mb-4">✈️ Travel Policy</h5>
+                    
+                    {travelLoading ? (
+                      <div className="text-center py-3">
+                        <div className="spinner-border spinner-border-sm text-primary" role="status">
+                          <span className="visually-hidden">Loading...</span>
+                        </div>
+                        <span className="ms-2 text-muted">Loading travel information...</span>
+                      </div>
+                    ) : travelInfo && travelInfo.is_willing_to_travel ? (
+                      <div>
+                        <div className="row g-3 mb-3">
+                          <div className="col-md-4">
+                            <div className="bg-light rounded p-3 text-center">
+                              <div className="text-success fw-bold mb-1">
+                                ✅ Willing to Travel
+                              </div>
+                              <small className="text-muted">
+                                Base: {travelInfo.base_city || photographer.location}
+                              </small>
+                            </div>
+                          </div>
+                          {travelInfo.per_km_rate > 0 && (
+                            <div className="col-md-4">
+                              <div className="bg-light rounded p-3 text-center">
+                                <div className="fw-bold mb-1">
+                                  PKR {travelInfo.per_km_rate}
+                                </div>
+                                <small className="text-muted">Per Kilometer</small>
+                              </div>
+                            </div>
+                          )}
+                          {travelInfo.accommodation_fee > 0 && (
+                            <div className="col-md-4">
+                              <div className="bg-light rounded p-3 text-center">
+                                <div className="fw-bold mb-1">
+                                  PKR {travelInfo.accommodation_fee}
+                                </div>
+                                <small className="text-muted">Accommodation</small>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+
+                        {travelInfo.min_charge > 0 && (
+                          <p className="text-muted small mb-2">
+                            💵 Minimum travel charge: PKR {travelInfo.min_charge}
+                          </p>
+                        )}
+
+                        {travelInfo.avoided_cities && travelInfo.avoided_cities.length > 0 && (
+                          <div className="alert alert-warning py-2 mb-2">
+                            <small>
+                              ⚠️ Does not travel to: {travelInfo.avoided_cities.join(", ")}
+                            </small>
+                          </div>
+                        )}
+
+                        {travelInfo.notes && (
+                          <p className="text-muted small mb-0 fst-italic">
+                            📝 Note: {travelInfo.notes}
+                          </p>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="text-center py-3">
+                        <div className="text-muted">
+                          <span className="text-warning">⚠️</span> This photographer only works in {photographer.location}
+                        </div>
+                        <small className="text-muted">
+                          Contact them to discuss travel arrangements if needed
+                        </small>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>

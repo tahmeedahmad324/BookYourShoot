@@ -40,6 +40,12 @@ STRIPE_PUBLISHABLE_KEY = os.getenv("STRIPE_PUBLISHABLE_KEY", "pk_test_demo")
 STRIPE_WEBHOOK_SECRET = os.getenv("STRIPE_WEBHOOK_SECRET", "whsec_demo")
 
 
+# ============ GOOGLE MAPS CONFIGURATION ============
+# Required for inter-city travel cost estimation (Distance Matrix API)
+# Free tier: $200/month credit ≈ 40,000 API calls — sufficient for FYP
+GOOGLE_MAPS_API_KEY = os.getenv("GOOGLE_MAPS_API_KEY", "")
+
+
 # ============ APP SETTINGS ============
 APP_NAME = "BookYourShoot"
 APP_URL = os.getenv("APP_URL", "http://localhost:3000")

@@ -41,10 +41,20 @@ const ClientBookings = () => {
       time: "14:00",
       duration: "4 hours",
       location: "Lahore",
-      totalAmount: 20000,
+      eventCity: "Multan",
+      totalAmount: 31500,
+      servicePrice: 20000,
+      travelCost: 11500,
+      travelDetails: {
+        from_city: "Lahore",
+        to_city: "Multan",
+        distance_km: 340,
+        duration_minutes: 408,
+        source: "calculated_osrm"
+      },
       status: "confirmed",
-      paidAmount: 10000,
-      remainingAmount: 10000,
+      paidAmount: 15750,
+      remainingAmount: 15750,
       specialRequests: "Golden hour portraits preferred",
       createdAt: "2024-11-01",
       imagesDelivered: 45,
@@ -706,6 +716,22 @@ const ClientBookings = () => {
                             <span className="text-muted small">Total Amount:</span>
                             <div className="fw-bold text-primary">Rs. {booking.totalAmount.toLocaleString()}</div>
                           </div>
+                          {/* Travel Cost Breakdown */}
+                          {booking.travelCost > 0 && (
+                            <div className="mb-2">
+                              <span className="text-muted small">Includes Travel:</span>
+                              <div className="fw-semibold text-info">
+                                ✈️ Rs. {booking.travelCost.toLocaleString()}
+                              </div>
+                              {booking.travelDetails && (
+                                <div className="text-muted" style={{ fontSize: '0.7rem' }}>
+                                  {booking.travelDetails.from_city} → {booking.travelDetails.to_city}
+                                  <br />
+                                  {booking.travelDetails.distance_km?.toFixed(0)} km
+                                </div>
+                              )}
+                            </div>
+                          )}
                           <div className="mb-2">
                             <span className="text-muted small">Paid:</span>
                             <div className="fw-semibold">Rs. {booking.paidAmount.toLocaleString()}</div>

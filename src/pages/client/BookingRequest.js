@@ -4,7 +4,7 @@ import { useForm } from "react-hook-form"
 import { yupResolver } from "@hookform/resolvers/yup"
 import * as yup from "yup"
 import { useAuth } from "../../context/AuthContext"
-import { photographerAPI } from "../../api/api"
+import { photographerAPI, travelAPI } from "../../api/api"
 import StripeCheckout from "../../components/StripeCheckout"
 import useFormPersistence from "../../hooks/useFormPersistence"
 import TermsModal from "../../components/legal/TermsModal"
@@ -29,6 +29,14 @@ const BookingRequest = () => {
   const [bookingData, setBookingData] = useState(null)
   const [error, setError] = useState(null)
   const [showTermsModal, setShowTermsModal] = useState(false)
+
+  // Travel cost state
+  const [travelEstimate, setTravelEstimate] = useState(null)
+  const [travelLoading, setTravelLoading] = useState(false)
+  const [eventCity, setEventCity] = useState("")
+  const [availableCities, setAvailableCities] = useState([])
+  const [citiesLoading, setCitiesLoading] = useState(true)
+  const [travelType, setTravelType] = useState('one_way') // 'one_way' = same-day, 'round_trip' = overnight
 
   // Photographer services data
   const photographerServices = {
@@ -144,10 +152,78 @@ const BookingRequest = () => {
     }
   }, [serviceType, duration])
 
+  // Fetch available cities on component mount
+  useEffect(() => {
+    const fetchCities = async () => {
+      setCitiesLoading(true)
+      try {
+        const response = await travelAPI.getCities()
+        setAvailableCities(response.data || [])
+      } catch (error) {
+        console.error('[BookingRequest] Failed to fetch cities:', error)
+        setAvailableCities([])
+      } finally {
+        setCitiesLoading(false)
+      }
+    }
+    fetchCities()
+  }, [])
+
+  // Fetch travel estimate when event city or photographer changes
+  useEffect(() => {
+    const fetchTravelEstimate = async () => {
+      if (!eventCity || !photographer?.location) {
+        setTravelEstimate(null)
+        return
+      }
+      
+      // Normalize city names for comparison
+      const normalizedEventCity = eventCity.trim().toLowerCase()
+      const normalizedPhotographerCity = photographer.location.trim().toLowerCase()
+      
+      // Same city = no travel cost
+      if (normalizedEventCity === normalizedPhotographerCity) {
+        setTravelEstimate({ 
+          source: 'same_city', 
+          distance_km: 0, 
+          duration_minutes: 0,
+          estimates: { 
+            one_way: { total: 0, breakdown: [] }, 
+            round_trip: { total: 0, breakdown: [] } 
+          } 
+        })
+        return
+      }
+
+      setTravelLoading(true)
+      try {
+        const response = await travelAPI.estimate({
+          from_city: photographer.location,
+          to_city: eventCity,
+          photographer_id: id,
+        })
+        if (response.data) {
+          setTravelEstimate(response.data)
+        }
+      } catch (error) {
+        console.error('[BookingRequest] Failed to fetch travel estimate:', error)
+        setTravelEstimate(null)
+      } finally {
+        setTravelLoading(false)
+      }
+    }
+
+    fetchTravelEstimate()
+  }, [eventCity, photographer?.location, id])
+
   const onSubmit = async (data) => {
     setSubmitting(true)
 
     try {
+      // Calculate total price including travel
+      const travelCost = travelEstimate?.estimates?.[travelType]?.total || 0
+      const totalPrice = calculatedPrice + travelCost
+
       // Create booking data
       const newBookingData = {
         id: `BOOK-${Date.now()}`,
@@ -162,9 +238,20 @@ const BookingRequest = () => {
         time: data.eventTime,
         duration: data.duration,
         location: data.location,
-        price: calculatedPrice,
-        advancePayment: calculatedPrice * 0.5, // Standard 50% advance
-        remainingPayment: calculatedPrice * 0.5, // 50% after work
+        eventCity: eventCity,
+        price: totalPrice,
+        servicePrice: calculatedPrice,
+        travelCost: travelCost,
+        travelDetails: travelEstimate ? {
+          from_city: photographer.location,
+          to_city: eventCity,
+          distance_km: travelEstimate.distance_km,
+          duration_minutes: travelEstimate.duration_minutes,
+          source: travelEstimate.source,
+          travel_type: travelType,
+        } : null,
+        advancePayment: totalPrice * 0.5, // Standard 50% advance
+        remainingPayment: totalPrice * 0.5, // 50% after work
         status: "pending_payment",
         specialRequests: data.specialRequests,
         createdAt: new Date().toISOString(),
@@ -486,12 +573,103 @@ const BookingRequest = () => {
                       {errors.duration && <div className="text-danger small mt-1">{errors.duration.message}</div>}
                     </div>
                     <div className="col-md-6 mb-3">
-                      <label className="form-label fw-semibold">Location *</label>
+                      <label className="form-label fw-semibold">Event City *</label>
+                      <select
+                        className="form-select"
+                        value={eventCity}
+                        onChange={(e) => setEventCity(e.target.value)}
+                        disabled={citiesLoading}
+                      >
+                        <option value="">Select event city...</option>
+                        {availableCities.map((city) => (
+                          <option key={city.name} value={city.name}>
+                            {city.name}
+                          </option>
+                        ))}
+                      </select>
+                      <small className="text-muted">
+                        {photographer?.location ? `Photographer is based in ${photographer.location}` : 'Select city where event will be held'}
+                      </small>
+                      
+                      {/* Same city - no travel cost */}
+                      {eventCity && photographer?.location && eventCity.toLowerCase() === photographer.location.toLowerCase() && (
+                        <div className="alert alert-success py-2 mt-2 mb-0 small">
+                          <span className="me-2">✓</span>
+                          <strong>No travel cost!</strong> Event is in photographer's base city.
+                        </div>
+                      )}
+                      
+                      {/* Different city - show travel info */}
+                      {eventCity && photographer?.location && eventCity.toLowerCase() !== photographer.location.toLowerCase() && (
+                        <div className="alert alert-info py-2 mt-2 mb-0 small">
+                          <span className="me-2">✈️</span>
+                          {travelLoading ? (
+                            <span>Calculating travel cost from {photographer.location}...</span>
+                          ) : travelEstimate && travelEstimate.distance_km > 0 ? (
+                            <span>
+                              <strong>Inter-city booking:</strong> {photographer.location} → {eventCity} 
+                              (~{travelEstimate.distance_km?.toFixed(0)} km, {travelEstimate.duration_display || `${Math.round((travelEstimate.duration_minutes || 0) / 60)}h`})
+                            </span>
+                          ) : (
+                            <span>Calculating travel cost from {photographer.location}...</span>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Travel Type Selection - Only for inter-city bookings */}
+                  {eventCity && photographer?.location && eventCity.toLowerCase() !== photographer.location.toLowerCase() && (
+                    <div className="alert alert-light border mb-3">
+                    <label className="form-label fw-semibold mb-3">Event Type & Travel *</label>
+                    <div className="d-flex gap-3">
+                      <div className="form-check">
+                        <input
+                          className="form-check-input"
+                          type="radio"
+                          name="travelType"
+                          id="travelOneWay"
+                          value="one_way"
+                          checked={travelType === 'one_way'}
+                          onChange={(e) => setTravelType(e.target.value)}
+                        />
+                        <label className="form-check-label" htmlFor="travelOneWay">
+                          <strong>📸 Same-Day Event</strong>
+                          <div className="small text-muted">Single-day photoshoot<br />Photographer travels there & back same day</div>
+                          <div className="small mt-1 text-primary fw-semibold">PKR {travelEstimate?.estimates?.one_way?.total?.toLocaleString() || 0}</div>
+                        </label>
+                      </div>
+                      <div className="form-check">
+                        <input
+                          className="form-check-input"
+                          type="radio"
+                          name="travelType"
+                          id="travelRoundTrip"
+                          value="round_trip"
+                          checked={travelType === 'round_trip'}
+                          onChange={(e) => setTravelType(e.target.value)}
+                        />
+                        <label className="form-check-label" htmlFor="travelRoundTrip">
+                          <strong>🏨 Multi-Day Event (Overnight)</strong>
+                          <div className="small text-muted">Multi-day coverage<br />Includes photographer accommodation</div>
+                          <div className="small mt-1 text-primary fw-semibold">PKR {travelEstimate?.estimates?.round_trip?.total?.toLocaleString() || 0}</div>
+                        </label>
+                      </div>
+                    </div>
+                    <div className="small text-muted mt-2 ms-2">
+                      💡 <strong>Note:</strong> Both options include round-trip travel costs (to event location and back)
+                    </div>
+                  </div>
+                )}
+
+                  <div className="row">
+                    <div className="col-md-12 mb-3">
+                      <label className="form-label fw-semibold">Full Location/Address *</label>
                       <input
                         type="text"
                         className={`form-control ${errors.location ? "is-invalid" : ""}`}
                         {...register("location")}
-                        placeholder="Event location address"
+                        placeholder="Event location address (venue name, street, city)"
                       />
                       {errors.location && <div className="text-danger small mt-1">{errors.location.message}</div>}
                     </div>
@@ -577,10 +755,70 @@ const BookingRequest = () => {
                   <span>PKR {selectedService ? (photographerServices[selectedService]?.hourlyRate * (selectedDuration - 1)).toLocaleString() : "0"}</span>
                 </div>
 
+                {/* Travel Cost Section */}
+                {travelEstimate && travelEstimate.source === 'same_city' && (
+                  <div className="border-top pt-2 mb-2">
+                    <div className="d-flex justify-content-between mb-1 text-success small">
+                      <span>✓ Travel Cost</span>
+                      <span className="fw-semibold">PKR 0 (Same City)</span>
+                    </div>
+                  </div>
+                )}
+                
+                {travelEstimate && travelEstimate.estimates && travelEstimate.source !== 'same_city' && (
+                  <div className="border-top pt-2 mb-2">
+                    <div className="d-flex justify-content-between mb-1 text-muted small">
+                      <span>✈️ Travel Cost ({travelType === 'round_trip' ? 'Multi-Day + Accommodation' : 'Same-Day'})</span>
+                      <span>PKR {travelEstimate.estimates[travelType]?.total?.toLocaleString() || "0"}</span>
+                    </div>
+                    {travelEstimate.estimates[travelType]?.breakdown && travelEstimate.estimates[travelType].breakdown.length > 0 && (
+                      <div className="ms-3 small text-muted">
+                        {travelEstimate.estimates[travelType].breakdown.map((item, idx) => (
+                          <div key={idx} className="d-flex justify-content-between" style={{ fontSize: '0.75rem' }}>
+                            <span>{item.label}</span>
+                            <span>PKR {item.amount?.toLocaleString()}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    <div className="small text-muted mt-1">
+                      <span className="badge bg-secondary">{travelEstimate.source?.replace(/_/g, ' ')}</span>
+                    </div>
+                  </div>
+                )}
+
+                {travelLoading && (
+                  <div className="border-top pt-2 mb-2 text-muted small">
+                    <span className="spinner-border spinner-border-sm me-2" role="status"></span>
+                    Calculating travel cost...
+                  </div>
+                )}
+
                 <div className="d-flex justify-content-between py-3 border-top border-bottom mb-3">
                   <span className="fw-bold fs-6">Total</span>
-                  <span className="fw-bold fs-5 text-primary">PKR {calculatedPrice.toLocaleString()}</span>
+                  <span className="fw-bold fs-5 text-primary">
+                    PKR {(calculatedPrice + (travelEstimate?.estimates?.[travelType]?.total || 0)).toLocaleString()}
+                  </span>
                 </div>
+
+                {travelEstimate && travelEstimate.source !== 'same_city' && travelEstimate.estimates?.[travelType]?.total > 0 && (
+                  <div className="alert alert-info py-2 mb-3 small">
+                    <strong>ℹ️ Travel Cost Breakdown:</strong>
+                    <ul className="mb-1 mt-2 ps-3" style={{ fontSize: '0.85rem' }}>
+                      <li><strong>Round-Trip Travel:</strong> Bus/train fare (both ways)</li>
+                      <li><strong>Local Transport:</strong> Taxi at destination (PKR 800)</li>
+                      <li><strong>Handling Fee:</strong> Administrative & coordination costs (PKR 500)</li>
+                      {travelType === 'round_trip' && (
+                        <li><strong>Accommodation:</strong> Overnight stay for multi-day events (PKR 3,000)</li>
+                      )}
+                    </ul>
+                    <small className="d-block text-muted">
+                      {travelType === 'round_trip' 
+                        ? '🏨 Multi-day package includes overnight accommodation'
+                        : '📸 Same-day event: Photographer travels to location and returns home that day'}
+                    </small>
+                  </div>
+                )}
 
                 {/* Payment Summary */}
                 <div className="mb-3">
@@ -596,11 +834,11 @@ const BookingRequest = () => {
                         <div className="mt-2">
                           <div className="d-flex justify-content-between mb-1">
                             <span className="small">Advance Payment (Now):</span>
-                            <span className="badge bg-primary">PKR {(calculatedPrice * 0.5).toLocaleString()}</span>
+                            <span className="badge bg-primary">PKR {((calculatedPrice + (travelEstimate?.estimates?.[travelType]?.total || 0)) * 0.5).toLocaleString()}</span>
                           </div>
                           <div className="d-flex justify-content-between">
                             <span className="small text-muted">Remaining (After Work):</span>
-                            <span className="badge bg-secondary">PKR {(calculatedPrice * 0.5).toLocaleString()}</span>
+                            <span className="badge bg-secondary">PKR {((calculatedPrice + (travelEstimate?.estimates?.[travelType]?.total || 0)) * 0.5).toLocaleString()}</span>
                           </div>
                         </div>
                       </div>
