@@ -6,7 +6,7 @@ Uses MoviePy for video processing and local file storage
 from fastapi import APIRouter, HTTPException, Depends, UploadFile, File
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
-from typing import Optional, List
+from typing import Optional, List, Dict
 import requests
 from io import BytesIO
 from pathlib import Path
@@ -16,23 +16,30 @@ from datetime import datetime
 import traceback
 import numpy as np
 
-# MoviePy imports
+# MoviePy imports - Direct from moviepy module
 try:
-    from moviepy.editor import ImageClip, TextClip, concatenate_videoclips, ColorClip, CompositeVideoClip, AudioFileClip
-except ImportError:
-    print("Warning: MoviePy not available. Reel generation will not work.")
+    from moviepy import ImageClip, TextClip, concatenate_videoclips, ColorClip, CompositeVideoClip, AudioFileClip
+    MOVIEPY_AVAILABLE = True
+    print("✅ MoviePy loaded successfully")
+except ImportError as e:
+    print(f"Warning: MoviePy not available - {e}")
+    print("Install with: pip install moviepy")
     ImageClip = None
     TextClip = None
     concatenate_videoclips = None
     ColorClip = None
     CompositeVideoClip = None
     AudioFileClip = None
+    MOVIEPY_AVAILABLE = False
 
 from PIL import Image, ImageDraw, ImageFont, ImageEnhance
 
 # Supabase - fix import path
 from backend.supabase_client import supabase
 from backend.auth import get_current_user
+
+# Import photo selector for auto-generation
+from backend.services.reel_photo_selector import analyze_and_select_photos
 
 router = APIRouter(prefix="/reels", tags=["Reel Generator"])
 
@@ -58,6 +65,18 @@ class ReelResponse(BaseModel):
     num_images: int
     aspect_ratio: str
     file_size: Optional[int] = None
+
+
+class AutoReelResponse(BaseModel):
+    """Response for auto-generated reel with quality analysis"""
+    video_url: str
+    duration: float
+    num_images_uploaded: int
+    num_images_selected: int
+    aspect_ratio: str
+    file_size: Optional[int] = None
+    quality_summary: Dict
+    selected_photos_info: List[Dict]
 
 
 def apply_filter(img: Image.Image, filter_name: str) -> Image.Image:
@@ -590,6 +609,215 @@ async def serve_image(user_id: str, filename: str):
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to serve image: {str(e)}")
+
+
+@router.post("/generate-auto", response_model=AutoReelResponse)
+async def generate_auto_reel(
+    files: List[UploadFile] = File(..., description="10-15 photos for reel"),
+    ratio: str = "9:16",
+    filter_type: str = "vibrant",
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    🎬 **AUTOMATIC REEL GENERATOR** - Upload photos, get instant reel!
+    
+    **What it does:**
+    1. User uploads 10-15 photos
+    2. AI analyzes quality:
+       - Sharpness (Laplacian variance)
+       - Brightness (HSV V-channel)
+       - Contrast (std deviation)
+       - Face detection (Haar Cascade)
+       - Color vibrancy (saturation)
+    3. Selects best 8-12 photos automatically
+    4. Applies trendy filters (vibrant, vintage, cinematic)
+    5. Adds smooth transitions (fade, crossfade)
+    6. Generates 15-30 sec video
+    
+    **Parameters:**
+    - files: 10-15 event photos (JPG/PNG)
+    - ratio: Video aspect ratio ('9:16' for reels, '16:9' for YouTube, '1:1' for Instagram)
+    - filter_type: Auto-filter ('vibrant', 'vintage', 'cinematic', 'warm', 'cool', 'bw')
+    
+    **Returns:**
+    - video_url: Download link
+    - quality_summary: AI analysis stats
+    - selected_photos_info: Which photos were chosen and why
+    """
+    
+    # Check MoviePy availability FIRST
+    if not MOVIEPY_AVAILABLE:
+        raise HTTPException(
+            status_code=503, 
+            detail="Video generation service unavailable. Please install moviepy: pip install moviepy"
+        )
+    
+    # Validate photo count
+    if len(files) < 10:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Need at least 10 photos for auto-generation. You uploaded {len(files)}."
+        )
+    if len(files) > 15:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Maximum 15 photos allowed. You uploaded {len(files)}."
+        )
+    
+    temp_dir = tempfile.mkdtemp()
+    
+    try:
+        user_id = current_user.get("id")
+        
+        print(f"\n🎬 AUTO-REEL: User {user_id} uploaded {len(files)} photos")
+        
+        # Step 1: Read all uploaded photos
+        photos = []
+        for file in files:
+            contents = await file.read()
+            photos.append((contents, file.filename))
+        
+        print(f"📸 Step 1: Read {len(photos)} photos")
+        
+        # Step 2: AI analyzes and selects best photos
+        print("🤖 Step 2: AI analyzing photo quality...")
+        selected_photos, quality_summary = analyze_and_select_photos(
+            photos,
+            min_photos=8,
+            max_photos=12
+        )
+        
+        print(f"✅ Selected {len(selected_photos)} best photos")
+        print(f"   Average quality: {quality_summary['average_quality']:.1f}/100")
+        print(f"   Photos with faces: {quality_summary['photos_with_faces']}")
+        
+        # Step 3: Get target dimensions
+        if ratio == "9:16":
+            target_width, target_height = 1080, 1920
+        elif ratio == "16:9":
+            target_width, target_height = 1920, 1080
+        elif ratio == "1:1":
+            target_width, target_height = 1080, 1080
+        else:
+            target_width, target_height = 1080, 1920
+        
+        # Step 4: Create video clips from selected photos
+        clips = []
+        selected_photos_info = []
+        
+        for idx, (image_bytes, filename, analysis) in enumerate(selected_photos):
+            try:
+                # Fix orientation
+                img = fix_image_orientation(image_bytes)
+                
+                # Apply trendy filter automatically
+                img = apply_filter(img, filter_type)
+                
+                # Save to temp file
+                temp_img_path = Path(temp_dir) / f"selected_{idx}.png"
+                img.save(temp_img_path, format='PNG')
+                
+                # Create clip
+                img_clip = ImageClip(str(temp_img_path))
+                img_clip = resize_to_aspect_ratio(img_clip, ratio, fit_mode="fill")
+                
+                # Dynamic duration based on content:
+                # Photos with faces = 3.0 sec (people want to see faces longer)
+                # Photos without faces = 2.5 sec (landscapes/objects)
+                duration = 3.0 if analysis['face_score'] > 50 else 2.5
+                img_clip = img_clip.set_duration(duration)
+                
+                # Apply Ken Burns effect (zoom) for engagement
+                img_clip = apply_ken_burns_effect(img_clip, zoom_ratio=1.08)
+                
+                clips.append(img_clip)
+                
+                # Track selected photo info
+                selected_photos_info.append({
+                    "filename": filename,
+                    "quality_score": analysis['overall_score'],
+                    "has_faces": analysis['face_score'] > 50,
+                    "sharpness": analysis['sharpness'],
+                    "brightness": analysis['brightness'],
+                    "duration": duration
+                })
+                
+            except Exception as e:
+                print(f"⚠️  Error processing {filename}: {e}")
+                continue
+        
+        if not clips:
+            raise HTTPException(status_code=400, detail="No valid images after quality analysis")
+        
+        print(f"🎞️  Step 3: Created {len(clips)} video clips")
+        
+        # Step 5: Apply smooth transitions (fade between clips)
+        print("✨ Step 4: Adding smooth transitions...")
+        fade_duration = 0.5
+        final_clips = []
+        
+        for i, clip in enumerate(clips):
+            if i < len(clips) - 1:
+                # Add crossfade to next clip
+                clip = clip.crossfadeout(fade_duration)
+            final_clips.append(clip)
+        
+        # Step 6: Concat all clips
+        print("📹 Step 5: Rendering final video...")
+        final_video = concatenate_videoclips(final_clips, method="compose")
+        
+        # Step 7: Save video
+        output_dir = Path("storage/reels/generated") / str(user_id)
+        output_dir.mkdir(parents=True, exist_ok=True)
+        
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        output_filename = f"auto_reel_{timestamp}.mp4"
+        output_path = output_dir / output_filename
+        
+        final_video.write_videofile(
+            str(output_path),
+            fps=24,
+            codec='libx264',
+            audio=False,  # TODO: Add music in future
+            preset='medium',
+            threads=4
+        )
+        
+        # Get file size
+        file_size = output_path.stat().st_size
+        
+        # Clean up
+        final_video.close()
+        for clip in clips:
+            clip.close()
+        
+        print(f"✅ Video saved: {output_path}")
+        print(f"   Duration: {final_video.duration:.1f}s")
+        print(f"   Size: {file_size / 1024 / 1024:.2f} MB")
+        
+        # Return response
+        video_url = f"/api/reels/videos/{user_id}/{output_filename}"
+        
+        return AutoReelResponse(
+            video_url=video_url,
+            duration=final_video.duration,
+            num_images_uploaded=len(files),
+            num_images_selected=len(selected_photos),
+            aspect_ratio=ratio,
+            file_size=file_size,
+            quality_summary=quality_summary,
+            selected_photos_info=selected_photos_info
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"❌ Error generating auto-reel: {e}")
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Failed to generate reel: {str(e)}")
+    finally:
+        # Clean up temp directory
+        shutil.rmtree(temp_dir, ignore_errors=True)
 
 
 @router.post("/generate", response_model=ReelResponse)
