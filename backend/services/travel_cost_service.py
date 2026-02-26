@@ -1,19 +1,19 @@
 """
 Travel Cost Estimation Service
 ==============================
-Implements the "Bus First, Calculate Second" hybrid strategy:
+Simplified "Bus First, Calculate Second" strategy (Round-Trip Only):
   1. Check intercity_bus_fares table for predefined fares
-  2. Check travel_estimates_cache for cached distance data
-    3. Fallback to Google Maps Distance Matrix API (or OSRM)
-    4. If still missing, use Punjab matrix or Haversine fallback
-    5. Apply photographer-specific rates & overheads
-    6. Return one-way and round-trip breakdowns
+  2. Fallback to OSRM routing API
+  3. If still missing, use Punjab distance matrix
+  4. Final fallback: Haversine estimation
+  5. Apply photographer-specific rates & overheads
+  6. Return round-trip cost breakdown only
 """
 
 import math
 import os
 import logging
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from typing import Optional, Dict, Any, List
 
 import httpx
@@ -26,9 +26,7 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 # Constants
 # ---------------------------------------------------------------------------
-GOOGLE_MAPS_API_KEY = os.getenv("GOOGLE_MAPS_API_KEY", "")
 OSRM_BASE_URL = os.getenv("OSRM_BASE_URL", "https://router.project-osrm.org")
-CACHE_EXPIRY_DAYS = 7
 
 # Default overhead costs (PKR)
 DEFAULT_LOCAL_TAXI_COST = 800       # Taxi to/from bus terminal
@@ -36,7 +34,7 @@ DEFAULT_HANDLING_FEE = 500          # Misc handling/booking fee
 DEFAULT_PER_KM_RATE = 30            # PKR per km (personal car)
 DEFAULT_ACCOMMODATION_FEE = 3000    # Per night
 DEFAULT_MIN_CHARGE = 500
-OVERNIGHT_THRESHOLD_HOURS = 6       # If trip > 6 hours, add accommodation
+OVERNIGHT_THRESHOLD_HOURS = 12      # If total trip > 12 hours, add accommodation
 
 # Punjab city coordinates for Haversine fallback
 CITY_COORDS = {
@@ -128,121 +126,7 @@ class TravelCostService:
             return None
 
     # ------------------------------------------------------------------
-    # 2. Cache Layer
-    # ------------------------------------------------------------------
-    def get_cached_distance(self, from_city: str, to_city: str, mode: str = "driving") -> Optional[Dict]:
-        """Check cache for a previously computed distance/duration."""
-        try:
-            now_iso = datetime.now(timezone.utc).isoformat()
-            resp = (
-                supabase.table("travel_estimates_cache")
-                .select("*")
-                .eq("from_city", from_city)
-                .eq("to_city", to_city)
-                .eq("mode", mode)
-                .gte("expires_at", now_iso)
-                .order("cached_at", desc=True)
-                .limit(1)
-                .execute()
-            )
-            if resp.data:
-                row = resp.data[0]
-                return {
-                    "distance_km": float(row["distance_km"]),
-                    "duration_minutes": int(row["duration_minutes"]),
-                    "source": row["source"],
-                }
-            # Try reverse direction
-            resp2 = (
-                supabase.table("travel_estimates_cache")
-                .select("*")
-                .eq("from_city", to_city)
-                .eq("to_city", from_city)
-                .eq("mode", mode)
-                .gte("expires_at", now_iso)
-                .order("cached_at", desc=True)
-                .limit(1)
-                .execute()
-            )
-            if resp2.data:
-                row = resp2.data[0]
-                return {
-                    "distance_km": float(row["distance_km"]),
-                    "duration_minutes": int(row["duration_minutes"]),
-                    "source": row["source"],
-                }
-            return None
-        except Exception as e:
-            logger.warning(f"Cache lookup failed: {e}")
-            return None
-
-    def save_to_cache(self, from_city: str, to_city: str, mode: str,
-                      distance_km: float, duration_minutes: int, source: str,
-                      raw_response: dict = None):
-        """Persist distance/duration to cache."""
-        try:
-            expires = (datetime.now(timezone.utc) + timedelta(days=CACHE_EXPIRY_DAYS)).isoformat()
-            supabase.table("travel_estimates_cache").insert({
-                "from_city": from_city,
-                "to_city": to_city,
-                "mode": mode,
-                "distance_km": distance_km,
-                "duration_minutes": duration_minutes,
-                "source": source,
-                "raw_response": raw_response or {},
-                "expires_at": expires,
-            }).execute()
-        except Exception as e:
-            logger.warning(f"Cache save failed: {e}")
-
-    # ------------------------------------------------------------------
-    # 3. Google Maps Distance Matrix API
-    # ------------------------------------------------------------------
-    def fetch_google_distance(self, from_city: str, to_city: str, mode: str = "driving") -> Optional[Dict]:
-        """
-        Call Google Maps Distance Matrix API.
-        Returns distance_km & duration_minutes or None.
-        """
-        if not GOOGLE_MAPS_API_KEY:
-            return None
-
-        try:
-            url = "https://maps.googleapis.com/maps/api/distancematrix/json"
-            params = {
-                "origins": f"{from_city}, Pakistan",
-                "destinations": f"{to_city}, Pakistan",
-                "mode": mode,
-                "key": GOOGLE_MAPS_API_KEY,
-            }
-            with httpx.Client(timeout=10) as client:
-                resp = client.get(url, params=params)
-                data = resp.json()
-
-            if data.get("status") != "OK":
-                logger.warning(f"Google Maps API error: {data.get('status')}")
-                return None
-
-            element = data["rows"][0]["elements"][0]
-            if element.get("status") != "OK":
-                return None
-
-            distance_km = element["distance"]["value"] / 1000
-            duration_minutes = element["duration"]["value"] // 60
-
-            # Cache for later
-            self.save_to_cache(from_city, to_city, mode, distance_km, duration_minutes, "google", data)
-
-            return {
-                "distance_km": round(distance_km, 2),
-                "duration_minutes": duration_minutes,
-                "source": "google",
-            }
-        except Exception as e:
-            logger.warning(f"Google Maps API call failed: {e}")
-            return None
-
-    # ------------------------------------------------------------------
-    # 3b. OSRM (OpenStreetMap routing) fallback
+    # 2. OSRM (OpenStreetMap routing) - Primary distance source
     # ------------------------------------------------------------------
     def fetch_osrm_distance(self, from_city: str, to_city: str) -> Optional[Dict]:
         """
@@ -272,8 +156,6 @@ class TravelCostService:
             distance_km = route["distance"] / 1000
             duration_minutes = int(route["duration"] // 60)
 
-            self.save_to_cache(from_city, to_city, "driving", distance_km, duration_minutes, "osrm", data)
-
             return {
                 "distance_km": round(distance_km, 2),
                 "duration_minutes": duration_minutes,
@@ -284,7 +166,7 @@ class TravelCostService:
             return None
 
     # ------------------------------------------------------------------
-    # 4. Punjab Distance Matrix Fallback
+    # 3. Punjab Distance Matrix & Haversine Fallback
     # ------------------------------------------------------------------
     def get_local_distance(self, from_city: str, to_city: str) -> Optional[Dict]:
         """
@@ -326,7 +208,7 @@ class TravelCostService:
         return None
 
     # ------------------------------------------------------------------
-    # 5. Photographer Settings
+    # 4. Photographer Settings
     # ------------------------------------------------------------------
     def get_photographer_settings(self, photographer_id: str) -> Optional[Dict]:
         """Fetch photographer's travel preferences from DB."""
@@ -360,7 +242,7 @@ class TravelCostService:
             raise
 
     # ------------------------------------------------------------------
-    # 6. CORE: Full Estimate Calculation
+    # 5. CORE: Full Estimate Calculation (Round-Trip Only)
     # ------------------------------------------------------------------
     def calculate_estimate(
         self,
@@ -368,12 +250,24 @@ class TravelCostService:
         to_city: str,
         photographer_id: Optional[str] = None,
         date: Optional[str] = None,
+        event_duration_hours: float = 0,
+        event_days: int = 1,
+        requires_accommodation: bool = False,
     ) -> Dict[str, Any]:
         """
         Master estimate method. Follows the "Bus First, Calculate Second" strategy.
 
-        Returns a full estimate with one_way and round_trip breakdowns.
+        Returns round-trip cost breakdown only (photographers need to return home).
         Checks photographer distance limits before calculating.
+        
+        Args:
+            from_city: Origin city name
+            to_city: Destination city name
+            photographer_id: Optional photographer UUID for custom rates
+            date: Optional event date (ISO format)
+            event_duration_hours: Total event duration in hours (for single-day calculation)
+            event_days: Number of days the event spans (e.g., 3 for a 3-day wedding)
+            requires_accommodation: Explicitly request accommodation regardless of duration
         """
         from_city = from_city.strip().title()
         to_city = to_city.strip().title()
@@ -411,43 +305,31 @@ class TravelCostService:
             distance_data=distance_data,
             bus_fare=bus_fare,
             photog_settings=photog_settings,
-            event_duration_hours=0,  # Will be provided from frontend later if needed
+            event_duration_hours=event_duration_hours,
+            event_days=event_days,
+            requires_accommodation=requires_accommodation,
         )
 
     # ------------------------------------------------------------------
     # Private helpers
     # ------------------------------------------------------------------
     def _resolve_distance(self, from_city: str, to_city: str) -> Dict:
-        """Resolve distance using: Cache → Google → OSRM → Local Matrix → Haversine."""
-        # 1. Cache
-        cached = self.get_cached_distance(from_city, to_city)
-        if cached:
-            logger.info(f"Cache HIT for {from_city}->{to_city}")
-            return cached
-
-        logger.info(f"Cache MISS for {from_city}->{to_city}")
-
-        # 2. Google Maps
-        google_result = self.fetch_google_distance(from_city, to_city)
-        if google_result:
-            return google_result
-
-        # 3. OSRM
+        """Resolve distance using: OSRM → Punjab Matrix → Haversine fallback."""
+        
+        # 1. Try OSRM (real routing via OSM data)
         osrm_result = self.fetch_osrm_distance(from_city, to_city)
         if osrm_result:
+            logger.info(f"OSRM routing used for {from_city} → {to_city}")
             return osrm_result
 
-        # 4. Local matrix / Haversine
+        # 2. Local Punjab matrix or Haversine
         local = self.get_local_distance(from_city, to_city)
         if local:
-            # Also cache this for consistency
-            self.save_to_cache(
-                from_city, to_city, "driving",
-                local["distance_km"], local["duration_minutes"], local["source"]
-            )
+            logger.info(f"Local distance source '{local['source']}' used for {from_city} → {to_city}")
             return local
 
-        # Absolute fallback: unknown cities — use rough average
+        # 3. Absolute fallback: unknown cities — use rough average
+        logger.warning(f"Using default estimate for {from_city} → {to_city}")
         return {
             "distance_km": 200,
             "duration_minutes": 240,
@@ -462,14 +344,22 @@ class TravelCostService:
         bus_fare: Optional[Dict],
         photog_settings: Optional[Dict],
         event_duration_hours: float = 0,
+        event_days: int = 1,
+        requires_accommodation: bool = False,
     ) -> Dict[str, Any]:
         """
-        Assemble the full cost breakdown.
+        Assemble the round-trip cost breakdown (photographers need to return home).
         
         Handles travel_mode_preference:
         - 'auto': Choose cheaper between bus fare and distance-based
         - 'public_transport': Prefer bus fare, fallback to distance-based
         - 'personal_vehicle': Always use distance-based calculation
+        
+        Accommodation logic:
+        - Multi-day events: event_days > 1 → accommodation = (event_days - 1) nights
+        - Single-day events: total_trip_hours > 12 → 1 night accommodation
+        - Explicit request: requires_accommodation = True → 1 night minimum
+        - Photographer preference: photog_settings.requires_accommodation → always add
         """
 
         distance_km = distance_data["distance_km"]
@@ -498,106 +388,97 @@ class TravelCostService:
             # Prefer bus fare if available
             use_bus_fare = bool(bus_fare)
             if use_bus_fare:
-                source = "manual_bus_fare_public_transport"
+                source = "bus_fare_public_transport"
             else:
                 source = f"distance_based_public_transport_{distance_data['source']}"
         else:  # auto mode
             # Compare both and choose cheaper
             if bus_fare:
-                # Calculate both options
-                distance_cost = max(distance_km * per_km, min_charge) + DEFAULT_LOCAL_TAXI_COST + DEFAULT_HANDLING_FEE
-                bus_cost = bus_fare["one_way_amount"] + DEFAULT_LOCAL_TAXI_COST + DEFAULT_HANDLING_FEE
+                # Calculate both options (round-trip)
+                distance_cost = (max(distance_km * per_km, min_charge) * 2) + (DEFAULT_LOCAL_TAXI_COST * 2) + DEFAULT_HANDLING_FEE
+                bus_cost = (bus_fare["one_way_amount"] * 2) + (DEFAULT_LOCAL_TAXI_COST * 2) + DEFAULT_HANDLING_FEE
                 
                 # Use bus fare if it's cheaper or equal
                 use_bus_fare = bus_cost <= distance_cost
-                source = "manual_bus_fare_auto_selected" if use_bus_fare else "distance_based_auto_selected"
+                source = "bus_fare_auto" if use_bus_fare else "distance_based_auto"
             else:
                 use_bus_fare = False
                 source = f"calculated_{distance_data['source']}"
 
-        # ---------- ONE-WAY BREAKDOWN ----------
-        one_way_items: List[Dict] = []
-
-        if use_bus_fare and bus_fare:
-            one_way_items.append({
-                "label": f"Bus Fare ({bus_fare['provider']})",
-                "amount": bus_fare["one_way_amount"],
-            })
-        else:
-            # Distance-based calculation
-            travel_allowance = max(distance_km * per_km, min_charge)
-            one_way_items.append({
-                "label": "Travel Allowance (distance-based)",
-                "amount": round(travel_allowance, 0),
-            })
-
-        # Local taxi to terminal / pickup-drop
-        one_way_items.append({
-            "label": "Local Taxi (Pickup/Drop)",
-            "amount": DEFAULT_LOCAL_TAXI_COST,
-        })
-
-        # Hourly compensation (if set)
-        if per_hour > 0:
-            hourly_comp = round(duration_hours * per_hour, 0)
-            one_way_items.append({
-                "label": "Hourly Travel Compensation",
-                "amount": hourly_comp,
-            })
-
-        # Handling fee
-        one_way_items.append({
-            "label": "Handling Fee",
-            "amount": DEFAULT_HANDLING_FEE,
-        })
-
-        one_way_total = sum(item["amount"] for item in one_way_items)
-
         # ---------- ROUND-TRIP BREAKDOWN ----------
-        round_trip_items: List[Dict] = []
+        breakdown_items: List[Dict] = []
 
-        # Double the transport cost
+        # Transport cost (round-trip)
         if use_bus_fare and bus_fare:
-            round_trip_items.append({
+            breakdown_items.append({
                 "label": f"Return Bus Fare ({bus_fare['provider']})",
                 "amount": bus_fare["one_way_amount"] * 2,
             })
         else:
+            # Distance-based calculation (round-trip)
             travel_allowance = max(distance_km * per_km, min_charge)
-            round_trip_items.append({
+            breakdown_items.append({
                 "label": "Return Travel Allowance",
                 "amount": round(travel_allowance * 2, 0),
             })
 
-        round_trip_items.append({
+        # Local taxi (both ways)
+        breakdown_items.append({
             "label": "Local Taxi (Both Ways)",
             "amount": DEFAULT_LOCAL_TAXI_COST * 2,
         })
 
+        # Hourly compensation (if set, for both ways)
         if per_hour > 0:
-            round_trip_items.append({
+            breakdown_items.append({
                 "label": "Hourly Travel Compensation (Both Ways)",
                 "amount": round(duration_hours * per_hour * 2, 0),
             })
 
-        round_trip_items.append({
+        # Handling fee
+        breakdown_items.append({
             "label": "Handling Fee",
             "amount": DEFAULT_HANDLING_FEE,
         })
 
-        # Improved accommodation logic: Use total trip duration
-        # Total = (travel_time_hours * 2 for round trip) + event_duration_hours
-        total_trip_hours = (duration_hours * 2) + event_duration_hours
-        needs_overnight = total_trip_hours > 12  # More realistic: 12 hour threshold
-        requires_accom = photog_settings.get("requires_accommodation", False) if photog_settings else False
+        # ---------- ACCOMMODATION LOGIC ----------
+        # Smart accommodation calculation for real-world scenarios:
+        # 1. Multi-day events (e.g., 3-day wedding) → charge for (event_days - 1) nights
+        # 2. Single long day → if total trip time > 12 hours, add 1 night
+        # 3. Photographer always requires accommodation → add nights based on event_days
+        # 4. Client explicitly requests accommodation → add nights
         
-        if needs_overnight or requires_accom:
-            round_trip_items.append({
-                "label": "Overnight Accommodation",
-                "amount": accommodation_fee,
+        nights_needed = 0
+        accommodation_reason = None
+        
+        # Check photographer's accommodation preference
+        photog_requires_accom = photog_settings.get("requires_accommodation", False) if photog_settings else False
+        
+        if event_days > 1:
+            # Multi-day event: photographer needs to stay (event_days - 1) nights
+            # Example: 3-day wedding = 2 nights (arrive day 1, leave after day 3)
+            nights_needed = event_days - 1
+            accommodation_reason = f"{event_days}-day event"
+        elif requires_accommodation or photog_requires_accom:
+            # Explicitly requested or photographer requires it
+            nights_needed = 1
+            accommodation_reason = "requested" if requires_accommodation else "photographer preference"
+        else:
+            # Single-day event: check if trip is too long for same-day return
+            total_trip_hours = (duration_hours * 2) + event_duration_hours
+            if total_trip_hours > OVERNIGHT_THRESHOLD_HOURS:
+                nights_needed = 1
+                accommodation_reason = f"long trip ({total_trip_hours:.1f}h total)"
+        
+        # Add accommodation cost if needed
+        if nights_needed > 0:
+            total_accommodation = accommodation_fee * nights_needed
+            breakdown_items.append({
+                "label": f"Accommodation ({nights_needed} night{'s' if nights_needed > 1 else ''})",
+                "amount": total_accommodation,
             })
 
-        round_trip_total = sum(item["amount"] for item in round_trip_items)
+        total_cost = sum(item["amount"] for item in breakdown_items)
 
         return {
             "from_city": from_city,
@@ -608,15 +489,19 @@ class TravelCostService:
             "duration_display": f"{int(duration_hours)}h {int(duration_minutes % 60)}m",
             "travel_mode_used": "public_transport" if use_bus_fare else "personal_vehicle",
             "travel_mode_preference": travel_mode_pref,
-            "estimates": {
-                "one_way": {
-                    "total": round(one_way_total, 0),
-                    "breakdown": one_way_items,
-                },
-                "round_trip": {
-                    "total": round(round_trip_total, 0),
-                    "breakdown": round_trip_items,
-                },
+            "total_cost": round(total_cost, 0),
+            "breakdown": breakdown_items,
+            "accommodation": {
+                "included": nights_needed > 0,
+                "nights": nights_needed,
+                "reason": accommodation_reason,
+                "cost_per_night": accommodation_fee,
+                "total_cost": accommodation_fee * nights_needed if nights_needed > 0 else 0,
+            },
+            "event_info": {
+                "event_days": event_days,
+                "event_duration_hours": event_duration_hours,
+                "total_trip_hours": round((duration_hours * 2) + event_duration_hours, 1),
             },
             "photographer_rates": {
                 "per_km_rate": per_km,
@@ -636,9 +521,19 @@ class TravelCostService:
             "distance_km": 0,
             "duration_minutes": 0,
             "duration_display": "0h 0m",
-            "estimates": {
-                "one_way": {"total": 0, "breakdown": []},
-                "round_trip": {"total": 0, "breakdown": []},
+            "total_cost": 0,
+            "breakdown": [],
+            "accommodation": {
+                "included": False,
+                "nights": 0,
+                "reason": None,
+                "cost_per_night": 0,
+                "total_cost": 0,
+            },
+            "event_info": {
+                "event_days": 1,
+                "event_duration_hours": 0,
+                "total_trip_hours": 0,
             },
             "photographer_rates": None,
             "calculated_at": datetime.now(timezone.utc).isoformat(),
@@ -698,35 +593,6 @@ class TravelCostService:
         except Exception as e:
             logger.error(f"Delete bus fare failed: {e}")
             return False
-
-    # ------------------------------------------------------------------
-    # Cache management
-    # ------------------------------------------------------------------
-    def clear_expired_cache(self) -> int:
-        """Remove expired cache entries. Returns count removed."""
-        try:
-            now_iso = datetime.now(timezone.utc).isoformat()
-            resp = supabase.table("travel_estimates_cache").delete().lt("expires_at", now_iso).execute()
-            count = len(resp.data) if resp.data else 0
-            logger.info(f"Cleared {count} expired cache entries")
-            return count
-        except Exception as e:
-            logger.warning(f"Cache cleanup failed: {e}")
-            return 0
-
-    def get_cache_stats(self) -> Dict:
-        """Return cache statistics for admin dashboard."""
-        try:
-            all_entries = supabase.table("travel_estimates_cache").select("id, source, expires_at", count="exact").execute()
-            now_iso = datetime.now(timezone.utc).isoformat()
-            active = supabase.table("travel_estimates_cache").select("id", count="exact").gte("expires_at", now_iso).execute()
-            return {
-                "total_entries": len(all_entries.data) if all_entries.data else 0,
-                "active_entries": len(active.data) if active.data else 0,
-                "expired_entries": (len(all_entries.data) if all_entries.data else 0) - (len(active.data) if active.data else 0),
-            }
-        except Exception as e:
-            return {"total_entries": 0, "active_entries": 0, "expired_entries": 0}
 
 
 # Singleton instance
