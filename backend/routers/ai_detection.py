@@ -46,6 +46,7 @@ try:
         detect_event_mood_from_image,
         detect_event_mood_from_video,
         get_music_params_for_event,
+        generate_smart_music_keywords,
         EVENT_TO_MUSIC_VIBE
     )
     CLIP_SERVICE_AVAILABLE = True
@@ -153,35 +154,35 @@ def validate_file_type(content_type: str, filename: str) -> tuple:
     return False, None, "Invalid file type. Please upload an image (JPG, PNG) or video (MP4, MOV)."
 
 
-async def get_music_suggestions(event_type: str, mood: str, limit: int = 10) -> List[dict]:
+async def get_music_suggestions(event_type: str, mood: str, visual_context: dict = None, limit: int = 10) -> List[dict]:
     """
-    Get music suggestions based on detected event and mood.
-    Uses the existing Spotify service integration.
+    Get music suggestions based on detected event, mood, and visual context.
+    Uses smart context-aware keywords for better matching.
     """
     if not SPOTIFY_AVAILABLE or not spotify_service:
         return []
     
     try:
-        # Get music parameters for the event
-        params = get_music_params_for_event(event_type)
-        
-        # Build search query combining event keywords and mood
-        query = f"{params['keywords']} {mood}"
+        # Generate smart search keywords based on context
+        query = generate_smart_music_keywords(event_type, mood, visual_context)
+        print(f"🎵 Smart music search: '{query}'")
         
         # Search for tracks
         tracks = spotify_service.search_tracks(query, limit=limit)
         
         # Format for response
+        # Note: spotify_service.search_tracks() returns tracks with:
+        # 'id', 'title', 'artist' (string), 'album' (string), 'previewUrl', 'spotifyUrl', 'imageUrl'
         suggestions = []
         for track in tracks:
             suggestions.append({
                 "id": track.get("id"),
-                "name": track.get("name"),
-                "artist": ", ".join([a.get("name", "") for a in track.get("artists", [])]),
-                "album": track.get("album", {}).get("name", ""),
-                "image": track.get("album", {}).get("images", [{}])[0].get("url", ""),
-                "preview_url": track.get("preview_url"),
-                "spotify_url": track.get("external_urls", {}).get("spotify", "")
+                "name": track.get("title"),  # spotify_service uses 'title' not 'name'
+                "artist": track.get("artist", ""),  # Already a formatted string
+                "album": track.get("album", ""),  # Already a string, not a dict
+                "image": track.get("imageUrl", ""),  # spotify_service uses 'imageUrl'
+                "preview_url": track.get("previewUrl"),  # spotify_service uses 'previewUrl'
+                "spotify_url": track.get("spotifyUrl", "")  # spotify_service uses 'spotifyUrl'
             })
         
         return suggestions
@@ -278,10 +279,11 @@ async def detect_event_mood(file: UploadFile = File(...)):
                 }
             )
         
-        # Get music suggestions
+        # Get music suggestions with visual context
         music = await get_music_suggestions(
             result["detected_event"],
             result["detected_mood"],
+            result.get("visual_context"),
             limit=10
         )
         

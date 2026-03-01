@@ -7,6 +7,13 @@ from dotenv import load_dotenv
 # Load environment variables from .env file
 load_dotenv()
 
+# Limit BLAS/NumPy thread usage to avoid OpenBLAS memory allocation failures on Windows
+os.environ.setdefault("OPENBLAS_NUM_THREADS", "1")
+os.environ.setdefault("OMP_NUM_THREADS", "1")
+os.environ.setdefault("MKL_NUM_THREADS", "1")
+os.environ.setdefault("NUMEXPR_NUM_THREADS", "1")
+os.environ.setdefault("VECLIB_MAXIMUM_THREADS", "1")
+
 # Suppress NumPy warnings on Windows
 warnings.filterwarnings('ignore', category=RuntimeWarning, module='numpy')
 
@@ -762,6 +769,7 @@ if __name__ == "__main__":
     # Get port from environment variable (default: 8000)
     port = int(os.getenv("BACKEND_PORT", "8000"))
     host = os.getenv("BACKEND_HOST", "127.0.0.1")
+    reload_enabled = os.getenv("BACKEND_RELOAD", "false").lower() == "true"
     
     print(f"\n🚀 Starting BookYourShoot Backend Server")
     print(f"   Host: {host}")
@@ -770,6 +778,10 @@ if __name__ == "__main__":
     print(f"   Swagger Docs: http://{host}:{port}/docs")
     print(f"   WebSocket Chat: ws://{host}:{port}/ws/chat")
     print(f"   WebSocket Voice: ws://{host}:{port}/ws/voice")
+    print(f"   Auto Reload: {'ON' if reload_enabled else 'OFF'}")
     print(f"\n   Press CTRL+C to quit\n")
-    
-    uvicorn.run("backend.main:app", host=host, port=port, reload=True)
+
+    if reload_enabled:
+        uvicorn.run("backend.main:app", host=host, port=port, reload=True)
+    else:
+        uvicorn.run(app, host=host, port=port, reload=False)

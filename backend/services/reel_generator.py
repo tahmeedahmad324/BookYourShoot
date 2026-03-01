@@ -10,17 +10,29 @@ import logging
 logger = logging.getLogger(__name__)
 
 # Optional moviepy import with graceful degradation
+MOVIEPY_AVAILABLE = False
+ImageClip = None
+concatenate_videoclips = None
+AudioFileClip = None
+vfx = None
+
 try:
     from moviepy.editor import ImageClip, concatenate_videoclips, AudioFileClip, vfx
     MOVIEPY_AVAILABLE = True
-except ImportError:
-    logger.warning("MoviePy not available. Reel generation will not work.")
-    MOVIEPY_AVAILABLE = False
-    # Define dummy classes to prevent errors
-    ImageClip = None
-    concatenate_videoclips = None
-    AudioFileClip = None
-    vfx = None
+except ImportError as e:
+    error_msg = str(e).lower()
+    if "ffmpeg" in error_msg:
+        logger.warning(f"MoviePy available but FFmpeg not found: {e}")
+        logger.warning("Install FFmpeg from https://ffmpeg.org/download.html for reel generation")
+    else:
+        logger.warning(f"MoviePy not available. Reel generation will not work: {e}")
+except RuntimeError as e:
+    # FFmpeg not found at runtime
+    if "ffmpeg" in str(e).lower():
+        logger.warning(f"FFmpeg not installed: {e}")
+        logger.warning("Install FFmpeg from https://ffmpeg.org/download.html")
+    else:
+        logger.warning(f"MoviePy runtime error: {e}")
 
 
 class ReelGenerator:

@@ -3,6 +3,8 @@
  * WebRTC-based peer-to-peer audio calling
  */
 
+import { API_CONFIG } from '../config';
+
 class VoiceChatService {
   constructor() {
     this.peerConnection = null;
@@ -144,7 +146,7 @@ class VoiceChatService {
     }
     
     // Use the existing chat WebSocket for signaling
-    const wsUrl = `ws://localhost:8000/ws/voice?token=${token}`;
+    const wsUrl = `${API_CONFIG.WS_URL}/ws/voice?token=${token}`;
     console.log(`🔌 Connecting to: ${wsUrl.substring(0, 50)}...`);
     this.ws = new WebSocket(wsUrl);
     
@@ -152,6 +154,7 @@ class VoiceChatService {
       console.log('✅ Voice signaling connected');
       console.log(`   User ID: ${userId}`);
       console.log(`   ReadyState: ${this.ws.readyState}`);
+      this._resetReconnect();
     };
     
     this.ws.onmessage = async (event) => {
@@ -166,7 +169,39 @@ class VoiceChatService {
     
     this.ws.onclose = (event) => {
       console.log(`🔌 Voice signaling disconnected - Code: ${event.code}, Reason: ${event.reason || 'No reason'}`);
+      this.ws = null;
+      // Auto-reconnect with exponential backoff (only if we still have credentials)
+      if (this.authToken && this.currentUserId) {
+        this._scheduleReconnect();
+      }
     };
+  }
+
+  /**
+   * Reconnect WebSocket with exponential backoff
+   */
+  _scheduleReconnect() {
+    if (this._reconnectTimer) return; // already scheduled
+    const delay = Math.min(1000 * Math.pow(2, this._reconnectAttempts || 0), 30000);
+    this._reconnectAttempts = (this._reconnectAttempts || 0) + 1;
+    console.log(`🔄 Voice WS reconnecting in ${delay / 1000}s (attempt ${this._reconnectAttempts})...`);
+    this._reconnectTimer = setTimeout(() => {
+      this._reconnectTimer = null;
+      if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+        this.initSignaling(this.authToken, this.currentUserId);
+      }
+    }, delay);
+  }
+
+  /**
+   * Reset reconnect counter (called on successful open)
+   */
+  _resetReconnect() {
+    this._reconnectAttempts = 0;
+    if (this._reconnectTimer) {
+      clearTimeout(this._reconnectTimer);
+      this._reconnectTimer = null;
+    }
   }
 
   /**
@@ -185,6 +220,9 @@ class VoiceChatService {
         this.pendingOffer = data.offer;
         this.pendingCallerName = data.caller_name;
         
+        // Play ringtone so the receiver hears the ring
+        this.playRingtone();
+
         // Notify subscribers of incoming call
         if (this.incomingCallCallback) {
           this.incomingCallCallback({
@@ -637,8 +675,13 @@ class VoiceChatService {
    * Initialize voice service globally
    */
   async init(token, userId) {
+    // Always update credentials so callbacks can be re-registered
+    this.currentUserId = userId;
+    this.authToken = token;
+
     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-      console.log('⚠️  Voice service already initialized');
+      console.log('⚠️  Voice WebSocket already connected — re-registering callbacks');
+      // Don't return early: callbacks may have changed after a React re-render
       return;
     }
     
@@ -892,7 +935,7 @@ class VoiceChatService {
         message_id: this.callLogMessageId
       };
 
-      const response = await fetch('http://localhost:8000/api/chat/voice-call-log', {
+      const response = await fetch(`${API_CONFIG.BASE_URL}/api/chat/voice-call-log`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -916,47 +959,6 @@ class VoiceChatService {
     } catch (error) {
       console.error('Error logging call status:', error);
     }
-  }
-
-  /**
-   * Start monitoring audio quality statistics
-   */
-  startQualityMonitoring() {
-    // Clear any existing monitor
-    if (this.qualityMonitorInterval) {
-      clearInterval(this.qualityMonitorInterval);
-    }
-    
-    // Monitor every 3 seconds
-    this.qualityMonitorInterval = setInterval(async () => {
-      if (!this.peerConnection) return;
-      
-      try {
-        const stats = await this.peerConnection.getStats();
-        stats.forEach(report => {
-          if (report.type === 'inbound-rtp' && report.kind === 'audio') {
-            const packetsLost = report.packetsLost || 0;
-            const packetsReceived = report.packetsReceived || 0;
-            const jitter = report.jitter || 0;
-            
-            if (packetsReceived > 0) {
-              const lossPercent = ((packetsLost / (packetsLost + packetsReceived)) * 100).toFixed(2);
-              console.log(`📊 Audio Quality: Packet Loss: ${lossPercent}%, Jitter: ${(jitter * 1000).toFixed(2)}ms, Packets: ${packetsReceived}`);
-              
-              // Warn if quality is degrading
-              if (lossPercent > 5) {
-                console.warn(`⚠️ High packet loss detected: ${lossPercent}%`);
-              }
-              if (jitter > 0.1) {
-                console.warn(`⚠️ High jitter detected: ${(jitter * 1000).toFixed(2)}ms`);
-              }
-            }
-          }
-        });
-      } catch (error) {
-        console.error('Error monitoring quality:', error);
-      }
-    }, 3000);
   }
 
   /**
@@ -1045,6 +1047,9 @@ class VoiceChatService {
    */
   disconnect() {
     this.cleanup();
+    
+    // Stop reconnect timer so we don't auto-reconnect after intentional disconnect
+    this._resetReconnect();
     
     if (this.ws) {
       this.ws.close();

@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import {
-  Music, Play, Pause, Heart, Search, Sparkles, ExternalLink,
-  Upload, Image, Wand2, X, Camera, CheckCircle2,
+  Music, Play, Pause, Heart, Search, ExternalLink,
+  Upload, Image, X, Camera, CheckCircle2,
   Loader2, AlertCircle, RefreshCw, Video, FileVideo, ImageIcon
 } from 'lucide-react';
 
@@ -64,6 +64,16 @@ const MusicDiscoveryUI = () => {
     { id: 'birthday', name: 'Birthday', image: '/illustrations/birthday.jpg', emoji: '🎂' },
     { id: 'corporate', name: 'Corporate', image: '/illustrations/corporate.jpg', emoji: '💼' }
   ];
+
+  // Map event IDs to emojis for display
+  const eventEmojiMap = {
+    mehndi: '💛',
+    barat: '🎊',
+    walima: '💕',
+    birthday: '🎂',
+    corporate: '💼',
+    general: '🎉'
+  };
 
   // Load saved tracks on mount
   useEffect(() => {
@@ -272,8 +282,26 @@ const MusicDiscoveryUI = () => {
           })));
         }
       } else {
-        console.error('Batch analysis failed:', data.error);
-        setBatchAnalysis({ error: data.detail || data.error || 'Analysis failed' });
+        console.error('Batch analysis failed:', data.error || data.detail);
+        
+        // Handle detailed error response (when images are rejected)
+        if (data.detail && typeof data.detail === 'object') {
+          const errorDetails = data.detail;
+          const errorMessage = errorDetails.message || errorDetails.error || 'Analysis failed';
+          const validCount = errorDetails.valid_images || 0;
+          const rejectedCount = errorDetails.rejected_images || 0;
+          
+          setBatchAnalysis({ 
+            error: errorMessage,
+            valid_images: validCount,
+            rejected_images: rejectedCount,
+            total_images: validCount + rejectedCount,
+            rejection_details: errorDetails.details || []
+          });
+        } else {
+          // Simple error message
+          setBatchAnalysis({ error: data.detail || data.error || 'Analysis failed' });
+        }
       }
     } catch (error) {
       console.error('Error in batch analysis:', error);
@@ -336,11 +364,11 @@ const MusicDiscoveryUI = () => {
           detected_event: data.detected_event,
           event_confidence: Math.round(data.event_confidence * 100),
           event_label: data.event_label,
-          detected_mood: data.detected_mood,
-          mood_confidence: Math.round(data.mood_confidence * 100),
-          mood_label: data.mood_label,
+          // detected_mood: data.detected_mood,  // DISABLED - Mood deprecated
+          // mood_confidence: Math.round(data.mood_confidence * 100),
+          // mood_label: data.mood_label,
           all_event_scores: data.all_event_scores,
-          all_mood_scores: data.all_mood_scores,
+          // all_mood_scores: data.all_mood_scores,  // DISABLED - Mood deprecated
           not_event_score: data.not_event_score,
           file_type: fileType
         });
@@ -476,9 +504,13 @@ const MusicDiscoveryUI = () => {
 
     let title = 'Recommended Music';
     if (mode === 'smart' && analysis) {
-      title = `${analysis.event_label || 'Recommended'} Music`;
+      const eventEmoji = eventEmojiMap[analysis.detected_event] || '🎵';
+      const eventName = analysis.event_label || analysis.detected_event || 'Recommended';
+      title = `${eventEmoji} ${eventName.charAt(0).toUpperCase() + eventName.slice(1)} Music`;
     } else if (mode === 'batch' && batchAnalysis && !batchAnalysis.error) {
-      title = `${batchAnalysis.aggregate_event.charAt(0).toUpperCase() + batchAnalysis.aggregate_event.slice(1)} Music (${batchAnalysis.confidence_percentage})`;
+      const eventEmoji = eventEmojiMap[batchAnalysis.aggregate_event] || '🎵';
+      const eventName = batchAnalysis.aggregate_event.charAt(0).toUpperCase() + batchAnalysis.aggregate_event.slice(1);
+      title = `${eventEmoji} ${eventName} Music (${batchAnalysis.confidence_percentage})`;
     } else if (mode === 'browse') {
       title = searchQuery ? `Results for "${searchQuery}"` : `${selectedEventData?.name || 'Select Event'} Music`;
     }
@@ -487,7 +519,7 @@ const MusicDiscoveryUI = () => {
       <div>
         <div className="d-flex justify-content-between align-items-center mb-3">
           <div className="d-flex align-items-center gap-2">
-            <Sparkles size={20} style={{ color: '#667eea' }} />
+            <Music size={20} style={{ color: '#667eea' }} />
             <h5 className="fw-bold mb-0" style={{ color: '#1a1a1a' }}>{title}</h5>
           </div>
           {savedTracks.length > 0 && (
@@ -510,10 +542,10 @@ const MusicDiscoveryUI = () => {
             <p className="mt-3 text-muted">
               {mode === 'smart'
                 ? (fileType === 'video'
-                  ? 'AI is extracting frames and analyzing your video...'
-                  : 'AI is analyzing your image with CLIP...')
+                  ? 'Analyzing your video...'
+                  : 'Analyzing your image...')
                 : mode === 'batch'
-                  ? `AI is analyzing ${uploadedImages.length} images with confidence-weighted voting...`
+                  ? `Analyzing ${uploadedImages.length} images...`
                   : 'Discovering music...'}
             </p>
           </div>
@@ -534,7 +566,7 @@ const MusicDiscoveryUI = () => {
                   <FileVideo size={40} className="text-muted" />
                 </div>
                 <p className="text-muted mb-0">
-                  Upload a photo or video to get AI-powered music suggestions
+                  Upload a photo or video to get personalized music suggestions
                 </p>
                 <small className="text-muted d-block mt-2">
                   Supports: JPG, PNG, MP4, MOV
@@ -544,7 +576,7 @@ const MusicDiscoveryUI = () => {
               <>
                 <div className="d-flex justify-content-center gap-3 mb-3">
                   <ImageIcon size={40} className="text-muted" />
-                  <Sparkles size={40} className="text-muted" />
+                  <Music size={40} className="text-muted" />
                 </div>
                 <p className="text-muted mb-0">
                   Upload 5-10 event photos for best accuracy
@@ -746,7 +778,7 @@ const MusicDiscoveryUI = () => {
               color: '#6c757d',
               boxShadow: '0 2px 8px rgba(0,0,0,0.05)'
             }}>
-              {mode === 'smart' ? '✨ AI-Powered • ' : ''}🎵 Powered by Spotify • Curated by BookYourShoot
+              🎵 Powered by Spotify • Curated by BookYourShoot
             </span>
           </div>
         )}
@@ -769,10 +801,10 @@ const MusicDiscoveryUI = () => {
           <div className="d-flex justify-content-between align-items-center mb-3">
             <div>
               <h1 className="fw-bold mb-1" style={{ fontSize: '2rem', color: '#1a1a1a' }}>
-                <Sparkles className="me-2" style={{ color: '#667eea' }} size={28} />
-                Smart Music Discovery
+                <Music className="me-2" style={{ color: '#667eea' }} size={28} />
+                Music Discovery
               </h1>
-              <p className="text-muted mb-0">AI-powered song recommendations for your moments</p>
+              <p className="text-muted mb-0">Get perfect song recommendations for your events</p>
             </div>
             <Link to="/client/dashboard" className="btn btn-outline-secondary">
               ← Back
@@ -791,8 +823,8 @@ const MusicDiscoveryUI = () => {
                 transition: 'all 0.3s ease'
               }}
             >
-              <Wand2 size={18} className="me-2" />
-              Smart Detection
+              <Music size={18} className="me-2" />
+              Single Photo
             </button>
             <button
               onClick={() => { setMode('batch'); setTracks([]); setSelectedEvent(null); clearFile(); }}
@@ -804,8 +836,8 @@ const MusicDiscoveryUI = () => {
                 transition: 'all 0.3s ease'
               }}
             >
-              <ImageIcon size={18} className="me-2" />
-              Multiple Images <span className="badge bg-success ms-1" style={{ fontSize: '0.7rem' }}>Better</span>
+              <Music size={18} className="me-2" />
+              Multiple Photos
             </button>
             <button
               onClick={() => { setMode('browse'); setTracks([]); clearFile(); clearBatchImages(); setSelectedEvent(null); }}
@@ -999,11 +1031,11 @@ const MusicDiscoveryUI = () => {
                       {analyzing ? (
                         <>
                           <Loader2 size={20} className="animate-spin" style={{ animation: 'spin 1s linear infinite' }} />
-                          Analyzing with AI...
+                          Analyzing...
                         </>
                       ) : (
                         <>
-                          <Wand2 size={20} />
+                          <Music size={20} />
                           Analyze & Get Music
                         </>
                       )}
@@ -1012,7 +1044,7 @@ const MusicDiscoveryUI = () => {
                 )}
               </div>
 
-              {/* Analysis Results Card - Enhanced for CLIP Detection */}
+              {/* Analysis Results Card */}
               {analysis && !analysis.error && (
                 <div style={{
                   background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
@@ -1023,7 +1055,7 @@ const MusicDiscoveryUI = () => {
                 }}>
                   <div className="d-flex align-items-center gap-2 mb-3">
                     <CheckCircle2 size={24} />
-                    <h5 className="fw-bold mb-0">CLIP AI Detection Results</h5>
+                    <h5 className="fw-bold mb-0">Event Detection Results</h5>
                     {analysis.file_type === 'video' && (
                       <span style={{
                         background: 'rgba(255,255,255,0.2)',
@@ -1071,8 +1103,8 @@ const MusicDiscoveryUI = () => {
                     </div>
                   </div>
 
-                  {/* Mood Detection */}
-                  <div style={{
+                  {/* Mood Detection - DISABLED (Feb 2026) - Spotify audio features deprecated */}
+                  {/* <div style={{
                     background: 'rgba(255,255,255,0.15)',
                     borderRadius: '12px',
                     padding: '1rem',
@@ -1104,7 +1136,7 @@ const MusicDiscoveryUI = () => {
                         {analysis.mood_confidence || 0}%
                       </span>
                     </div>
-                  </div>
+                  </div> */}
 
                   {/* All Scores (Expandable) */}
                   {analysis.all_event_scores && (
@@ -1130,7 +1162,8 @@ const MusicDiscoveryUI = () => {
                             <span>{Math.round(score * 100)}%</span>
                           </div>
                         ))}
-                        {analysis.all_mood_scores && (
+                        {/* Mood Scores - DISABLED (Feb 2026) */}
+                        {/* {analysis.all_mood_scores && (
                           <>
                             <div style={{ marginTop: '0.75rem', marginBottom: '0.5rem', fontWeight: '600' }}>Mood Scores:</div>
                             {Object.entries(analysis.all_mood_scores).map(([mood, score]) => (
@@ -1140,12 +1173,12 @@ const MusicDiscoveryUI = () => {
                               </div>
                             ))}
                           </>
-                        )}
+                        )} */}
                       </div>
                     </details>
                   )}
 
-                  {/* AI Method Badge */}
+                  {/* Detection Method Badge */}
                   <div style={{
                     marginTop: '1rem',
                     padding: '0.75rem',
@@ -1156,8 +1189,8 @@ const MusicDiscoveryUI = () => {
                     alignItems: 'center',
                     gap: '0.5rem'
                   }}>
-                    <Sparkles size={14} />
-                    <span>Powered by CLIP Zero-Shot Classification</span>
+                    <Music size={14} />
+                    <span>Intelligent Event Detection</span>
                   </div>
                 </div>
               )}
@@ -1238,19 +1271,19 @@ const MusicDiscoveryUI = () => {
               {/* Error State - General errors */}
               {analysis && analysis.error && !analysis.is_not_event && (
                 <div style={{
-                  background: analysis.error.includes('CLIP') ? '#fef3c7' : '#fef2f2',
-                  border: `1px solid ${analysis.error.includes('CLIP') ? '#fcd34d' : '#fecaca'}`,
+                  background: analysis.error.includes('loading') ? '#fef3c7' : '#fef2f2',
+                  border: `1px solid ${analysis.error.includes('loading') ? '#fcd34d' : '#fecaca'}`,
                   borderRadius: '12px',
                   padding: '1.25rem',
-                  color: analysis.error.includes('CLIP') ? '#92400e' : '#dc2626'
+                  color: analysis.error.includes('loading') ? '#92400e' : '#dc2626'
                 }}>
                   <div className="d-flex align-items-center gap-2 mb-2">
                     <AlertCircle size={20} />
-                    <strong>{analysis.error.includes('CLIP') ? 'Model Loading...' : 'Analysis Failed'}</strong>
+                    <strong>{analysis.error.includes('loading') ? 'Model Loading...' : 'Analysis Failed'}</strong>
                   </div>
                   <p style={{ margin: '0.5rem 0', fontSize: '0.9rem' }}>
-                    {analysis.error.includes('CLIP')
-                      ? 'The CLIP model is loading for the first time. This may take 30-60 seconds. Please try again.'
+                    {analysis.error.includes('loading')
+                      ? 'The analysis model is loading for the first time. This may take 30-60 seconds. Please try again.'
                       : analysis.error}
                   </p>
                   <div className="d-flex gap-2 mt-3">
@@ -1258,7 +1291,7 @@ const MusicDiscoveryUI = () => {
                       onClick={analyzeAndGetSuggestions}
                       style={{
                         padding: '0.5rem 1rem',
-                        background: analysis.error.includes('CLIP') ? '#f59e0b' : '#dc2626',
+                        background: analysis.error.includes('loading') ? '#f59e0b' : '#dc2626',
                         color: '#fff',
                         border: 'none',
                         borderRadius: '8px',
@@ -1461,7 +1494,7 @@ const MusicDiscoveryUI = () => {
                         </>
                       ) : (
                         <>
-                          <Sparkles className="me-2" size={18} />
+                          <Music className="me-2" size={18} />
                           Analyze & Get Music Suggestions
                         </>
                       )}
@@ -1576,11 +1609,33 @@ const MusicDiscoveryUI = () => {
                 }}>
                   <div className="d-flex align-items-start gap-2">
                     <AlertCircle size={20} className="text-warning mt-1" />
-                    <div>
-                      <strong>Analysis Failed</strong>
-                      <p className="mb-0 mt-1 text-muted" style={{ fontSize: '0.9rem' }}>
+                    <div style={{ flex: 1 }}>
+                      <strong>Analysis Issue</strong>
+                      <p className="mb-2 mt-1 text-muted" style={{ fontSize: '0.9rem' }}>
                         {batchAnalysis.error}
                       </p>
+                      
+                      {/* Show rejection stats if available */}
+                      {batchAnalysis.rejected_images > 0 && (
+                        <div className="mt-2 p-2" style={{
+                          background: 'rgba(255, 193, 7, 0.1)',
+                          borderRadius: '8px',
+                          fontSize: '0.85rem'
+                        }}>
+                          <div className="d-flex justify-content-between mb-1">
+                            <span>✅ Valid event images:</span>
+                            <strong className="text-success">{batchAnalysis.valid_images}</strong>
+                          </div>
+                          <div className="d-flex justify-content-between">
+                            <span>❌ Rejected (scenery/casual):</span>
+                            <strong className="text-danger">{batchAnalysis.rejected_images}</strong>
+                          </div>
+                        </div>
+                      )}
+                      
+                      <div className="mt-2 text-muted" style={{ fontSize: '0.8rem' }}>
+                        💡 <strong>Tip:</strong> Upload photos showing event decorations, ceremonies, or celebrations for best results.
+                      </div>
                     </div>
                   </div>
                 </div>
