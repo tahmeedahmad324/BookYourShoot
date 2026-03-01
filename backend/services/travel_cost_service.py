@@ -1,13 +1,25 @@
 """
 Travel Cost Estimation Service
 ==============================
-Simplified "Bus First, Calculate Second" strategy (Round-Trip Only):
-  1. Check intercity_bus_fares table for predefined fares
-  2. Fallback to OSRM routing API
-  3. If still missing, use Punjab distance matrix
-  4. Final fallback: Haversine estimation
-  5. Apply photographer-specific rates & overheads
-  6. Return round-trip cost breakdown only
+Production-ready "Bus First, Calculate Second" strategy (Round-Trip Only):
+
+Distance Resolution Order:
+  1. OSRM routing API (real road distance, 5s timeout, 1 retry)
+  2. Punjab inter-city distance matrix (hardcoded for offline reliability)
+  3. Haversine × 1.4 road factor (geometric fallback for unknown cities)
+
+Cost Calculation Strategy:
+  1. Check intercity_bus_fares DB table for predefined fares
+  2. Compare bus fare vs distance-based cost (auto mode picks cheapest)
+  3. Apply photographer-specific rates & overheads if provided
+  4. Smart accommodation: multi-day → (days-1) nights, long single-day → 1 night
+  5. Return round-trip cost breakdown
+
+Costs (2025-2026 Pakistan):
+  - Accommodation: PKR 5,000/night (budget hotel)
+  - Local taxi: PKR 500-1,500 per way (scales with distance)
+  - Handling: PKR 500 flat
+  - Personal vehicle: PKR 35/km
 """
 
 import math
@@ -28,20 +40,23 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 OSRM_BASE_URL = os.getenv("OSRM_BASE_URL", "https://router.project-osrm.org")
 
-# Default overhead costs (PKR)
-DEFAULT_LOCAL_TAXI_COST = 800       # Taxi to/from bus terminal
-DEFAULT_HANDLING_FEE = 500          # Misc handling/booking fee
-DEFAULT_PER_KM_RATE = 30            # PKR per km (personal car)
-DEFAULT_ACCOMMODATION_FEE = 3000    # Per night
-DEFAULT_MIN_CHARGE = 500
-OVERNIGHT_THRESHOLD_HOURS = 12      # If total trip > 12 hours, add accommodation
+# Default overhead costs (PKR) — 2025-2026 Pakistan market rates
+DEFAULT_LOCAL_TAXI_SHORT = 500       # Taxi/rickshaw for short trips (<100km)
+DEFAULT_LOCAL_TAXI_MEDIUM = 1000     # Taxi/rickshaw for medium trips (100-300km)
+DEFAULT_LOCAL_TAXI_LONG = 1500       # Taxi/rickshaw for long trips (300+ km)
+DEFAULT_HANDLING_FEE = 500           # Misc handling/booking fee
+DEFAULT_PER_KM_RATE = 35            # PKR per km (personal car: fuel + depreciation)
+DEFAULT_ACCOMMODATION_FEE = 5000    # Per night (budget hotel in Pakistani city)
+DEFAULT_MIN_CHARGE = 1000           # Minimum travel charge
+OVERNIGHT_THRESHOLD_HOURS = 10      # If total trip > 10 hours, add accommodation
+# Pakistani highways avg speed is ~60 km/h with stops, buffer makes it ~50 effective
 
-# Punjab city coordinates for Haversine fallback
+# Punjab province city coordinates for OSRM routing and Haversine fallback
 CITY_COORDS = {
+    # Major Punjab cities
     "Lahore":          (31.5204, 74.3587),
     "Faisalabad":      (31.4504, 73.1350),
     "Rawalpindi":      (33.5651, 73.0169),
-    "Islamabad":       (33.6844, 73.0479),
     "Multan":          (30.1575, 71.5249),
     "Gujranwala":      (32.1617, 74.1883),
     "Sialkot":         (32.4945, 74.5229),
@@ -58,6 +73,20 @@ CITY_COORDS = {
     "Dera Ghazi Khan": (30.0489, 70.6455),
     "Jhelum":          (32.9425, 73.7257),
     "Kamoke":          (31.9750, 74.2230),
+    # Additional Punjab cities
+    "Chiniot":         (31.7208, 72.9789),
+    "Mianwali":        (32.5839, 71.5370),
+    "Attock":          (33.7660, 72.3609),
+    "Chakwal":         (32.9328, 72.8630),
+    "Khanewal":        (30.3018, 71.9321),
+    "Muzaffargarh":    (30.0720, 71.1932),
+    "Vehari":          (30.0451, 72.3489),
+    "Lodhran":         (29.5414, 71.6332),
+    "Layyah":          (30.9609, 70.9409),
+    "Toba Tek Singh":  (30.9709, 72.4826),
+    "Hafizabad":       (32.0712, 73.6895),
+    "Mandi Bahauddin": (32.5861, 73.4914),
+    "Narowal":         (32.1020, 74.8730),
 }
 
 
@@ -71,6 +100,16 @@ def haversine_distance(lat1: float, lon1: float, lat2: float, lon2: float) -> fl
     dlon = lon2 - lon1
     a = math.sin(dlat / 2) ** 2 + math.cos(lat1) * math.cos(lat2) * math.sin(dlon / 2) ** 2
     return 6371 * 2 * math.asin(math.sqrt(a))
+
+
+def _local_taxi_cost(distance_km: float) -> float:
+    """Get appropriate local taxi cost based on trip distance (one-way)."""
+    if distance_km < 100:
+        return DEFAULT_LOCAL_TAXI_SHORT
+    elif distance_km < 300:
+        return DEFAULT_LOCAL_TAXI_MEDIUM
+    else:
+        return DEFAULT_LOCAL_TAXI_LONG
 
 
 # ---------------------------------------------------------------------------
@@ -130,40 +169,55 @@ class TravelCostService:
     # ------------------------------------------------------------------
     def fetch_osrm_distance(self, from_city: str, to_city: str) -> Optional[Dict]:
         """
-        Call OSRM public routing API using city coordinates.
+        Call OSRM routing API using city coordinates.
         Returns distance_km & duration_minutes or None.
+        
+        Note: The public OSRM demo server (router.project-osrm.org) has rate limits
+        and no SLA. For production, set OSRM_BASE_URL to a self-hosted instance.
+        See: https://github.com/Project-OSRM/osrm-backend
         """
         from_coords = CITY_COORDS.get(from_city)
         to_coords = CITY_COORDS.get(to_city)
         if not from_coords or not to_coords:
+            logger.info(f"OSRM skip: no coordinates for {from_city} or {to_city}")
             return None
 
-        try:
-            url = (
-                f"{OSRM_BASE_URL}/route/v1/driving/"
-                f"{from_coords[1]},{from_coords[0]};{to_coords[1]},{to_coords[0]}"
-            )
-            params = {"overview": "false"}
-            with httpx.Client(timeout=10) as client:
-                resp = client.get(url, params=params)
-                data = resp.json()
+        url = (
+            f"{OSRM_BASE_URL}/route/v1/driving/"
+            f"{from_coords[1]},{from_coords[0]};{to_coords[1]},{to_coords[0]}"
+        )
+        params = {"overview": "false"}
 
-            if data.get("code") != "Ok":
-                logger.warning(f"OSRM API error: {data.get('code')}")
-                return None
+        # Try with short timeout + 1 retry (don't block the request)
+        for attempt in range(2):
+            try:
+                with httpx.Client(timeout=5.0) as client:
+                    resp = client.get(url, params=params)
+                    resp.raise_for_status()
+                    data = resp.json()
 
-            route = data["routes"][0]
-            distance_km = route["distance"] / 1000
-            duration_minutes = int(route["duration"] // 60)
+                if data.get("code") != "Ok":
+                    logger.warning(f"OSRM API returned code={data.get('code')} for {from_city}→{to_city}")
+                    return None
 
-            return {
-                "distance_km": round(distance_km, 2),
-                "duration_minutes": duration_minutes,
-                "source": "osrm",
-            }
-        except Exception as e:
-            logger.warning(f"OSRM API call failed: {e}")
-            return None
+                route = data["routes"][0]
+                distance_km = route["distance"] / 1000
+                duration_minutes = int(route["duration"] // 60)
+
+                return {
+                    "distance_km": round(distance_km, 2),
+                    "duration_minutes": duration_minutes,
+                    "source": "osrm",
+                }
+            except httpx.TimeoutException:
+                logger.warning(f"OSRM timeout (attempt {attempt + 1}/2) for {from_city}→{to_city}")
+                continue
+            except Exception as e:
+                logger.warning(f"OSRM failed (attempt {attempt + 1}/2) for {from_city}→{to_city}: {e}")
+                break  # Don't retry on non-timeout errors
+
+        logger.info(f"OSRM unavailable for {from_city}→{to_city}, falling back to local data")
+        return None
 
     # ------------------------------------------------------------------
     # 3. Punjab Distance Matrix & Haversine Fallback
@@ -183,8 +237,8 @@ class TravelCostService:
             distance = PUNJAB_DISTANCES[to_norm][from_norm]
 
         if distance is not None and distance > 0:
-            # Estimate duration: avg 60 km/h on Pakistani highways, +20% buffer
-            duration = int((distance / 60) * 1.2 * 60)
+            # Pakistani highway avg effective speed: ~50 km/h (accounting for stops, tolls, city traffic)
+            duration = int((distance / 50) * 60)
             return {
                 "distance_km": float(distance),
                 "duration_minutes": duration,
@@ -196,9 +250,10 @@ class TravelCostService:
         to_coords = CITY_COORDS.get(to_norm)
         if from_coords and to_coords:
             dist = haversine_distance(from_coords[0], from_coords[1], to_coords[0], to_coords[1])
-            # Road distance is ~1.3x straight-line
-            road_dist = dist * 1.3
-            duration = int((road_dist / 60) * 1.2 * 60)
+            # Road distance in Pakistan is ~1.4x straight-line (winding roads, detours)
+            road_dist = dist * 1.4
+            # ~50 km/h effective speed
+            duration = int((road_dist / 50) * 60)
             return {
                 "distance_km": round(road_dist, 2),
                 "duration_minutes": duration,
@@ -393,10 +448,11 @@ class TravelCostService:
                 source = f"distance_based_public_transport_{distance_data['source']}"
         else:  # auto mode
             # Compare both and choose cheaper
+            taxi_cost = _local_taxi_cost(distance_km)
             if bus_fare:
                 # Calculate both options (round-trip)
-                distance_cost = (max(distance_km * per_km, min_charge) * 2) + (DEFAULT_LOCAL_TAXI_COST * 2) + DEFAULT_HANDLING_FEE
-                bus_cost = (bus_fare["one_way_amount"] * 2) + (DEFAULT_LOCAL_TAXI_COST * 2) + DEFAULT_HANDLING_FEE
+                distance_cost = (max(distance_km * per_km, min_charge) * 2) + (taxi_cost * 2) + DEFAULT_HANDLING_FEE
+                bus_cost = (bus_fare["one_way_amount"] * 2) + (taxi_cost * 2) + DEFAULT_HANDLING_FEE
                 
                 # Use bus fare if it's cheaper or equal
                 use_bus_fare = bus_cost <= distance_cost
@@ -422,10 +478,11 @@ class TravelCostService:
                 "amount": round(travel_allowance * 2, 0),
             })
 
-        # Local taxi (both ways)
+        # Local taxi (both ways) — scales with distance
+        taxi_per_way = _local_taxi_cost(distance_km)
         breakdown_items.append({
             "label": "Local Taxi (Both Ways)",
-            "amount": DEFAULT_LOCAL_TAXI_COST * 2,
+            "amount": taxi_per_way * 2,
         })
 
         # Hourly compensation (if set, for both ways)

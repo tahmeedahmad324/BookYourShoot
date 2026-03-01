@@ -720,10 +720,9 @@ async def send_booking_confirmation_email(request: SendBookingEmailRequest):
     """Send booking confirmation email to client AND photographer, create notifications"""
     print(f"📧 Received send-booking-email request: {request.dict()}")
     try:
-        # Calculate amounts for 50/50 payment model
+        # Calculate amounts for full payment upfront (100% in escrow)
         total_amount = request.amount
-        advance_amount = request.advance_paid or (total_amount * 0.5)
-        remaining_amount = total_amount - advance_amount
+        full_payment = request.advance_paid or total_amount  # Collect 100% upfront
         photographer_earnings = total_amount * 0.9  # After 10% platform fee
         
         # Send booking confirmation email to client
@@ -742,11 +741,11 @@ async def send_booking_confirmation_email(request: SendBookingEmailRequest):
             travel_breakdown_json=request.travel_breakdown_json,
             is_multi_day=request.is_multi_day or False,
             amount=total_amount,
-            advance_paid=advance_amount
+            advance_paid=full_payment  # Now 100%
         )
         print(f"📧 Client booking confirmation email sent: {result}")
         
-        # Also send advance payment received email for clarity
+        # Send full payment confirmation email for clarity
         email_service.send_advance_payment_received(
             client_email=request.client_email,
             client_name=request.client_name,
@@ -754,8 +753,8 @@ async def send_booking_confirmation_email(request: SendBookingEmailRequest):
             service_type=request.service_type,
             photographer_name=request.photographer_name,
             date=request.event_date,
-            advance_amount=advance_amount,
-            remaining_amount=remaining_amount,
+            advance_amount=full_payment,  # Full amount
+            remaining_amount=0,  # No remaining amount
             service_cost=request.service_price or 0,
             travel_cost=request.travel_cost or 0,
             travel_breakdown_json=request.travel_breakdown_json
@@ -766,28 +765,28 @@ async def send_booking_confirmation_email(request: SendBookingEmailRequest):
         notification_client_id = request.notification_user_id or request.client_email
         print(f"🔔 Creating notifications for client: {notification_client_id}")
         
-        # Notify both parties about advance payment received (50/50 flow)
+        # Notify both parties about full payment received (100% in escrow)
         notification_service.notify_advance_payment_received(
             client_id=notification_client_id,
             photographer_id=photographer_id,
             booking_id=request.booking_id,
-            advance_amount=advance_amount,
-            remaining_amount=remaining_amount,
+            advance_amount=full_payment,  # Full amount
+            remaining_amount=0,  # No remaining payment
             photographer_name=request.photographer_name,
             service_type=request.service_type,
             date=request.event_date
         )
         
-        print(f"✅ 50/50 payment notifications created for booking {request.booking_id}")
+        print(f"✅ Full payment (100% escrow) notifications created for booking {request.booking_id}")
         
         return {
             "status": "success",
-            "message": "Booking confirmation email sent with 50/50 payment details",
+            "message": "Booking confirmation email sent - full payment held in escrow",
             "email_sent": True,
             "notifications_created": True,
-            "payment_model": "50/50",
-            "advance_amount": advance_amount,
-            "remaining_amount": remaining_amount
+            "payment_model": "full_escrow",
+            "full_payment": full_payment,
+            "remaining_amount": 0
         }
     except Exception as e:
         print(f"❌ Failed to send booking email: {e}")

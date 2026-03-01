@@ -155,7 +155,7 @@ const BookingRequests = () => {
       date: "2024-12-18",
       time: "10:00",
       duration: "2 hours",
-      location: "Islamabad",
+      location: "Rawalpindi",
       venue: "Client's Office",
       guestCount: 5,
       totalAmount: 8000,
@@ -184,8 +184,8 @@ const BookingRequests = () => {
       date: "2024-12-22",
       time: "18:00",
       duration: "4 hours",
-      location: "Karachi",
-      venue: "Sea View Restaurant",
+      location: "Faisalabad",
+      venue: "Garden Restaurant",
       guestCount: 50,
       totalAmount: 15000,
       advanceRequired: 7500,
@@ -292,7 +292,7 @@ const BookingRequests = () => {
       return (
         <span className="badge bg-info d-inline-flex align-items-center">
           <span className="me-1">💰</span>
-          50% Advance Received
+          Full Payment Received (Escrow)
         </span>
       );
     }
@@ -395,7 +395,7 @@ const BookingRequests = () => {
           : booking
       ));
 
-      toast.success(result.message || 'Work marked as completed! Client will be notified to pay the remaining 50%.');
+      toast.success(result.message || 'Work marked as completed! Payment will be released from escrow after client confirmation.');
 
       // Show next steps
       if (result.next_steps) {
@@ -681,7 +681,7 @@ const BookingRequests = () => {
                         </div>
                       ) : (
                         <div className="mb-2">
-                          <span className="text-muted small">Advance (50%):</span>
+                          <span className="text-muted small">Amount Paid:</span>
                           <div className="fw-semibold">Rs. {booking.advanceRequired.toLocaleString()}</div>
                         </div>
                       )}
@@ -861,13 +861,10 @@ const BookingRequests = () => {
                         <strong>Total Amount:</strong>
                         <div className="text-primary fs-5">Rs. {selectedBooking.totalAmount.toLocaleString()}</div>
                       </div>
-                      <div className="col-md-4 mb-2">
-                        <strong>Advance Paid (50%):</strong>
+                      <div className="col-md-6 mb-2">
+                        <strong>Full Payment (In Escrow):</strong>
                         <div className="text-success fs-5">Rs. {selectedBooking.advanceRequired.toLocaleString()}</div>
-                      </div>
-                      <div className="col-md-4 mb-2">
-                        <strong>Remaining (50%):</strong>
-                        <div className="text-warning fs-5">Rs. {selectedBooking.remainingAmount?.toLocaleString() || selectedBooking.advanceRequired.toLocaleString()}</div>
+                        <small className="text-muted">Complete the work to receive payment</small>
                       </div>
                     </div>
                     <div className="mt-2">

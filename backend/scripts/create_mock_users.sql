@@ -24,7 +24,7 @@ VALUES
         'photographer@test.com',
         'Test Photographer',
         '+923009876543',
-        'Karachi',
+        'Faisalabad',
         'photographer',
         NULL,
         true
@@ -35,7 +35,7 @@ VALUES
         'admin@test.com',
         'Test Admin',
         '+923005555555',
-        'Islamabad',
+        'Rawalpindi',
         'admin',
         NULL,
         true

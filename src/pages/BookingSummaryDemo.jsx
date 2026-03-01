@@ -131,8 +131,8 @@ const BookingSummaryDemo = () => {
                 <h6 className="fw-bold mb-3">💡 Features</h6>
                 <ul className="small mb-0">
                   <li className="mb-2">Clear cost breakdown</li>
-                  <li className="mb-2">50% advance payment</li>
-                  <li className="mb-2">Remaining due on completion</li>
+                  <li className="mb-2">Full payment upfront (held in escrow)</li>
+                  <li className="mb-2">Payment released after work completion</li>
                   <li className="mb-2">Equipment deposit shown separately</li>
                   <li className="mb-2">Platform fee visible to photographers</li>
                   <li className="mb-2">Payment security notice</li>

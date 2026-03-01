@@ -228,7 +228,7 @@ const EquipmentDetail = () => {
       if (response.data.success) {
         const rentalData = response.data.data;
         const totalAmount = response.data.total_amount;
-        const advancePayment = totalAmount * 0.5;
+        const advancePayment = totalAmount; // Full payment (100%) upfront
 
         const bookingData = {
           id: rentalData.id,
@@ -266,7 +266,7 @@ const EquipmentDetail = () => {
       // Fallback to old flow for demo/mock data
       const rentalCost = calculateRentalCost();
       const totalAmount = rentalCost + equipment.deposit;
-      const advancePayment = totalAmount * 0.5;
+      const advancePayment = totalAmount; // Full payment (100%) upfront
 
       const bookingData = {
         id: `RENT-${Date.now()}`,

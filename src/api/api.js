@@ -186,12 +186,15 @@ export const travelAPI = {
     return apiRequest('/api/travel/cities');
   },
 
-  estimate: async ({ from_city, to_city, photographer_id, date } = {}) => {
+  estimate: async ({ from_city, to_city, photographer_id, date, event_duration_hours, event_days, requires_accommodation } = {}) => {
     const query = new URLSearchParams();
     if (from_city) query.append('from_city', from_city);
     if (to_city) query.append('to_city', to_city);
     if (photographer_id) query.append('photographer_id', photographer_id);
     if (date) query.append('date', date);
+    if (event_duration_hours) query.append('event_duration_hours', String(event_duration_hours));
+    if (event_days && event_days > 1) query.append('event_days', String(event_days));
+    if (requires_accommodation) query.append('requires_accommodation', 'true');
     return apiRequest(`/api/travel/estimate?${query.toString()}`);
   },
 

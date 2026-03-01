@@ -44,11 +44,11 @@ class CalculateTravelRequest(BaseModel):
 class PhotographerTravelSettingsRequest(BaseModel):
     is_willing_to_travel: bool = True
     base_city: str = "Lahore"
-    per_km_rate: float = 30
+    per_km_rate: float = 35
     per_hour_rate: float = 0
-    min_charge: float = 500
+    min_charge: float = 1000
     requires_accommodation: bool = False
-    accommodation_fee: float = 3000
+    accommodation_fee: float = 5000
     avoided_cities: List[str] = []
     preferred_transport: str = "bus"  # bus, car, bike
     max_travel_distance_km: float = 500
@@ -182,11 +182,11 @@ def get_my_travel_settings(current_user: dict = Depends(get_current_user)):
                 "photographer_id": user_id,
                 "is_willing_to_travel": False,
                 "base_city": "Lahore",
-                "per_km_rate": 30,
+                "per_km_rate": 35,
                 "per_hour_rate": 0,
-                "min_charge": 500,
+                "min_charge": 1000,
                 "requires_accommodation": False,
-                "accommodation_fee": 3000,
+                "accommodation_fee": 5000,
                 "avoided_cities": [],
                 "preferred_transport": "bus",
                 "max_travel_distance_km": 500,

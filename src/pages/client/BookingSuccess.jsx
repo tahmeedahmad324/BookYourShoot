@@ -270,11 +270,11 @@ export default function BookingSuccess() {
                   }
                 </p>
 
-                {/* 50% Advance Payment Notice */}
+                {/* Full Payment in Escrow Notice */}
                 {!isEquipmentRental && (
-                  <div className="alert alert-info mb-4">
-                    <strong>✅ 50% Advance Paid</strong>
-                    <p className="mb-0 small">The remaining 50% will be due after your photography session is complete.</p>
+                  <div className="alert alert-success mb-4">
+                    <strong>✅ Full Payment Secured in Escrow</strong>
+                    <p className="mb-0 small">Your complete payment is held securely and will be released to the photographer after your session is completed and confirmed.</p>
                   </div>
                 )}
 

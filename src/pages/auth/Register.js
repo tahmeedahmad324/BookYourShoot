@@ -85,7 +85,7 @@ const registerSchema = yup.object().shape({
     }),
   city: yup.string()
     .required('Please select your city')
-    .oneOf(['Lahore', 'Karachi', 'Islamabad', 'Rawalpindi', 'Faisalabad', 'Multan', 'Sialkot', 'Gujranwala', 'Other'], 'Please select a valid city'),
+    .oneOf(['Lahore', 'Rawalpindi', 'Faisalabad', 'Multan', 'Gujranwala', 'Sialkot', 'Bahawalpur', 'Sargodha', 'Shekhupura', 'Jhang', 'Rahim Yar Khan', 'Gujrat', 'Kasur', 'Sahiwal', 'Okara', 'Other'], 'Please select a valid city'),
   password: yup.string()
     .min(8, 'Password must be at least 8 characters')
     .matches(/[a-z]/, 'Password must contain at least one lowercase letter')
@@ -381,13 +381,21 @@ const Register = () => {
                         >
                           <option value="">Select your city</option>
                           <option value="Lahore">Lahore</option>
-                          <option value="Karachi">Karachi</option>
-                          <option value="Islamabad">Islamabad</option>
-                          <option value="Rawalpindi">Rawalpindi</option>
                           <option value="Faisalabad">Faisalabad</option>
+                          <option value="Rawalpindi">Rawalpindi</option>
                           <option value="Multan">Multan</option>
-                          <option value="Sialkot">Sialkot</option>
                           <option value="Gujranwala">Gujranwala</option>
+                          <option value="Sialkot">Sialkot</option>
+                          <option value="Bahawalpur">Bahawalpur</option>
+                          <option value="Sargodha">Sargodha</option>
+                          <option value="Shekhupura">Shekhupura</option>
+                          <option value="Jhang">Jhang</option>
+                          <option value="Rahim Yar Khan">Rahim Yar Khan</option>
+                          <option value="Gujrat">Gujrat</option>
+                          <option value="Kasur">Kasur</option>
+                          <option value="Sahiwal">Sahiwal</option>
+                          <option value="Okara">Okara</option>
+                          <option value="Other">Other</option>
                         </select>
                         {errors.city && (
                           <div className="text-danger small mt-1">{errors.city.message}</div>
