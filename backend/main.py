@@ -7,6 +7,13 @@ from dotenv import load_dotenv
 # Load environment variables from .env file
 load_dotenv()
 
+# Limit BLAS/NumPy thread usage to avoid OpenBLAS memory allocation failures on Windows
+os.environ.setdefault("OPENBLAS_NUM_THREADS", "1")
+os.environ.setdefault("OMP_NUM_THREADS", "1")
+os.environ.setdefault("MKL_NUM_THREADS", "1")
+os.environ.setdefault("NUMEXPR_NUM_THREADS", "1")
+os.environ.setdefault("VECLIB_MAXIMUM_THREADS", "1")
+
 # Suppress NumPy warnings on Windows
 warnings.filterwarnings('ignore', category=RuntimeWarning, module='numpy')
 
@@ -298,6 +305,38 @@ async def websocket_chat_endpoint(
                         logger.info(f"📢 Broadcasting presence update for user {user_id}")
                         await connection_manager.broadcast_presence_update(user_id, "online")
                         
+                        # 🔧 FIX: Send current online status of all other users in these conversations
+                        # This ensures the newly connected user sees who's already online
+                        if conv_resp.data:
+                            online_users_in_convs = set()
+                            for conv in conv_resp.data:
+                                conv_id = conv['conversation_id']
+                                # Get all members of this conversation
+                                members_resp = supabase.table('conversation_participants')\
+                                    .select('user_id')\
+                                    .eq('conversation_id', conv_id)\
+                                    .neq('user_id', user_id)\
+                                    .execute()
+                                
+                                if members_resp.data:
+                                    for member in members_resp.data:
+                                        other_user_id = member['user_id']
+                                        # Check if this user is online
+                                        presence = connection_manager.get_presence(other_user_id)
+                                        if presence.get('status') == 'online':
+                                            online_users_in_convs.add(other_user_id)
+                            
+                            # Send all online users to the newly connected user
+                            for online_user_id in online_users_in_convs:
+                                await websocket.send_json({
+                                    "type": "user_online",
+                                    "user_id": online_user_id,
+                                    "status": "online",
+                                    "timestamp": datetime.utcnow().isoformat()
+                                })
+                            
+                            logger.info(f"📤 Sent {len(online_users_in_convs)} online users to user {user_id}")
+                        
                         # Send confirmation
                         await websocket.send_json({
                             "type": "joined_conversations",
@@ -442,17 +481,34 @@ async def websocket_chat_endpoint(
                         
                         conv_data = conv_info.data[0] if conv_info.data else {}
                         
-                        # Calculate remaining messages for inquiry
+                        # 🔧 FIX: Increment inquiry_messages_sent counter for INQUIRY conversations
                         inquiry_status = None
                         if conv_data.get('conversation_type') == 'INQUIRY':
                             limit = conv_data.get('inquiry_message_limit', 15)
                             sent = conv_data.get('inquiry_messages_sent', 0)
-                            remaining = max(0, limit - sent)
+                            
+                            # Increment the counter in database
+                            new_sent = sent + 1
+                            try:
+                                supabase.table('conversations')\
+                                    .update({'inquiry_messages_sent': new_sent})\
+                                    .eq('id', conversation_id)\
+                                    .execute()
+                                logger.info(f"✅ Incremented inquiry_messages_sent: {sent} → {new_sent} for conversation {conversation_id}")
+                            except Exception as e:
+                                logger.error(f"Failed to update inquiry_messages_sent: {e}")
+                                # Continue with old value if update fails
+                                new_sent = sent
+                            
+                            # Use the NEW incremented value for accurate remaining count
+                            remaining = max(0, limit - new_sent)
                             
                             inquiry_status = {
                                 "messages_remaining": remaining,
+                                "messages_sent": new_sent,
+                                "message_limit": limit,
                                 "is_at_limit": remaining == 0,
-                                "warning_level": "critical" if remaining <= 3 else "low" if remaining <= 5 else None
+                                "warning_level": "critical" if remaining == 0 else "warning" if remaining <= 3 else "low" if remaining <= 5 else None
                             }
                         
                         # Broadcast to conversation with updated inquiry status
@@ -713,6 +769,7 @@ if __name__ == "__main__":
     # Get port from environment variable (default: 8000)
     port = int(os.getenv("BACKEND_PORT", "8000"))
     host = os.getenv("BACKEND_HOST", "127.0.0.1")
+    reload_enabled = os.getenv("BACKEND_RELOAD", "false").lower() == "true"
     
     print(f"\n🚀 Starting BookYourShoot Backend Server")
     print(f"   Host: {host}")
@@ -721,6 +778,10 @@ if __name__ == "__main__":
     print(f"   Swagger Docs: http://{host}:{port}/docs")
     print(f"   WebSocket Chat: ws://{host}:{port}/ws/chat")
     print(f"   WebSocket Voice: ws://{host}:{port}/ws/voice")
+    print(f"   Auto Reload: {'ON' if reload_enabled else 'OFF'}")
     print(f"\n   Press CTRL+C to quit\n")
-    
-    uvicorn.run("backend.main:app", host=host, port=port, reload=True)
+
+    if reload_enabled:
+        uvicorn.run("backend.main:app", host=host, port=port, reload=True)
+    else:
+        uvicorn.run(app, host=host, port=port, reload=False)

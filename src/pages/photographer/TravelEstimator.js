@@ -164,6 +164,15 @@ const TravelEstimator = () => {
           {/* Cost Breakdown */}
           <div className="col-lg-6">
             {estimate ? (
+              estimate.error ? (
+                <div className="card border-0 shadow-sm mb-4">
+                  <div className="card-body text-center py-5">
+                    <div className="text-warning mb-3" style={{ fontSize: '3rem' }}>⚠️</div>
+                    <h5 className="fw-bold mb-2">Cannot Estimate</h5>
+                    <p className="text-muted">{estimate.message || estimate.error}</p>
+                  </div>
+                </div>
+              ) : (
               <div className="card border-0 shadow-sm mb-4">
                 <div className="card-header bg-white border-0 pt-4 pb-3">
                   <div className="d-flex justify-content-between align-items-center">
@@ -173,48 +182,73 @@ const TravelEstimator = () => {
                 <div className="card-body">
                   <div className="text-center mb-4">
                     <div className="text-muted small">Round Trip Total</div>
-                    <div className="h2 fw-bold text-primary">PKR {estimate.estimates.round_trip.total.toLocaleString()}</div>
+                    <div className="h2 fw-bold text-primary">
+                      PKR {(estimate.total_cost || 0).toLocaleString()}
+                    </div>
                     <div className="text-muted small">
                       {estimate.distance_km} km • {estimate.duration_display}
                     </div>
                     <div className="text-muted small">Source: {estimate.source}</div>
+                    {estimate.travel_mode_used && (
+                      <span className="badge bg-secondary mt-1">
+                        {estimate.travel_mode_used === 'public_transport' ? '🚌 Bus' : '🚗 Personal Vehicle'}
+                      </span>
+                    )}
                   </div>
 
                   <div className="cost-breakdown">
+                    {/* Breakdown items */}
                     <div className="mb-3 p-3 bg-light rounded">
-                      <div className="fw-semibold mb-2">One Way</div>
-                      {estimate.estimates.one_way.breakdown.map((item, index) => (
+                      <div className="fw-semibold mb-2">Round Trip Breakdown</div>
+                      {(estimate.breakdown || []).map((item, index) => (
                         <div key={`${item.label}-${index}`} className="d-flex justify-content-between small mb-1">
                           <span>{item.label}</span>
-                          <span>PKR {item.amount.toLocaleString()}</span>
+                          <span>PKR {(item.amount || 0).toLocaleString()}</span>
                         </div>
                       ))}
                       <div className="d-flex justify-content-between mt-2 border-top pt-2">
                         <span className="fw-semibold">Total</span>
-                        <span className="fw-semibold">PKR {estimate.estimates.one_way.total.toLocaleString()}</span>
+                        <span className="fw-semibold">PKR {(estimate.total_cost || 0).toLocaleString()}</span>
                       </div>
                     </div>
 
-                    <div className="mb-3 p-3 bg-light rounded">
-                      <div className="fw-semibold mb-2">Round Trip</div>
-                      {estimate.estimates.round_trip.breakdown.map((item, index) => (
-                        <div key={`${item.label}-${index}`} className="d-flex justify-content-between small mb-1">
-                          <span>{item.label}</span>
-                          <span>PKR {item.amount.toLocaleString()}</span>
+                    {/* Accommodation info */}
+                    {estimate.accommodation?.included && (
+                      <div className="mb-3 p-3 bg-warning bg-opacity-10 rounded">
+                        <div className="fw-semibold mb-1">🏨 Accommodation Included</div>
+                        <div className="small text-muted">
+                          {estimate.accommodation.nights} night{estimate.accommodation.nights > 1 ? 's' : ''} 
+                          {' '}({estimate.accommodation.reason})
+                          {' '} — PKR {(estimate.accommodation.total_cost || 0).toLocaleString()}
                         </div>
-                      ))}
-                      <div className="d-flex justify-content-between mt-2 border-top pt-2">
-                        <span className="fw-semibold">Total</span>
-                        <span className="fw-semibold">PKR {estimate.estimates.round_trip.total.toLocaleString()}</span>
                       </div>
-                    </div>
+                    )}
+
+                    {/* Trip info */}
+                    {estimate.event_info && (
+                      <div className="mb-3 p-3 bg-info bg-opacity-10 rounded">
+                        <div className="small">
+                          <div className="d-flex justify-content-between mb-1">
+                            <span>Total Trip Duration</span>
+                            <span>{estimate.event_info.total_trip_hours || 0}h</span>
+                          </div>
+                          {estimate.event_info.event_days > 1 && (
+                            <div className="d-flex justify-content-between">
+                              <span>Event Days</span>
+                              <span>{estimate.event_info.event_days}</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   <div className="alert alert-info small mt-4">
-                    <strong>💡 Note:</strong> This is an estimate. Final cost may vary based on actual travel conditions.
+                    <strong>💡 Note:</strong> This is a round-trip estimate. Final cost may vary based on actual travel conditions.
                   </div>
                 </div>
               </div>
+              )
             ) : (
               <div className="card border-0 shadow-sm mb-4">
                 <div className="card-body text-center py-5">

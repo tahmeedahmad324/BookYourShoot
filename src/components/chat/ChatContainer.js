@@ -518,9 +518,11 @@ const ChatContainer = ({ userRole = 'client' }) => {
       const { conversation_id, inquiry_status } = e.detail;
       setConversations(prev => prev.map(conv => {
         if (conv.id === conversation_id) {
+          // 🔧 FIX: Use messages_sent from inquiry_status instead of calculating
           return {
             ...conv,
-            inquiry_messages_sent: conv.inquiry_message_limit - inquiry_status.messages_remaining
+            inquiry_messages_sent: inquiry_status.messages_sent || (conv.inquiry_message_limit - inquiry_status.messages_remaining),
+            inquiry_message_limit: inquiry_status.message_limit || conv.inquiry_message_limit
           };
         }
         return conv;

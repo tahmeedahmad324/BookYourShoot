@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { supabase } from '../supabaseClient';
 
 const AuthContext = createContext();
@@ -170,7 +170,7 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   // Get current session token for API calls
-  const getToken = async () => {
+  const getToken = useCallback(async () => {
     // If logged in with mock account, return mock token
     if (user?.is_mock) {
       const mockToken = `mock-jwt-token-${user.role}`;
@@ -189,9 +189,9 @@ export const AuthProvider = ({ children }) => {
     
     console.log('[AuthContext] Real token obtained from Supabase');
     return session.access_token;
-  };
+  }, [user]);  // Only re-create when user changes
 
-  const login = async (userData) => {
+  const login = useCallback(async (userData) => {
     console.log('[AuthContext] login() called with:', userData);
 
     // Handle both real Supabase sessions and mock accounts
@@ -200,9 +200,9 @@ export const AuthProvider = ({ children }) => {
     setUser(userData);
     // Store user data temporarily to prevent loss during navigation
     sessionStorage.setItem('real_user', JSON.stringify(userData));
-  };
+  }, []);
 
-  const logout = async () => {
+  const logout = useCallback(async () => {
     try {
       // If mock account, just clear state
       if (user?.is_mock) {
@@ -230,7 +230,7 @@ export const AuthProvider = ({ children }) => {
     } catch (error) {
       console.error('Logout error:', error);
     }
-  };
+  }, [user]);
 
   const value = {
     user,

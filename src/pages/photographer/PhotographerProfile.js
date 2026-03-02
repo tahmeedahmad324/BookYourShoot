@@ -654,13 +654,20 @@ const PhotographerProfile = () => {
                             onChange={(e) => setEditedProfile({ ...editedProfile, city: e.target.value })}
                           >
                             <option value="Lahore">Lahore</option>
-                            <option value="Karachi">Karachi</option>
-                            <option value="Islamabad">Islamabad</option>
-                            <option value="Rawalpindi">Rawalpindi</option>
                             <option value="Faisalabad">Faisalabad</option>
+                            <option value="Rawalpindi">Rawalpindi</option>
                             <option value="Multan">Multan</option>
-                            <option value="Peshawar">Peshawar</option>
-                            <option value="Quetta">Quetta</option>
+                            <option value="Gujranwala">Gujranwala</option>
+                            <option value="Sialkot">Sialkot</option>
+                            <option value="Bahawalpur">Bahawalpur</option>
+                            <option value="Sargodha">Sargodha</option>
+                            <option value="Shekhupura">Shekhupura</option>
+                            <option value="Jhang">Jhang</option>
+                            <option value="Rahim Yar Khan">Rahim Yar Khan</option>
+                            <option value="Gujrat">Gujrat</option>
+                            <option value="Kasur">Kasur</option>
+                            <option value="Sahiwal">Sahiwal</option>
+                            <option value="Okara">Okara</option>
                           </select>
                         ) : (
                           <p className="form-control-plaintext">{profile.city}</p>

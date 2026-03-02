@@ -61,7 +61,7 @@ const ClientRentals = () => {
             category: 'camera',
             brand: 'Sony',
             model: 'A7R IV',
-            photographer_profile: { business_name: 'Camera World', city: 'Karachi' }
+            photographer_profile: { business_name: 'Camera World', city: 'Faisalabad' }
           },
           start_date: '2024-11-22',
           end_date: '2024-11-28',
@@ -80,7 +80,7 @@ const ClientRentals = () => {
             category: 'video',
             brand: 'DJI',
             model: 'Ronin 4D',
-            photographer_profile: { business_name: 'Video Pro Hub', city: 'Islamabad' }
+            photographer_profile: { business_name: 'Video Pro Hub', city: 'Rawalpindi' }
           },
           start_date: '2024-11-15',
           end_date: '2024-11-20',

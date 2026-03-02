@@ -49,7 +49,7 @@ PLAYLIST_MAP = {
     'mehndi': ['4848ZkWeM8Ut3JM3kfcepy'],
     'barat': ['0Mg9QB6YJyjnmJkTreKWOE'],
     'walima': ['5uh1m66xZNODbbXunsURCu'],
-    'birthday': ['1YhFtD5duKmrPq50fAf70a1'],
+    'birthday': ['1YhFtD5duKmrPq50fAf70a'],
     'corporate': ['3cgRMNpZOJzmJPLdibErF1']
 }
 
@@ -77,7 +77,8 @@ EXCLUDE_KEYWORDS = {
     'barat': ['mehndi', 'dholki', 'sangeet', 'walima'],
     'walima': ['mehndi', 'dholki', 'barat', 'baraat', 'birthday'],
     'birthday': ['mehndi', 'barat', 'baraat', 'walima'],
-    'corporate': ['mehndi', 'barat', 'baraat', 'walima', 'birthday']
+    'corporate': ['mehndi', 'barat', 'baraat', 'walima', 'birthday'],
+    'general': ['birthday', 'happy birthday', 'bday', 'mehndi', 'barat', 'baraat', 'walima']
 }
 
 
@@ -356,7 +357,8 @@ def get_music_suggestions(
         token = get_spotify_token()
         headers = {"Authorization": f"Bearer {token}"}
         
-        all_tracks = []
+        playlist_tracks = []
+        search_tracks = []
         vibe_matched = False
         source = "search"  # Track where tracks came from
         
@@ -364,43 +366,46 @@ def get_music_suggestions(
         if eventType and eventType.lower() in PLAYLIST_MAP:
             playlist_ids = PLAYLIST_MAP[eventType.lower()]
             
-            # Try each playlist until we get enough tracks
+            # Try each playlist to get tracks
             for playlist_id in playlist_ids:
-                if len(all_tracks) >= limit:
-                    break
-                
                 tracks = fetch_playlist_tracks(playlist_id, headers, limit=50)
                 if tracks:
                     # Filter out tracks with excluded keywords
                     tracks = filter_by_excluded_keywords(tracks, eventType)
-                    all_tracks.extend(tracks)
+                    playlist_tracks.extend(tracks)
                     source = f"playlist:{playlist_id}"
                     print(f"Fetched {len(tracks)} tracks from playlist {playlist_id} (after keyword filter)")
             
             # Apply vibe filtering if we got tracks from playlist
-            if all_tracks:
-                track_ids = [t["id"] for t in all_tracks]
+            if playlist_tracks:
+                track_ids = [t["id"] for t in playlist_tracks]
                 audio_features = get_audio_features(track_ids, headers)
                 
                 if audio_features:
-                    filtered_tracks = filter_tracks_by_vibe(all_tracks, audio_features, eventType)
+                    filtered_tracks = filter_tracks_by_vibe(playlist_tracks, audio_features, eventType)
                     
                     if len(filtered_tracks) >= 5:
                         # Vibe filtering successful!
-                        all_tracks = filtered_tracks
+                        playlist_tracks = filtered_tracks
                         vibe_matched = True
-                        all_tracks.sort(key=lambda x: x.get("vibeScore", 0), reverse=True)
-                        print(f"Vibe filtering: {len(filtered_tracks)}/{len(all_tracks)} tracks passed")
+                        playlist_tracks.sort(key=lambda x: x.get("vibeScore", 0), reverse=True)
+                        print(f"Vibe filtering: {len(filtered_tracks)} playlist tracks passed vibe filter")
                     else:
                         # Too few tracks after filtering, keep original
-                        print(f"Vibe filtering too strict ({len(filtered_tracks)} tracks), keeping all")
-                        for track in all_tracks:
+                        print(f"Vibe filtering too strict ({len(filtered_tracks)} tracks), keeping all playlist tracks")
+                        for track in playlist_tracks:
                             track["vibeScore"] = track["popularity"]
-                        all_tracks.sort(key=lambda x: x["popularity"], reverse=True)
+                        playlist_tracks.sort(key=lambda x: x["popularity"], reverse=True)
+                
+                # Mark playlist tracks as prioritized
+                for track in playlist_tracks:
+                    track["source"] = "playlist"
         
-        # PHASE 2: Search Fallback if insufficient tracks
-        if len(all_tracks) < 5:
-            print(f"Falling back to search (only {len(all_tracks)} tracks from playlists)")
+        # PHASE 2: Always add keyword search results to provide more variety
+        if eventType or search:
+            # Calculate how many search tracks to add
+            search_limit = max(15, limit - len(playlist_tracks))
+            print(f"Adding keyword search results (playlist: {len(playlist_tracks)}, requesting {search_limit} search tracks)")
             
             # Build search query
             query_parts = []
@@ -430,7 +435,7 @@ def get_music_suggestions(
             params = {
                 "q": query,
                 "type": "track",
-                "limit": limit * 2,
+                "limit": search_limit,
                 "market": "IN"
             }
             
@@ -438,10 +443,9 @@ def get_music_suggestions(
             
             if response.status_code == 200:
                 data = response.json()
-                search_tracks = data.get("tracks", {}).get("items", [])
+                search_results = data.get("tracks", {}).get("items", [])
                 
-                search_formatted = []
-                for track in search_tracks:
+                for track in search_results:
                     title = track["name"]
                     artist = ", ".join([artist["name"] for artist in track["artists"]])
                     album = track["album"]["name"]
@@ -452,7 +456,7 @@ def get_music_suggestions(
                         title, artist, album, search or "", popularity
                     )
                     
-                    search_formatted.append({
+                    search_tracks.append({
                         "id": track["id"],
                         "title": title,
                         "artist": artist,
@@ -463,18 +467,18 @@ def get_music_suggestions(
                         "spotifyUrl": track["external_urls"]["spotify"],
                         "popularity": popularity,
                         "relevance": relevance_score,
-                        "vibeScore": relevance_score
+                        "vibeScore": relevance_score,
+                        "source": "search"
                     })
                 
                 # Filter out tracks with excluded keywords
-                search_formatted = filter_by_excluded_keywords(search_formatted, eventType)
-                all_tracks.extend(search_formatted)
-            
-            source = "search_fallback"
-            # Sort by relevance score (prioritizes title matches over popularity)
-            all_tracks.sort(key=lambda x: x["relevance"], reverse=True)
+                search_tracks = filter_by_excluded_keywords(search_tracks, eventType)
+                print(f"Added {len(search_tracks)} tracks from keyword search")
         
-        # PHASE 3: Remove duplicates (keep first occurrence)
+        # PHASE 3: Merge playlist tracks first, then search tracks (prioritized order)
+        all_tracks = playlist_tracks + search_tracks
+        
+        # PHASE 4: Remove duplicates (keep first occurrence = playlist tracks prioritized)
         seen_ids = set()
         unique_tracks = []
         for track in all_tracks:
@@ -483,26 +487,36 @@ def get_music_suggestions(
                 unique_tracks.append(track)
         
         all_tracks = unique_tracks
-        print(f"After deduplication: {len(all_tracks)} unique tracks")
+        print(f"After deduplication: {len(all_tracks)} unique tracks ({len(playlist_tracks)} from playlist, {len(search_tracks)} from search)")
         
-        # PHASE 4: Shuffle for variety (keep top tracks but add randomness)
+        # PHASE 5: Light shuffle for variety while maintaining playlist priority
+        # Keep playlist tracks at the top, only shuffle search results
         import random
-        if len(all_tracks) > limit:
-            # Keep top 70% by score, shuffle the rest
-            top_n = int(len(all_tracks) * 0.7)
-            top_tracks = all_tracks[:top_n]
-            remaining = all_tracks[top_n:]
-            random.shuffle(remaining)
-            all_tracks = top_tracks + remaining
+        playlist_count = len([t for t in all_tracks if t.get("source") == "playlist"])
+        playlist_section = all_tracks[:playlist_count]
+        search_section = all_tracks[playlist_count:]
+        
+        # Optionally shuffle search results for variety
+        if len(search_section) > 5:
+            random.shuffle(search_section)
+        
+        all_tracks = playlist_section + search_section
         
         # Return requested limit
         final_tracks = all_tracks[:limit]
+        
+        # Determine final source for response
+        final_source = "playlist" if playlist_count > 0 else "search"
+        if playlist_count > 0 and len(search_section) > 0:
+            final_source = "hybrid"
         
         return {
             "success": True,
             "tracks": final_tracks,
             "vibeMatched": vibe_matched,
-            "source": source,
+            "source": final_source,
+            "playlistTracks": playlist_count,
+            "searchTracks": len(search_section),
             "total": len(final_tracks),
             "previewAvailable": len(final_tracks)
         }
@@ -756,7 +770,7 @@ async def suggest_music_from_multiple_images(
             # Analyze with CLIP
             result = clip_analysis_service.detect_event_and_mood(image_data=image_base64, is_base64=True)
             
-            if result.get("success"):
+            if result.get("success") and result.get("is_valid_event", True):
                 event_type = result.get("detected_event", "unknown")
                 confidence = result.get("event_confidence", 0)
                 
@@ -767,9 +781,10 @@ async def suggest_music_from_multiple_images(
                     "detected_event": event_type,
                     "confidence": round(confidence, 2),
                     "confidence_percentage": f"{confidence * 100:.1f}%",
-                    "detected_mood": result.get("detected_mood", "calm"),
-                    "mood_confidence": round(result.get("mood_confidence", 0), 2),
-                    "all_scores": result.get("event_scores", {})
+                    # "detected_mood": result.get("detected_mood", "calm"),  # DISABLED - Mood deprecated
+                    # "mood_confidence": round(result.get("mood_confidence", 0), 2),
+                    "all_scores": result.get("all_event_scores", {}),
+                    "is_valid": True
                 })
                 
                 # Aggregate votes (confidence-weighted)
@@ -777,46 +792,115 @@ async def suggest_music_from_multiple_images(
                     event_votes[event_type] = 0
                 event_votes[event_type] += confidence
                 
-                # Track mood votes
-                mood = result.get("detected_mood", "calm")
-                mood_conf = result.get("mood_confidence", 0)
-                if mood not in mood_votes:
-                    mood_votes[mood] = 0
-                mood_votes[mood] += mood_conf
+                # MOOD TRACKING DISABLED (Feb 2026) - Spotify audio features deprecated
+                # # Track mood votes
+                # mood = result.get("detected_mood", "calm")
+                # mood_conf = result.get("mood_confidence", 0)
+                # if mood not in mood_votes:
+                #     mood_votes[mood] = 0
+                # mood_votes[mood] += mood_conf
             else:
-                # Failed to analyze this image
+                # Image rejected (not an event, scenery, casual photo, etc.)
+                rejection_reason = result.get("rejection_reason", "Analysis failed")
                 image_predictions.append({
                     "image_index": idx + 1,
                     "filename": image_file.filename,
-                    "detected_event": "unknown",
+                    "detected_event": result.get("detected_event", "rejected"),
                     "confidence": 0,
-                    "error": result.get("error", "Analysis failed")
+                    "is_valid": False,
+                    "rejection_reason": rejection_reason,
+                    "not_event_score": result.get("not_event_score", None)
                 })
         
-        # Step 2: Determine aggregate event type (weighted majority vote)
+        # Step 2: Check how many valid event images we got
+        valid_images = [p for p in image_predictions if p.get("is_valid", False)]
+        rejected_images = [p for p in image_predictions if not p.get("is_valid", True)]
+        
+        # If too many images were rejected, return helpful error
+        # INCREASED from 0.7 to 0.85 to be more lenient with legitimate event photos
+        if len(rejected_images) >= len(image_predictions) * 0.85:  # 85%+ rejected
+            rejection_reasons = [r.get("rejection_reason", "Unknown") for r in rejected_images]
+            most_common_reason = max(set(rejection_reasons), key=rejection_reasons.count)
+            
+            raise HTTPException(
+                status_code=400,
+                detail={
+                    "error": "Most uploaded images were rejected",
+                    "message": f"{len(rejected_images)}/{len(image_predictions)} images were not from events. {most_common_reason}",
+                    "valid_images": len(valid_images),
+                    "rejected_images": len(rejected_images),
+                    "details": image_predictions
+                }
+            )
+        
+        # Step 3: Determine aggregate event type (confidence-weighted majority vote with outlier rejection)
         if not event_votes:
             raise HTTPException(
                 status_code=400,
                 detail="Could not detect event type from any image. Please upload clearer event photos."
             )
         
+        # Reject predictions with very low confidence (< 10%) as noise
+        MIN_IMAGE_CONFIDENCE = 0.10
+        strong_predictions = [p for p in image_predictions if p.get("is_valid", False) and p.get("confidence", 0) >= MIN_IMAGE_CONFIDENCE]
+        
+        if not strong_predictions:
+            # Fall back to all valid predictions if none pass threshold
+            strong_predictions = [p for p in image_predictions if p.get("is_valid", False) and p.get("confidence", 0) > 0]
+        
+        if not strong_predictions:
+            raise HTTPException(
+                status_code=400,
+                detail="No valid event images with sufficient confidence. Please upload photos from actual events."
+            )
+        
+        # Re-aggregate using only strong predictions (confidence-weighted)
+        filtered_event_votes = {}
+        filtered_mood_votes = {}
+        for pred in strong_predictions:
+            event = pred.get("detected_event", "unknown")
+            conf = pred.get("confidence", 0)
+            filtered_event_votes[event] = filtered_event_votes.get(event, 0) + conf
+            
+            mood = pred.get("detected_mood", "calm")
+            mood_conf = pred.get("mood_confidence", 0)
+            filtered_mood_votes[mood] = filtered_mood_votes.get(mood, 0) + mood_conf
+        
         # Find event with highest total confidence
-        aggregate_event = max(event_votes, key=event_votes.get)
-        total_confidence = event_votes[aggregate_event]
-        num_valid_images = len([p for p in image_predictions if p["confidence"] > 0])
+        aggregate_event = max(filtered_event_votes, key=filtered_event_votes.get)
+        total_confidence = filtered_event_votes[aggregate_event]
+        num_valid_images = len(strong_predictions)
         aggregate_confidence = total_confidence / num_valid_images if num_valid_images > 0 else 0
         
-        # Find aggregate mood
-        aggregate_mood = max(mood_votes, key=mood_votes.get) if mood_votes else "calm"
-        aggregate_mood_confidence = mood_votes[aggregate_mood] / num_valid_images if num_valid_images > 0 else 0
+        # Secondary ranking: also count how many images voted for the winner
+        winner_count = sum(1 for p in strong_predictions if p.get("detected_event") == aggregate_event)
+        vote_ratio = winner_count / num_valid_images if num_valid_images > 0 else 0
         
-        # Step 3: Get music suggestions for detected event + mood
-        print(f"🎵 Fetching music for event: {aggregate_event} (conf: {aggregate_confidence:.2%}), mood: {aggregate_mood} (conf: {aggregate_mood_confidence:.2%})")
+        # If vote ratio is low (< 40%), the images are ambiguous — warn in response
+        consensus_warning = None
+        if vote_ratio < 0.4 and num_valid_images >= 3:
+            runner_up = sorted(filtered_event_votes.items(), key=lambda x: -x[1])
+            if len(runner_up) >= 2:
+                consensus_warning = (
+                    f"Low consensus: only {winner_count}/{num_valid_images} images voted for "
+                    f"'{aggregate_event}'. Runner-up: '{runner_up[1][0]}'. "
+                    f"Upload more similar event photos for better accuracy."
+                )
         
-        # Use mood-aware music recommendations
+        # MOOD DETECTION DISABLED (Feb 2026)
+        # Spotify audio features API deprecated for new developers
+        # 
+        # # Find aggregate mood
+        # aggregate_mood = max(filtered_mood_votes, key=filtered_mood_votes.get) if filtered_mood_votes else "calm"
+        # aggregate_mood_confidence = filtered_mood_votes.get(aggregate_mood, 0) / num_valid_images if num_valid_images > 0 else 0
+        
+        # Step 3: Get music suggestions for detected event (without mood)
+        print(f"🎵 Fetching music for event: {aggregate_event} (conf: {aggregate_confidence:.2%})")
+        
+        # Get event-based music recommendations (mood parameter ignored by service)
         music_suggestions = spotify_service.get_mood_aware_recommendations(
             event_type=aggregate_event,
-            mood=aggregate_mood,
+            mood=None,  # Deprecated - not used
             limit=50
         )
         
@@ -833,17 +917,19 @@ async def suggest_music_from_multiple_images(
                 "aggregate_event_type": aggregate_event,
                 "aggregate_confidence": round(aggregate_confidence, 2),
                 "confidence_percentage": f"{aggregate_confidence * 100:.1f}%",
-                "aggregate_mood": aggregate_mood,
-                "aggregate_mood_confidence": round(aggregate_mood_confidence, 2),
-                "mood_percentage": f"{aggregate_mood_confidence * 100:.1f}%",
+                "vote_ratio": round(vote_ratio, 2),
+                "consensus_warning": consensus_warning,
+                # "aggregate_mood": aggregate_mood,  # DISABLED - Mood detection deprecated
+                # "aggregate_mood_confidence": round(aggregate_mood_confidence, 2),
+                # "mood_percentage": f"{aggregate_mood_confidence * 100:.1f}%",
                 "all_event_votes": {
                     event: round(score / num_valid_images, 2) 
-                    for event, score in event_votes.items()
+                    for event, score in filtered_event_votes.items()
                 },
-                "all_mood_votes": {
-                    mood: round(score / num_valid_images, 2)
-                    for mood, score in mood_votes.items()
-                },
+                # "all_mood_votes": {  # DISABLED - Mood detection deprecated
+                #     mood: round(score / num_valid_images, 2)
+                #     for mood, score in filtered_mood_votes.items()
+                # },
                 "individual_predictions": image_predictions
             },
             "music_suggestions": {

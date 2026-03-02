@@ -21,7 +21,7 @@ WHY THIS APPROACH IS BETTER THAN DIRECT SPOTIFY SEARCH:
 
 IMPLEMENTATION:
 ---------------
-- Uses openai/clip-vit-base-patch32 model (smaller, faster for demo)
+- Uses openai/clip-vit-large-patch14 model (higher accuracy for production)
 - Zero-shot classification with custom Pakistani event categories
 - Video support via ffmpeg frame extraction
 - Confidence-based aggregation for reliable predictions
@@ -75,80 +75,90 @@ except ImportError:
 # Pakistani/South Asian event types with descriptive prompts for CLIP
 # These prompts are specifically designed for Pakistani wedding customs and attire
 # More specific prompts = better zero-shot classification accuracy
+# IMPORTANT: Prompts are tuned for clip-vit-large-patch14 — longer, more descriptive
 EVENT_PROMPTS = {
     "mehndi": [
         # Traditional mehndi ceremony - focus on colors, decorations, attire
-        "yellow and green colorful decorations at Pakistani wedding",
-        "bride wearing bright yellow or green dress at mehndi",
-        "colorful curtains and flower decorations at mehndi ceremony",
-        "women in colorful traditional dresses at celebration",
-        "bright colorful Pakistani wedding function with flowers",
-        "yellow marigold flower decorations at celebration",
-        "person in bright colored traditional Pakistani dress",
-        "mehndi henna designs on hands at wedding",
-        "colorful fabric drapes and flower garlands at celebration",
-        "vibrant yellow green orange decorations at party"
+        "a photograph of a Pakistani mehndi ceremony with yellow and green colorful decorations",
+        "a bride wearing a bright yellow or green traditional dress at a mehndi function",
+        "a colorful mehndi night with marigold garlands, flower curtains, and traditional dholki music",
+        "women in vibrant yellow, green, and orange dresses clapping and dancing at a mehndi celebration",
+        "a mehndi ceremony setup with bright fabric drapes, floral garlands, and henna decorations",
+        "henna patterns being applied on hands at a traditional South Asian mehndi ceremony",
+        "a group of women singing and dancing on a colorfully decorated mehndi stage",
+        "a vibrant Pakistani mehndi function with yellow marigold flowers and mirror-work decorations",
+        "a close-up of mehndi henna designs on a bride's hands with bangles and jewelry",
+        "a festive colorful stage with orange and yellow drapes for a mehndi night celebration",
+        "a vibrant Pakistani Mehndi ceremony dominated by bright yellow and orange marigold decor",
+        "a casual, high-energy floor-seated gathering with a dholak drum and singing women"
     ],
     "barat": [
-        # Pakistani Barat/Walima - formal wedding photos
-        "bride in red or pink bridal dress with jewelry",
-        "groom with red turban at Pakistani wedding",
-        "person in waistcoat and shalwar kameez at wedding",
-        "formal portrait at Pakistani wedding venue",
-        "white flower wall backdrop at wedding",
-        "person sitting on decorated chair at wedding",
-        "traditional Pakistani wedding formal attire",
-        "wedding photo with flower decorations",
-        "man in waistcoat and formal dress at celebration",
-        "bride with heavy jewelry and makeup at wedding",
-        "red and gold wedding decorations",
-        "formal wedding portrait with elegant backdrop",
-        "person in traditional dress at formal event"
+        # Pakistani Barat - formal wedding, bride in red, groom entry, warm red/gold tones
+        "a Pakistani bride wearing a traditional red or maroon bridal lehenga with heavy gold jewelry",
+        "a groom wearing a sherwani and a red turban arriving at a barat wedding ceremony",
+        "a formal Pakistani wedding portrait with the bride and groom on a decorated wedding stage",
+        "a white and red flower wall backdrop at a traditional Pakistani barat wedding",
+        "a groom sitting on a decorated wedding chair at a formal barat ceremony",
+        "a traditional Pakistani wedding barat with red and gold decorations and flower arrangements",
+        "a bride with heavy bridal makeup, nath nose ring, and tikka headpiece at a barat ceremony",
+        "the bride and groom exchanging vows at a formal Islamic nikah ceremony",
+        "a formal wedding photo featuring red and gold decorations and traditional Pakistani attire",
+        "a wedding procession with the groom arriving in a decorated car for the barat",
+        "a formal portrait of a couple in traditional bridal red and groom sherwani at a wedding",
+        "an elaborately decorated wedding stage with flowers and lights for a barat ceremony",
+        "a person in traditional heavily embroidered formal wedding attire with gold work",
+        "a wedding stage with intense red rose backdrops and warm, high-contrast gold lighting",
+        "a crowded wedding procession with rose petal showers and a decorated luxury car"
     ],
     "walima": [
-        # Walima reception - formal elegant event
-        "elegant wedding reception with decorations",
-        "formal Pakistani wedding dinner",
-        "bride and groom at walima reception",
-        "wedding reception with flower decorations",
-        "formal portrait at wedding reception",
-        "person in elegant formal dress at reception",
-        "white and pastel decorations at wedding",
-        "formal seated portrait at wedding",
-        "elegant backdrop at wedding reception"
+        # Walima reception - elegant, formal, COOL-TONED (silver/mint/pastel) vs barat's warm red/gold
+        "an elegant walima wedding reception with pastel and white flower decorations",
+        "a bride in a light pastel or white dress at a sophisticated walima dinner reception",
+        "a formal Pakistani walima reception with crystal chandeliers and elegant table settings",
+        "a wedding reception dinner party with white and gold decorations and candles",
+        "a bride and groom seated at a walima reception with a beautiful floral backdrop",
+        "an elegant dinner setting with round tables, white tablecloths, and centerpiece flowers",
+        "a formal seated portrait of a couple at a walima reception hall",
+        "a light and elegant wedding reception party with fairy lights and draped fabric",
+        "a sophisticated evening wedding reception with soft lighting and floral arrangements",
+        "an elegant Walima reception with a cool-toned pastel, silver, or mint green color palette",
+        "a bride in a silver, grey, or champagne-colored gown with diamond or stonework jewelry",
+        "a Walima stage with white hydrangeas, lilies, and soft white fairy lights",
+        "a calm and formal reception atmosphere with guests seated at round banquet tables"
     ],
     "birthday": [
         # Birthday celebrations
-        "birthday party with decorated cake and colorful balloons",
-        "children's birthday celebration with cartoon decorations",
-        "birthday cake with lit candles and party decorations",
-        "colorful birthday party with wrapped presents and streamers",
-        "happy birthday celebration with family gathered around cake",
-        "birthday party with banner and balloon arch decorations",
-        "child blowing candles on birthday cake",
-        "birthday celebration with themed decorations and guests"
+        "a birthday party with a decorated cake, colorful balloons, and party streamers",
+        "a children's birthday celebration with cartoon-themed decorations and a birthday cake",
+        "a birthday cake with lit candles being blown out at a birthday party",
+        "a colorful birthday party table with wrapped presents, confetti, and party hats",
+        "a happy family gathered around a birthday cake singing happy birthday",
+        "a birthday party with a balloon arch, banners saying happy birthday, and party decorations",
+        "a child blowing out candles on a birthday cake surrounded by smiling family",
+        "a first birthday smash cake party with number balloons and pastel decorations"
     ],
     "corporate": [
         # Professional events
-        "corporate event with people in formal business suits",
-        "professional conference or seminar in auditorium setting",
-        "business meeting in modern office environment",
-        "corporate gala dinner with formal table setup",
-        "professional networking event with name badges",
-        "presentation or speech at corporate event",
-        "business conference with projector and audience"
+        "a corporate event with people wearing formal business suits in a conference hall",
+        "a professional conference with a speaker at a podium and an audience in a seminar hall",
+        "a business meeting in a modern office environment with a large table and laptops",
+        "a corporate gala dinner with formal place settings, name badges, and business attire",
+        "a professional networking event in a hotel ballroom with standing cocktail tables",
+        "a corporate award ceremony with a stage, microphone, and branded backdrop",
+        "a technology conference with projection screens and rows of seated professionals",
+        "business professionals wearing identification lanyards in a brightly lit conference hall"
     ],
     "general": [
-        # Catch-all for other celebrations
-        "a social gathering or celebration with people",
-        "people dressed formally at a party or event",
-        "casual social event with guests mingling",
-        "family gathering or reunion with multiple generations",
-        "general celebration or function with decorations"
-        "concert or festival with crowd enjoying music"
-        "baby photo shoot with cute decorations"
-        "friends hanging out at casual event"
-        
+        # Catch-all for OTHER ACTUAL EVENTS (must have clear event context)
+        "a social celebration event with visible decorations, balloons, or party setup",
+        "people dressed formally at an organized party or indoor event with decorations",
+        "a catered social event with formal table settings, guests, and event decorations",
+        "a family celebration or reunion with multiple generations gathered for an occasion",
+        "an organized function with visible event decorations, banners, and guests celebrating",
+        "a concert or music festival with stage lighting, crowd, and live performance setup",
+        "a cultural celebration or community event with traditional decorations and people gathered",
+        "a formal graduation ceremony with caps, gowns, and ceremonial setup",
+        "an anniversary or milestone celebration with decorations and formal gathering"
     ]
 }
 
@@ -193,20 +203,48 @@ NOT_EVENT_PROMPTS = [
     "a screenshot of a mobile phone app or text messages",
     "a screenshot of a website browser or social media feed",
     "a video game character in a digital gaming environment",
-    "an esports or gaming tournament screenshot with health bars",
+    "an esports or gaming tournament screenshot with health bars and UI overlays",
+    "a digital user interface (UI) with health bars, buttons, and gaming text",
     
     # Clearly non-event content
     "a cartoon or animated drawing not a real photograph",
     "a meme image with text overlays and internet humor",
-    "a document page with text or paperwork"
+    "a low-quality internet meme with bold white Impact font text",
+    "a document page with text or paperwork",
+    "a flat document scan or a white page filled with black printed text",
+    
+    # Scenery and landscape photos (NOT events)
+    "a landscape photograph of mountains, trees, or nature scenery without any people",
+    "a scenic view of railway tracks, roads, or infrastructure in nature",
+    "an empty outdoor landscape with hills, forests, or countryside",
+    "a nature photograph focusing on trees, plants, or natural scenery",
+    "a travel photograph of tourist destinations or landmarks without event activities",
+    
+    # Baby/toddler casual photos (NOT event photography)
+    "a casual baby photoshoot or toddler portrait in a home or garden",
+    "a baby or toddler sitting alone on furniture or in a garden without event context",
+    "a studio baby portrait with props on a plain background",
+    "a casual family photo of a baby or child in everyday clothing at home",
+    
+    # Random personal/casual photos (NOT events) - Made more specific to avoid matching formal events
+    "a casual selfie or personal photo taken at home in everyday street clothes",
+    "a random snapshot of daily life with jeans and t-shirts without any event context",
+    "people in casual everyday street clothing like jeans and hoodies in a plain setting",
+    "a personal photo in pajamas or loungewear at home without any formal context",
+    "a casual group photo in everyday casual wear without any wedding or celebration attire"
 ]
 
 # Minimum confidence threshold for valid event detection
 # If the best event score is below this, the image is likely not an event
-MIN_EVENT_CONFIDENCE = 0.12  # 12% - lowered to reduce false rejections
+MIN_EVENT_CONFIDENCE = 0.08  # 8% - very low to avoid rejecting legitimate events
+
+# Special threshold for "general" event - must be higher to avoid false positives
+MIN_GENERAL_EVENT_CONFIDENCE = 0.20  # 20% - lowered from 25%
 
 # If NOT_EVENT score exceeds this relative to best event, reject
-NOT_EVENT_THRESHOLD = 1.0  # not_event must be < 100% of best_event to accept
+# INCREASED from 1.3 to 2.0 - NOT_EVENT must be 2x HIGHER than best_event to reject
+# This is very lenient to avoid rejecting formal wedding photos
+NOT_EVENT_THRESHOLD = 2.0  # not_event must be 2x higher than event score to reject
 
 # Mapping detected events to music vibes (for Spotify integration)
 EVENT_TO_MUSIC_VIBE = {
@@ -241,10 +279,56 @@ EVENT_TO_MUSIC_VIBE = {
         "danceability_min": 0.2
     },
     "general": {
-        "genres": ["pop", "party"],
-        "keywords": "party celebration happy music",
+        "genres": ["pop", "indie", "chill"],
+        "keywords": "popular music trending songs",
         "energy_range": (0.4, 0.8),
-        "danceability_min": 0.4
+        "danceability_min": 0.3
+    }
+}
+
+# Visual context prompts for better music matching
+VISUAL_CONTEXT_PROMPTS = {
+    "setting": {
+        "outdoor_nature": [
+            "a photo taken outdoors in nature with trees, mountains, or natural landscape",
+            "an outdoor scenic location with natural environment"
+        ],
+        "outdoor_urban": [
+            "a photo taken outdoors in an urban setting with buildings or city environment",
+            "an outdoor urban location with streets or architecture"
+        ],
+        "indoor_casual": [
+            "a photo taken indoors in a casual home or informal setting",
+            "an indoor casual environment like a room or house"
+        ],
+        "indoor_formal": [
+            "a photo taken indoors at a formal venue like a hall or decorated space",
+            "an indoor formal event space with decorations"
+        ]
+    },
+    "style": {
+        "casual": [
+            "people wearing casual everyday clothes like jeans, t-shirts, or casual wear",
+            "a casual photo with informal clothing and relaxed poses"
+        ],
+        "traditional": [
+            "people wearing traditional cultural clothing or ethnic attire like Shalwar Kameez or Sherwani",
+            "traditional dress and cultural clothing in the photo"
+        ],
+        "formal": [
+            "people wearing formal clothes like suits, dresses, or elegant evening gowns",
+            "formal clothing and elegant outfits in the photo"
+        ]
+    },
+    "atmosphere": {
+        "bright_cheerful": [
+            "a bright and cheerful photo with good lighting and happy atmosphere",
+            "well-lit bright photo with positive vibes"
+        ],
+        "dim_intimate": [
+            "a photo with soft or dim lighting creating an intimate mood",
+            "dimly lit intimate atmosphere in the photo"
+        ]
     }
 }
 
@@ -328,7 +412,7 @@ class CLIPAnalysisService:
             
             # Use the base model for faster inference
             # For better accuracy, use: "openai/clip-vit-large-patch14"
-            model_name = "openai/clip-vit-base-patch32"
+            model_name = "openai/clip-vit-large-patch14"
             
             self.model = CLIPModel.from_pretrained(model_name)
             self.processor = CLIPProcessor.from_pretrained(model_name)
@@ -552,34 +636,105 @@ class CLIPAnalysisService:
                 "all_mood_scores": {},
                 "num_people_detected": 0,
                 "music_params": None,
-                "model_used": "clip-vit-base-patch32 + yolov8"
+                "model_used": "clip-vit-large-patch14 + yolov8"
             }
         
-        # Step 1: Detect Event Type
+        # Step 1: Check NOT_EVENT prompts FIRST
+        not_event_result = self._zero_shot_classify(
+            image,
+            {"not_event": NOT_EVENT_PROMPTS},
+            ["not_event"]
+        )
+        
+        # Step 2: Detect Event Type
         event_result = self._zero_shot_classify(
             image, 
             EVENT_PROMPTS, 
             list(EVENT_PROMPTS.keys())
         )
         
-        # Step 2: Detect Mood
+        # Step 3: Reject if NOT_EVENT score is too high
+        not_event_confidence = not_event_result["confidence"]
+        best_event_confidence = event_result["confidence"]
+        
+        # Debug logging to understand rejections
+        print(f"🔍 Validation: Event={event_result['label']} ({best_event_confidence:.1%}), NOT_EVENT={not_event_confidence:.1%}, Threshold={NOT_EVENT_THRESHOLD}x")
+        print(f"   Decision: {'REJECT' if not_event_confidence > best_event_confidence * NOT_EVENT_THRESHOLD else 'ACCEPT'} (NOT_EVENT must be >{best_event_confidence * NOT_EVENT_THRESHOLD:.1%} to reject)")
+        
+        # If NOT_EVENT matches better than any real event, reject
+        if not_event_confidence > best_event_confidence * NOT_EVENT_THRESHOLD:
+            return {
+                "success": False,
+                "is_valid_event": False,
+                "rejection_reason": f"This appears to be a casual photo, scenery, or non-event image (confidence: {not_event_confidence:.0%}). Please upload photos from an actual event with decorations, ceremonies, or celebrations.",
+                "detected_event": "not_event",
+                "event_confidence": 0.0,
+                "detected_mood": "unknown",
+                "mood_confidence": 0.0,
+                "all_event_scores": event_result["all_scores"],
+                "not_event_score": not_event_confidence,
+                "num_people_detected": person_detection["num_people"],
+                "music_params": None,
+                "model_used": "clip-vit-large-patch14 + yolov8"
+            }
+        
+        # Step 4: Special validation for "general" event - must have higher confidence
+        if event_result["label"] == "general":
+            if best_event_confidence < MIN_GENERAL_EVENT_CONFIDENCE:
+                # Check if any specific event type scored close
+                all_scores = event_result["all_scores"]
+                sorted_scores = sorted(all_scores.items(), key=lambda x: -x[1])
+                
+                if len(sorted_scores) >= 2:
+                    runner_up = sorted_scores[1]
+                    margin = best_event_confidence - runner_up[1]
+                    
+                    # If margin is small, it's ambiguous
+                    if margin < 0.05:  # 5% margin
+                        suggestion = f"Image is ambiguous. If this is a {runner_up[0]} event, please upload more photos with clear decorations."
+                    else:
+                        suggestion = "Please upload photos from an actual event with decorations or ceremonies visible."
+                else:
+                    suggestion = "Please upload photos from an actual event."
+                
+                return {
+                    "success": False,
+                    "is_valid_event": False,
+                    "rejection_reason": f"Unable to identify a specific event type (confidence: {best_event_confidence:.0%}). {suggestion}",
+                    "detected_event": "general",
+                    "event_confidence": round(best_event_confidence, 2),
+                    "detected_mood": "unknown",
+                    "mood_confidence": 0.0,
+                    "all_event_scores": all_scores,
+                    "not_event_score": not_event_confidence,
+                    "num_people_detected": person_detection["num_people"],
+                    "music_params": None,
+                    "model_used": "clip-vit-large-patch14 + yolov8"
+                }
+        
+        # Step 5: Detect Mood
         mood_result = self._zero_shot_classify(
             image,
             MOOD_PROMPTS,
             list(MOOD_PROMPTS.keys())
         )
         
-        # Step 3: Get music parameters based on detected event
+        # Step 6: Get music parameters based on detected event
         music_params = EVENT_TO_MUSIC_VIBE.get(
             event_result["label"], 
             EVENT_TO_MUSIC_VIBE["general"]
         )
         
         # Add a low confidence warning if needed
-        best_event_confidence = event_result["confidence"]
         confidence_warning = None
         if best_event_confidence < 0.15:  # 15%
             confidence_warning = f"Low confidence detection ({best_event_confidence:.0%}). Results may not be accurate."
+        
+        # Step 4: For general/low-confidence events, detect visual context for better music matching
+        visual_context = None
+        if event_result["label"] == "general" or best_event_confidence < 0.40:
+            visual_context = self._detect_visual_context(image)
+            print(f"📸 Visual context: {visual_context}")
         
         print(f"✅ Detected: {event_result['label']} ({event_result['confidence']:.1%}), "
               f"Mood: {mood_result['label']} ({mood_result['confidence']:.1%})")
@@ -597,8 +752,67 @@ class CLIPAnalysisService:
             "all_mood_scores": mood_result["all_scores"],
             "num_people_detected": person_detection["num_people"],
             "music_params": music_params,
-            "model_used": "clip-vit-base-patch32 + yolov8"
+            "visual_context": visual_context,
+            "model_used": "clip-vit-large-patch14 + yolov8"
         }
+    
+    def _detect_visual_context(self, image: Image.Image) -> Dict[str, str]:
+        """
+        Detect visual context of the image to generate better music keywords.
+        
+        Analyzes:
+        - Setting: outdoor/indoor, nature/urban/formal
+        - Style: casual/traditional/formal attire
+        - Atmosphere: bright/dim lighting
+        
+        Returns:
+            Dictionary with detected setting, style, and atmosphere
+        """
+        context = {}
+        
+        # Detect setting
+        setting_scores = {}
+        for category, prompts in VISUAL_CONTEXT_PROMPTS["setting"].items():
+            result = self._zero_shot_classify(
+                image,
+                {category: prompts},
+                [category]
+            )
+            setting_scores[category] = result["confidence"]
+        
+        # Get best setting
+        best_setting = max(setting_scores, key=setting_scores.get)
+        context["setting"] = best_setting
+        
+        # Detect style
+        style_scores = {}
+        for category, prompts in VISUAL_CONTEXT_PROMPTS["style"].items():
+            result = self._zero_shot_classify(
+                image,
+                {category: prompts},
+                [category]
+            )
+            style_scores[category] = result["confidence"]
+        
+        # Get best style
+        best_style = max(style_scores, key=style_scores.get)
+        context["style"] = best_style
+        
+        # Detect atmosphere
+        atmosphere_scores = {}
+        for category, prompts in VISUAL_CONTEXT_PROMPTS["atmosphere"].items():
+            result = self._zero_shot_classify(
+                image,
+                {category: prompts},
+                [category]
+            )
+            atmosphere_scores[category] = result["confidence"]
+        
+        # Get best atmosphere
+        best_atmosphere = max(atmosphere_scores, key=atmosphere_scores.get)
+        context["atmosphere"] = best_atmosphere
+        
+        return context
     
     def _check_not_event(self, image: Image.Image) -> float:
         """
@@ -686,17 +900,24 @@ class CLIPAnalysisService:
             # Convert to probabilities using softmax
             probs = torch.softmax(logits, dim=0).cpu().numpy()
         
-        # Aggregate scores by label (average of all prompts for each label)
+        # Aggregate scores by label (max-of-means: for each label, pick the max
+        # prompt score then average. This is more robust than simple mean because
+        # a single highly-matching prompt is more informative.)
         label_scores = {label: [] for label in labels}
         
         for i, prompt in enumerate(all_prompts):
             label = prompt_to_label[prompt]
             label_scores[label].append(probs[i])
         
-        # Calculate average score for each label
+        # Calculate score for each label using a hybrid of max and mean.
+        # avg = mean(scores);  peak = max(scores)
+        # combined = 0.6 * peak + 0.4 * avg  (emphasise best-matching prompt)
         avg_scores = {}
         for label in labels:
-            avg_scores[label] = float(sum(label_scores[label]) / len(label_scores[label]))
+            scores = label_scores[label]
+            mean_val = float(sum(scores) / len(scores))
+            max_val  = float(max(scores))
+            avg_scores[label] = 0.6 * max_val + 0.4 * mean_val
         
         # Find best label
         best_label = max(avg_scores, key=avg_scores.get)
@@ -806,7 +1027,7 @@ class CLIPAnalysisService:
                 "all_event_scores": avg_event_scores,
                 "all_mood_scores": avg_mood_scores,
                 "music_params": music_params,
-                "model_used": "clip-vit-base-patch32",
+                "model_used": "clip-vit-large-patch14",
                 "frames_analyzed": len(frames),
                 "is_video": True
             }
@@ -960,3 +1181,63 @@ def get_music_params_for_event(event_type: str) -> Dict[str, Any]:
         Dictionary with genres, keywords, and audio feature ranges
     """
     return EVENT_TO_MUSIC_VIBE.get(event_type, EVENT_TO_MUSIC_VIBE["general"])
+
+
+def generate_smart_music_keywords(event_type: str, mood: str, visual_context: Dict = None) -> str:
+    """
+    Generate context-aware music search keywords based on event, mood, and visual context.
+    
+    For specific events (mehndi, barat, walima), use predefined keywords.
+    For general events, generate keywords based on actual visual content and mood.
+    
+    Args:
+        event_type: Detected event type
+        mood: Detected mood (romantic, energetic, dance, calm)
+        visual_context: Visual analysis of the image (setting, style, atmosphere)
+        
+    Returns:
+        Smart search keywords string
+    """
+    # For specific events, use predefined keywords
+    if event_type in ["mehndi", "barat", "walima", "birthday", "corporate"]:
+        base_params = EVENT_TO_MUSIC_VIBE.get(event_type, {})
+        return base_params.get("keywords", "")
+    
+    # For general events, generate smart keywords from context
+    keywords = []
+    
+    # Map mood to music style
+    mood_to_style = {
+        "romantic": "romantic love songs ballads",
+        "energetic": "upbeat energetic pop dance",
+        "dance": "dance party upbeat groove",
+        "calm": "chill relax calm ambient acoustic"
+    }
+    keywords.append(mood_to_style.get(mood, "popular music"))
+    
+    # Add context-based keywords
+    if visual_context:
+        setting = visual_context.get("setting", "")
+        style = visual_context.get("style", "")
+        
+        # Setting-based keywords
+        if "outdoor_nature" in setting:
+            keywords.append("indie folk acoustic nature")
+        elif "outdoor_urban" in setting:
+            keywords.append("urban pop hip hop contemporary")
+        elif "indoor_casual" in setting:
+            keywords.append("chill lofi indie alternative")
+        elif "indoor_formal" in setting:
+            keywords.append("elegant classic contemporary")
+        
+        # Style-based keywords
+        if "casual" in style:
+            keywords.append("casual everyday trending")
+        elif "traditional" in style:
+            keywords.append("cultural traditional fusion")
+        elif "formal" in style:
+            keywords.append("sophisticated elegant classy")
+    
+    # Join and deduplicate keywords
+    final_keywords = " ".join(keywords)
+    return final_keywords

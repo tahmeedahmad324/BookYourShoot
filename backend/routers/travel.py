@@ -1,10 +1,10 @@
 """
 Travel Router
 =============
-Endpoints for inter-city travel cost estimation.
+Endpoints for inter-city travel cost estimation (Round-Trip Only).
 
-PRD: "Bus First, Calculate Second" hybrid strategy.
-  GET  /api/travel/estimate          — Core estimate endpoint
+PRD: "Bus First, Calculate Second" simplified strategy:
+  GET  /api/travel/estimate          — Core estimate endpoint (round-trip)
   GET  /api/travel/cities            — Supported cities list
   GET  /api/travel/bus-fares         — List bus fares (public)
   POST /api/travel/photographer/settings — Save photographer travel prefs
@@ -15,8 +15,6 @@ Admin endpoints:
   POST   /api/travel/admin/bus-fares       — Create bus fare
   PUT    /api/travel/admin/bus-fares/{id}  — Update bus fare
   DELETE /api/travel/admin/bus-fares/{id}  — Delete bus fare
-  GET    /api/travel/admin/cache-stats     — Cache statistics
-  POST   /api/travel/admin/cache-cleanup   — Purge expired cache
 """
 
 from fastapi import APIRouter, HTTPException, Depends, Query
@@ -46,11 +44,11 @@ class CalculateTravelRequest(BaseModel):
 class PhotographerTravelSettingsRequest(BaseModel):
     is_willing_to_travel: bool = True
     base_city: str = "Lahore"
-    per_km_rate: float = 30
+    per_km_rate: float = 35
     per_hour_rate: float = 0
-    min_charge: float = 500
+    min_charge: float = 1000
     requires_accommodation: bool = False
-    accommodation_fee: float = 3000
+    accommodation_fee: float = 5000
     avoided_cities: List[str] = []
     preferred_transport: str = "bus"  # bus, car, bike
     max_travel_distance_km: float = 500
@@ -104,22 +102,36 @@ def get_travel_estimate(
     to_city: str = Query(..., description="Destination city name"),
     photographer_id: Optional[str] = Query(None, description="Photographer UUID"),
     date: Optional[str] = Query(None, description="Event date (ISO format)"),
+    event_duration_hours: float = Query(0, description="Total event duration in hours (for single-day events)"),
+    event_days: int = Query(1, description="Number of days event spans (e.g., 3 for 3-day wedding)"),
+    requires_accommodation: bool = Query(False, description="Explicitly request accommodation"),
 ):
     """
-    🚌 CORE ENDPOINT: Inter-city Travel Cost Estimate
+    🚌 CORE ENDPOINT: Inter-City Travel Cost Estimate (Round-Trip Only)
 
     Strategy: "Bus First, Calculate Second"
       1. Look up predefined bus fare in DB
-      2. If not found, check cache for distance data
-      3. If cache miss, call Google Maps API (or Haversine fallback)
+      2. If not found, use OSRM routing API
+      3. Fallback to Punjab distance matrix or Haversine
       4. Apply photographer-specific rates if photographer_id provided
-      5. Return one-way & round-trip breakdowns
+      5. Return round-trip cost breakdown with smart accommodation logic
 
     Query Params:
       - from_city: Origin city (e.g. "Lahore")
       - to_city: Destination city (e.g. "Multan")
       - photographer_id: UUID (optional) — applies photographer's custom rates
       - date: ISO date (optional, for future date-based pricing)
+      - event_duration_hours: Total event hours (default 0)
+      - event_days: Number of days (default 1, use 3 for 3-day wedding)
+      - requires_accommodation: Force accommodation (default False)
+      
+    Accommodation Logic:
+      - Multi-day events (event_days > 1): Charges for (event_days - 1) nights
+        Example: 3-day wedding = 2 nights accommodation
+      - Single-day events: Adds accommodation if total trip > 12 hours
+      - Explicit request: requires_accommodation=True forces accommodation
+      
+    Note: Only round-trip costs are returned since photographers need to return home.
     """
     try:
         result = travel_cost_service.calculate_estimate(
@@ -127,6 +139,9 @@ def get_travel_estimate(
             to_city=to_city,
             photographer_id=photographer_id,
             date=date,
+            event_duration_hours=event_duration_hours,
+            event_days=event_days,
+            requires_accommodation=requires_accommodation,
         )
         return {"success": True, "data": result}
     except Exception as e:
@@ -167,11 +182,11 @@ def get_my_travel_settings(current_user: dict = Depends(get_current_user)):
                 "photographer_id": user_id,
                 "is_willing_to_travel": False,
                 "base_city": "Lahore",
-                "per_km_rate": 30,
+                "per_km_rate": 35,
                 "per_hour_rate": 0,
-                "min_charge": 500,
+                "min_charge": 1000,
                 "requires_accommodation": False,
-                "accommodation_fee": 3000,
+                "accommodation_fee": 5000,
                 "avoided_cities": [],
                 "preferred_transport": "bus",
                 "max_travel_distance_km": 500,
@@ -249,20 +264,6 @@ def delete_bus_fare(fare_id: int, current_user: dict = Depends(verify_admin)):
     if not success:
         raise HTTPException(status_code=400, detail="Failed to delete fare")
     return {"success": True, "message": f"Fare {fare_id} deleted"}
-
-
-@router.get("/admin/cache-stats")
-def get_cache_stats(current_user: dict = Depends(verify_admin)):
-    """Admin: View cache statistics."""
-    stats = travel_cost_service.get_cache_stats()
-    return {"success": True, "data": stats}
-
-
-@router.post("/admin/cache-cleanup")
-def cleanup_cache(current_user: dict = Depends(verify_admin)):
-    """Admin: Purge expired cache entries."""
-    count = travel_cost_service.clear_expired_cache()
-    return {"success": True, "message": f"Removed {count} expired entries"}
 
 
 # ====================================================================

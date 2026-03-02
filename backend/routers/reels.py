@@ -17,20 +17,25 @@ import traceback
 import numpy as np
 
 # MoviePy imports - Direct from moviepy module
+MOVIEPY_AVAILABLE = False
+ImageClip = None
+TextClip = None
+concatenate_videoclips = None
+ColorClip = None
+CompositeVideoClip = None
+AudioFileClip = None
+
 try:
     from moviepy import ImageClip, TextClip, concatenate_videoclips, ColorClip, CompositeVideoClip, AudioFileClip
     MOVIEPY_AVAILABLE = True
     print("✅ MoviePy loaded successfully")
 except ImportError as e:
-    print(f"Warning: MoviePy not available - {e}")
-    print("Install with: pip install moviepy")
-    ImageClip = None
-    TextClip = None
-    concatenate_videoclips = None
-    ColorClip = None
-    CompositeVideoClip = None
-    AudioFileClip = None
-    MOVIEPY_AVAILABLE = False
+    if "ffmpeg" in str(e).lower():
+        print(f"⚠️  MoviePy available but FFmpeg not found: {e}")
+        print("Install FFmpeg for video generation: https://ffmpeg.org/download.html")
+    else:
+        print(f"⚠️  MoviePy not available - {e}")
+        print("Install with: pip install moviepy")
 
 from PIL import Image, ImageDraw, ImageFont, ImageEnhance
 

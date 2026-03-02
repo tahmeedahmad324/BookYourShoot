@@ -33,6 +33,8 @@ export const VoiceCallProvider = ({ children }) => {
   useEffect(() => {
     const initService = async () => {
       if (!currentUserId) {
+        // User logged out — disconnect voice service
+        voiceChatService.disconnect();
         setIsServiceReady(false);
         return;
       }
@@ -40,10 +42,16 @@ export const VoiceCallProvider = ({ children }) => {
       try {
         const token = await getToken() || localStorage.getItem('token');
         
+        if (!token) {
+          console.warn('⚠️ No auth token available for voice service');
+          setIsServiceReady(false);
+          return;
+        }
+        
         // Initialize the service
         await voiceChatService.init(token, currentUserId);
         
-        // Set up state change listener
+        // Set up state change listener (always re-register after init)
         voiceChatService.onStateChange((state) => {
           console.log('🎙️ Voice call state changed:', state);
           setCallState(state);
@@ -97,6 +105,8 @@ export const VoiceCallProvider = ({ children }) => {
       if (durationIntervalRef.current) {
         clearInterval(durationIntervalRef.current);
       }
+      // Disconnect voice WS on unmount (e.g., during logout)
+      voiceChatService.disconnect();
     };
   }, [currentUserId, getToken]);
 
@@ -143,14 +153,14 @@ export const VoiceCallProvider = ({ children }) => {
   const rejectCall = useCallback(() => {
     if (!currentCall || !currentCall.isIncoming) return;
     
-    voiceChatService.rejectCall();
+    voiceChatService.rejectCall(); // rejectCall() already calls stopRingtone()
     setCurrentCall(null);
     setCallState('idle');
   }, [currentCall]);
 
   // End active call
   const endCall = useCallback(() => {
-    voiceChatService.endCall();
+    voiceChatService.endCall(); // endCall() already stops tones and timers
     setCurrentCall(null);
     setCallState('idle');
     
