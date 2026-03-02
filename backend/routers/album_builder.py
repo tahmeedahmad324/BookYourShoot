@@ -536,6 +536,75 @@ async def get_session_status(
     return {"success": True, "data": status}
 
 
+@router.get("/album-photos/{session_id}/{person_name}")
+async def get_album_photos(
+    session_id: str,
+    person_name: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Get list of photo files in a specific person's album
+    Returns base64 encoded thumbnails for preview
+    """
+    if session_id not in sessions:
+        raise HTTPException(status_code=404, detail="Session not found")
+    
+    session = sessions[session_id]
+    if session["user_id"] != current_user["id"]:
+        raise HTTPException(status_code=403, detail="Access denied")
+        
+    if session["status"] != "completed":
+        raise HTTPException(status_code=400, detail="Albums not ready yet")
+    
+    albums_dir = session.get("albums_dir")
+    if not albums_dir:
+        raise HTTPException(status_code=404, detail="Albums directory not found")
+    
+    # Get the person's album folder
+    person_album_dir = os.path.join(albums_dir, person_name)
+    if not os.path.exists(person_album_dir):
+        raise HTTPException(status_code=404, detail=f"Album for {person_name} not found")
+    
+    # Get all image files in the album
+    import base64
+    from PIL import Image
+    import io
+    
+    photos = []
+    for filename in os.listdir(person_album_dir):
+        file_path = os.path.join(person_album_dir, filename)
+        if os.path.isfile(file_path) and filename.lower().endswith(('.jpg', '.jpeg', '.png', '.gif', '.bmp')):
+            try:
+                # Create thumbnail
+                with Image.open(file_path) as img:
+                    # Convert to RGB if needed
+                    if img.mode in ('RGBA', 'LA', 'P'):
+                        img = img.convert('RGB')
+                    
+                    # Create thumbnail (max 300x300)
+                    img.thumbnail((300, 300), Image.Resampling.LANCZOS)
+                    
+                    # Convert to base64
+                    buffer = io.BytesIO()
+                    img.save(buffer, format='JPEG', quality=85)
+                    img_str = base64.b64encode(buffer.getvalue()).decode()
+                    
+                    photos.append({
+                        "filename": filename,
+                        "thumbnail": f"data:image/jpeg;base64,{img_str}"
+                    })
+            except Exception as e:
+                logger.warning(f"Failed to process {filename}: {e}")
+                continue
+    
+    return {
+        "success": True,
+        "person_name": person_name,
+        "photo_count": len(photos),
+        "photos": photos
+    }
+
+
 @router.delete("/cleanup-session/{session_id}")
 async def cleanup_session(
     session_id: str,

@@ -30,6 +30,8 @@ const ClientDashboard = () => {
     pendingPayments: 0,
     activeEscrows: 0,
   })
+  const [isAlbumProcessing, setIsAlbumProcessing] = useState(false)
+  const [albumProgress, setAlbumProgress] = useState(0)
 
   useEffect(() => {
     // Mock data for client bookings
@@ -63,6 +65,27 @@ const ClientDashboard = () => {
       pendingPayments: 1,
       activeEscrows: 2,
     })
+  }, [])
+
+  // Check for album processing status
+  useEffect(() => {
+    const checkAlbumProcessing = () => {
+      if (window.albumBuilderProcessing) {
+        setIsAlbumProcessing(window.albumBuilderProcessing.active || false)
+        setAlbumProgress(window.albumBuilderProcessing.progress || 0)
+      } else {
+        setIsAlbumProcessing(false)
+        setAlbumProgress(0)
+      }
+    }
+
+    // Check immediately
+    checkAlbumProcessing()
+
+    // Poll every second
+    const interval = setInterval(checkAlbumProcessing, 1000)
+
+    return () => clearInterval(interval)
   }, [])
 
   // Client menu options
@@ -263,21 +286,39 @@ const ClientDashboard = () => {
             <div className="row g-3">
               {menuOptions.map((option) => {
                 const IconComponent = option.icon
+                const showProcessingIndicator = option.id === 'album' && isAlbumProcessing
                 return (
                   <div className="col-md-6 col-lg-4" key={option.id}>
                     <Link
                       to={option.link}
                       className="card h-100 border hover-lift text-decoration-none"
                       onClick={() => window.scrollTo(0, 0)}
+                      style={{ position: 'relative' }}
                     >
                       <div className="card-body">
                         <div className="d-flex justify-content-between align-items-start mb-2">
-                          <div className="text-primary">
+                          <div className="text-primary" style={{ position: 'relative' }}>
                             <IconComponent size={32} />
+                            {showProcessingIndicator && (
+                              <span 
+                                className="position-absolute top-0 start-100 translate-middle p-2 bg-danger border border-light rounded-circle"
+                                style={{
+                                  animation: 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                                  boxShadow: '0 0 0 0 rgba(220, 38, 38, 0.7)'
+                                }}
+                              >
+                                <span className="visually-hidden">AI Processing</span>
+                              </span>
+                            )}
                           </div>
                           {option.badge !== null && option.badge !== undefined && (
                             <span className={`badge bg-${option.badgeColor || 'secondary'}`}>
                               {option.badge}
+                            </span>
+                          )}
+                          {showProcessingIndicator && (
+                            <span className="badge bg-danger">
+                              {albumProgress}%
                             </span>
                           )}
                         </div>
@@ -340,6 +381,15 @@ if (typeof document !== 'undefined') {
             0 0 0 2px #2d75c7,
             0 0 20px rgba(34, 94, 161, 0.5),
             0 0 40px rgba(247, 147, 30, 0.3);
+        }
+      }
+      
+      @keyframes pulse {
+        0%, 100% {
+          opacity: 1;
+        }
+        50% {
+          opacity: 0.5;
         }
       }
     `;
