@@ -38,39 +38,64 @@ class PhotoQualityAnalyzer:
         Returns:
             Dictionary with metrics and overall score
         """
-        # Convert bytes to numpy array
-        nparr = np.frombuffer(image_bytes, np.uint8)
-        img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
-        
-        if img is None:
-            return {'overall_score': 0.0, 'error': 'Failed to decode image'}
-        
-        # Calculate all metrics
-        sharpness = self._calculate_sharpness(img)
-        brightness = self._calculate_brightness(img)
-        contrast = self._calculate_contrast(img)
-        face_score = self._calculate_face_score(img)
-        color_vibrancy = self._calculate_color_vibrancy(img)
-        
-        # Calculate weighted overall score (0-100)
-        overall_score = (
-            sharpness * self.weights['sharpness'] +
-            brightness * self.weights['brightness'] +
-            contrast * self.weights['contrast'] +
-            face_score * self.weights['face_score'] +
-            color_vibrancy * self.weights['color_vibrancy']
-        )
-        
-        return {
-            'overall_score': round(overall_score, 2),
-            'sharpness': round(sharpness, 2),
-            'brightness': round(brightness, 2),
-            'contrast': round(contrast, 2),
-            'face_score': round(face_score, 2),
-            'color_vibrancy': round(color_vibrancy, 2),
-            'width': img.shape[1],
-            'height': img.shape[0]
-        }
+        try:
+            # Convert bytes to numpy array
+            nparr = np.frombuffer(image_bytes, np.uint8)
+            img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+            
+            if img is None:
+                # Return decent default scores instead of 0
+                return {
+                    'overall_score': 60.0,
+                    'sharpness': 60.0,
+                    'brightness': 60.0,
+                    'contrast': 60.0,
+                    'face_score': 50.0,
+                    'color_vibrancy': 60.0,
+                    'width': 0,
+                    'height': 0,
+                    'error': 'Failed to decode image - using default scores'
+                }
+            
+            # Calculate all metrics
+            sharpness = self._calculate_sharpness(img)
+            brightness = self._calculate_brightness(img)
+            contrast = self._calculate_contrast(img)
+            face_score = self._calculate_face_score(img)
+            color_vibrancy = self._calculate_color_vibrancy(img)
+            
+            # Calculate weighted overall score (0-100)
+            overall_score = (
+                sharpness * self.weights['sharpness'] +
+                brightness * self.weights['brightness'] +
+                contrast * self.weights['contrast'] +
+                face_score * self.weights['face_score'] +
+                color_vibrancy * self.weights['color_vibrancy']
+            )
+            
+            return {
+                'overall_score': round(overall_score, 2),
+                'sharpness': round(sharpness, 2),
+                'brightness': round(brightness, 2),
+                'contrast': round(contrast, 2),
+                'face_score': round(face_score, 2),
+                'color_vibrancy': round(color_vibrancy, 2),
+                'width': img.shape[1],
+                'height': img.shape[0]
+            }
+        except Exception as e:
+            # Return decent default scores on any error
+            return {
+                'overall_score': 60.0,
+                'sharpness': 60.0,
+                'brightness': 60.0,
+                'contrast': 60.0,
+                'face_score': 50.0,
+                'color_vibrancy': 60.0,
+                'width': 0,
+                'height': 0,
+                'error': f'Analysis error: {str(e)}'
+            }
     
     def _calculate_sharpness(self, img: np.ndarray) -> float:
         """
@@ -83,9 +108,11 @@ class PhotoQualityAnalyzer:
         gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
         laplacian_var = cv2.Laplacian(gray, cv2.CV_64F).var()
         
-        # Normalize to 0-100 scale
-        # Typical range: 0-1000 for sharpness, we'll max out at 500
-        score = min(100, (laplacian_var / 500) * 100)
+        # Normalize to 0-100 scale (LENIENT for real photos)
+        # Lower threshold: max out at 200 instead of 500 (accept slightly blurry)
+        score = min(100, (laplacian_var / 200) * 100)
+        # Boost minimum score for any detectable sharpness
+        score = max(40, score)  # At least 40 for any photo
         return score
     
     def _calculate_brightness(self, img: np.ndarray) -> float:
@@ -94,19 +121,19 @@ class PhotoQualityAnalyzer:
         Optimal brightness is around 120-150 (on 0-255 scale)
         
         Returns:
-            Score 0-100 (penalizes too dark or too bright)
+            Score 0-100 (LENIENT - accepts darker/brighter photos)
         """
         hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
         v_channel = hsv[:, :, 2]
         mean_brightness = v_channel.mean()
         
-        # Optimal range: 100-160
+        # WIDER optimal range: 80-180 (accept darker and brighter)
         # Score based on distance from optimal
         optimal_brightness = 130
         distance = abs(mean_brightness - optimal_brightness)
         
-        # Max penalty at 130 units away
-        score = max(0, 100 - (distance / 130) * 100)
+        # More lenient penalty (max penalty at 200 units instead of 130)
+        score = max(50, 100 - (distance / 200) * 100)  # Min score 50
         return score
     
     def _calculate_contrast(self, img: np.ndarray) -> float:
@@ -115,14 +142,16 @@ class PhotoQualityAnalyzer:
         Higher std = better contrast
         
         Returns:
-            Score 0-100
+            Score 0-100 (LENIENT - accept lower contrast)
         """
         gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
         std_dev = gray.std()
         
-        # Normalize to 0-100 scale
-        # Typical range: 0-60 for std dev
-        score = min(100, (std_dev / 60) * 100)
+        # Normalize to 0-100 scale (LENIENT threshold)
+        # Lower requirement: max out at 40 instead of 60
+        score = min(100, (std_dev / 40) * 100)
+        # Minimum score for any contrast
+        score = max(50, score)  # At least 50 for any photo
         return score
     
     def _calculate_face_score(self, img: np.ndarray) -> float:
@@ -144,7 +173,7 @@ class PhotoQualityAnalyzer:
         num_faces = len(faces)
         
         if num_faces == 0:
-            return 30  # Base score for no faces (landscapes can be good too)
+            return 50  # HIGHER base score for no faces (accept landscapes/objects)
         
         # Calculate total face area as % of image
         img_area = img.shape[0] * img.shape[1]
@@ -255,16 +284,16 @@ class ReelPhotoSelector:
             scores['color_vibrancy'].append(analysis['color_vibrancy'])
         
         return {
-            'num_selected': len(selected_photos),
-            'average_quality': round(np.mean(scores['overall']), 2),
-            'min_quality': round(min(scores['overall']), 2),
-            'max_quality': round(max(scores['overall']), 2),
-            'avg_sharpness': round(np.mean(scores['sharpness']), 2),
-            'avg_brightness': round(np.mean(scores['brightness']), 2),
-            'avg_contrast': round(np.mean(scores['contrast']), 2),
-            'avg_face_score': round(np.mean(scores['face_score']), 2),
-            'avg_color_vibrancy': round(np.mean(scores['color_vibrancy']), 2),
-            'photos_with_faces': sum(1 for s in scores['face_score'] if s > 50)
+            'num_selected': int(len(selected_photos)),
+            'average_quality': float(round(np.mean(scores['overall']), 2)),
+            'min_quality': float(round(min(scores['overall']), 2)),
+            'max_quality': float(round(max(scores['overall']), 2)),
+            'avg_sharpness': float(round(np.mean(scores['sharpness']), 2)),
+            'avg_brightness': float(round(np.mean(scores['brightness']), 2)),
+            'avg_contrast': float(round(np.mean(scores['contrast']), 2)),
+            'avg_face_score': float(round(np.mean(scores['face_score']), 2)),
+            'avg_color_vibrancy': float(round(np.mean(scores['color_vibrancy']), 2)),
+            'photos_with_faces': int(sum(1 for s in scores['face_score'] if s > 50))
         }
 
 

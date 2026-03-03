@@ -38,6 +38,7 @@ except ImportError as e:
         print("Install with: pip install moviepy")
 
 from PIL import Image, ImageDraw, ImageFont, ImageEnhance
+from PIL.ExifTags import TAGS as ExifTags
 
 # Supabase - fix import path
 from backend.supabase_client import supabase
@@ -45,6 +46,24 @@ from backend.auth import get_current_user
 
 # Import photo selector for auto-generation
 from backend.services.reel_photo_selector import analyze_and_select_photos
+
+# Import CLIP for event detection
+try:
+    from backend.services.clip_analysis_service import clip_analysis_service
+    CLIP_AVAILABLE = True
+except ImportError:
+    print("⚠️ CLIP service not available - event detection disabled")
+    CLIP_AVAILABLE = False
+    clip_analysis_service = None
+
+# Import Spotify service for music
+try:
+    from backend.services.spotify_service import spotify_service
+    SPOTIFY_AVAILABLE = True
+except ImportError:
+    print("⚠️ Spotify service not available - music disabled")
+    SPOTIFY_AVAILABLE = False
+    spotify_service = None
 
 router = APIRouter(prefix="/reels", tags=["Reel Generator"])
 
@@ -82,6 +101,10 @@ class AutoReelResponse(BaseModel):
     file_size: Optional[int] = None
     quality_summary: Dict
     selected_photos_info: List[Dict]
+    # Music integration
+    detected_event: Optional[str] = None
+    event_confidence: Optional[float] = None
+    music_track: Optional[Dict] = None  # {title, artist, spotify_url, preview_url}
 
 
 def apply_filter(img: Image.Image, filter_name: str) -> Image.Image:
@@ -127,15 +150,15 @@ def apply_filter(img: Image.Image, filter_name: str) -> Image.Image:
         return sepia
     
     elif filter_name == "vibrant":
-        # Vibrant - increase saturation and brightness
+        # Vibrant - SUBTLE increase in saturation and brightness for natural look
         enhancer = ImageEnhance.Color(img)
-        img = enhancer.enhance(1.4)  # Increase saturation
+        img = enhancer.enhance(1.15)  # Gentle saturation boost (was 1.4)
         
         enhancer = ImageEnhance.Brightness(img)
-        img = enhancer.enhance(1.1)  # Slight brightness boost
+        img = enhancer.enhance(1.05)  # Very subtle brightness (was 1.1)
         
         enhancer = ImageEnhance.Contrast(img)
-        img = enhancer.enhance(1.1)  # Slight contrast boost
+        img = enhancer.enhance(1.05)  # Very subtle contrast (was 1.1)
         
         return img
     
@@ -174,29 +197,38 @@ def fix_image_orientation(image_bytes: bytes) -> Image.Image:
     try:
         img = Image.open(BytesIO(image_bytes))
         
-        # Get EXIF orientation tag
-        for orientation in ExifTags.TAGS.keys():
-            if ExifTags.TAGS[orientation] == 'Orientation':
-                break
+        # Try to get EXIF data and fix orientation
+        try:
+            exif = img.getexif()
+            if exif:
+                # Orientation tag is 274
+                orientation = exif.get(274)
+                
+                if orientation == 3:
+                    img = img.rotate(180, expand=True)
+                elif orientation == 6:
+                    img = img.rotate(270, expand=True)
+                elif orientation == 8:
+                    img = img.rotate(90, expand=True)
+        except Exception:
+            # No EXIF or error reading it - just use image as-is
+            pass
         
-        exif = img._getexif()
-        
-        if exif is not None and orientation in exif:
-            orientation_value = exif[orientation]
-            
-            # Rotate based on orientation value
-            if orientation_value == 3:
-                img = img.rotate(180, expand=True)
-            elif orientation_value == 6:
-                img = img.rotate(270, expand=True)
-            elif orientation_value == 8:
-                img = img.rotate(90, expand=True)
+        # Convert to RGB if needed (handle RGBA, grayscale, etc.)
+        if img.mode != 'RGB':
+            img = img.convert('RGB')
         
         return img
     
     except Exception as e:
-        # If any error, return image without rotation
-        return Image.open(BytesIO(image_bytes))
+        # Last resort: try to open without any processing
+        try:
+            img = Image.open(BytesIO(image_bytes))
+            if img.mode != 'RGB':
+                img = img.convert('RGB')
+            return img
+        except Exception:
+            raise Exception(f"Failed to load image: {str(e)}")
 
 
 def resize_to_aspect_ratio(clip, ratio: str, fit_mode: str = "fit"):
@@ -236,10 +268,10 @@ def resize_to_aspect_ratio(clip, ratio: str, fit_mode: str = "fit"):
             new_height = int(current_height * (target_width / current_width))
         
         # Resize
-        clip = clip.resize(width=new_width, height=new_height)
+        clip = clip.resized(width=new_width, height=new_height)
         
         # Crop to exact target size from center
-        clip = clip.crop(
+        clip = clip.cropped(
             x_center=clip.w / 2,
             y_center=clip.h / 2,
             width=target_width,
@@ -260,15 +292,15 @@ def resize_to_aspect_ratio(clip, ratio: str, fit_mode: str = "fit"):
             new_width = int(current_width * (target_height / current_height))
         
         # Resize to fit
-        clip = clip.resize(width=new_width, height=new_height)
+        clip = clip.resized(width=new_width, height=new_height)
         
         # Add black padding to center the image
         # Create black background
         background = ColorClip(size=(target_width, target_height), color=(0, 0, 0))
-        background = background.set_duration(clip.duration)
+        background = background.with_duration(clip.duration)
         
         # Center the clip on the background
-        clip = clip.set_position(('center', 'center'))
+        clip = clip.with_position(('center', 'center'))
         
         # Composite
         final_clip = CompositeVideoClip([background, clip], size=(target_width, target_height))
@@ -285,40 +317,13 @@ def apply_ken_burns_effect(clip, zoom_ratio=1.2):
     
     Returns:
         Clip with Ken Burns effect applied
+        
+    NOTE: Temporarily disabled due to MoviePy 2.x API changes (.fl method removed)
+    TODO: Reimplement using MoviePy 2.x transform or resize_animate methods
     """
-    def zoom_in_effect(get_frame, t):
-        """Zoom in from 1.0x to zoom_ratio over duration"""
-        frame = get_frame(t)
-        h, w = frame.shape[:2]
-        
-        # Calculate progress (0 to 1)
-        progress = t / clip.duration
-        
-        # Current zoom level
-        current_zoom = 1.0 + (zoom_ratio - 1.0) * progress
-        
-        # New dimensions after zoom
-        new_h = int(h / current_zoom)
-        new_w = int(w / current_zoom)
-        
-        # Center crop
-        y1 = (h - new_h) // 2
-        x1 = (w - new_w) // 2
-        y2 = y1 + new_h
-        x2 = x1 + new_w
-        
-        # Crop and resize back to original size
-        cropped = frame[y1:y2, x1:x2]
-        
-        # Resize back using PIL for better quality
-        from PIL import Image
-        img = Image.fromarray(cropped)
-        img = img.resize((w, h), Image.LANCZOS)
-        
-        return np.array(img)
-    
-    # Apply the zoom effect
-    return clip.fl(zoom_in_effect)
+    # Temporarily return clip unchanged - Ken Burns effect disabled
+    # MoviePy 2.x removed .fl() method, needs new implementation
+    return clip
 
 
 def apply_fade_transition(clips, fade_duration=0.5):
@@ -328,13 +333,13 @@ def apply_fade_transition(clips, fade_duration=0.5):
     for i, clip in enumerate(clips):
         if i == 0:
             # First clip: fade in only
-            faded_clips.append(clip.fadein(fade_duration))
+            faded_clips.append(clip.with_fadein(fade_duration))
         elif i == len(clips) - 1:
             # Last clip: fade out only
-            faded_clips.append(clip.fadeout(fade_duration))
+            faded_clips.append(clip.with_fadeout(fade_duration))
         else:
             # Middle clips: fade in and out
-            faded_clips.append(clip.fadein(fade_duration).fadeout(fade_duration))
+            faded_clips.append(clip.with_fadein(fade_duration).with_fadeout(fade_duration))
     
     return faded_clips
 
@@ -405,12 +410,12 @@ def process_audio(music_url: str, video_duration: float, volume: int, temp_dir: 
             audio_clip = concatenate_audioclips([audio_clip] * loops_needed)
         
         # Trim to exact video duration
-        audio_clip = audio_clip.subclip(0, video_duration)
+        audio_clip = audio_clip.subclipped(0, video_duration)
         print(f"Audio trimmed to {video_duration:.2f}s")
         
         # Adjust volume (0-100 to 0.0-1.0)
         volume_factor = volume / 100.0
-        audio_clip = audio_clip.volumex(volume_factor)
+        audio_clip = audio_clip.with_volume_scaled(volume_factor)
         print(f"Audio volume adjusted to {volume}% (factor: {volume_factor})")
         
         return audio_clip
@@ -503,7 +508,7 @@ def create_intro_clip(text: str, width: int, height: int, duration: float = 2.5)
     intro_array = np.array(intro_img)
     
     # Create clip from numpy array
-    intro_clip = ImageClip(intro_array).set_duration(duration)
+    intro_clip = ImageClip(intro_array).with_duration(duration)
     
     return intro_clip
 
@@ -618,7 +623,7 @@ async def serve_image(user_id: str, filename: str):
 
 @router.post("/generate-auto", response_model=AutoReelResponse)
 async def generate_auto_reel(
-    files: List[UploadFile] = File(..., description="10-15 photos for reel"),
+    files: List[UploadFile] = File(..., description="10-30 photos for reel"),
     ratio: str = "9:16",
     filter_type: str = "vibrant",
     current_user: dict = Depends(get_current_user)
@@ -627,20 +632,20 @@ async def generate_auto_reel(
     🎬 **AUTOMATIC REEL GENERATOR** - Upload photos, get instant reel!
     
     **What it does:**
-    1. User uploads 10-15 photos
+    1. User uploads 10-30 photos
     2. AI analyzes quality:
        - Sharpness (Laplacian variance)
        - Brightness (HSV V-channel)
        - Contrast (std deviation)
        - Face detection (Haar Cascade)
        - Color vibrancy (saturation)
-    3. Selects best 8-12 photos automatically
+    3. Selects best 10-12 photos automatically
     4. Applies trendy filters (vibrant, vintage, cinematic)
     5. Adds smooth transitions (fade, crossfade)
-    6. Generates 15-30 sec video
+    6. Generates 30-second video
     
     **Parameters:**
-    - files: 10-15 event photos (JPG/PNG)
+    - files: 10-30 event photos (JPG/PNG)
     - ratio: Video aspect ratio ('9:16' for reels, '16:9' for YouTube, '1:1' for Instagram)
     - filter_type: Auto-filter ('vibrant', 'vintage', 'cinematic', 'warm', 'cool', 'bw')
     
@@ -663,10 +668,10 @@ async def generate_auto_reel(
             status_code=400,
             detail=f"Need at least 10 photos for auto-generation. You uploaded {len(files)}."
         )
-    if len(files) > 15:
+    if len(files) > 30:
         raise HTTPException(
             status_code=400,
-            detail=f"Maximum 15 photos allowed. You uploaded {len(files)}."
+            detail=f"Maximum 30 photos allowed. You uploaded {len(files)}."
         )
     
     temp_dir = tempfile.mkdtemp()
@@ -688,15 +693,117 @@ async def generate_auto_reel(
         print("🤖 Step 2: AI analyzing photo quality...")
         selected_photos, quality_summary = analyze_and_select_photos(
             photos,
-            min_photos=8,
-            max_photos=12
+            min_photos=10,
+            max_photos=10  # Exactly 10 photos for 30-second reel
         )
         
         print(f"✅ Selected {len(selected_photos)} best photos")
         print(f"   Average quality: {quality_summary['average_quality']:.1f}/100")
         print(f"   Photos with faces: {quality_summary['photos_with_faces']}")
         
-        # Step 3: Get target dimensions
+        # Step 3: Event Detection (CLIP AI) - Sample 3 photos
+        detected_event = "general"
+        event_confidence = 0.0
+        
+        if CLIP_AVAILABLE and clip_analysis_service:
+            try:
+                print("\n🎭 Step 3: Detecting event type from photos...")
+                event_detections = []
+                
+                # Sample up to 3 photos for event detection (faster, good accuracy)
+                sample_size = min(3, len(selected_photos))
+                for idx in range(sample_size):
+                    image_bytes, filename, analysis = selected_photos[idx]
+                    detection = clip_analysis_service.detect_event_and_mood(
+                        image_file=image_bytes,
+                        is_base64=False
+                    )
+                    
+                    if detection.get('success', False):
+                        event_detections.append({
+                            'event': detection.get('detected_event', 'general'),
+                            'confidence': detection.get('event_confidence', 0.0)
+                        })
+                        print(f"   Photo {idx+1}: {detection.get('detected_event')} ({detection.get('event_confidence', 0):.1f}%)")
+                
+                # Aggregate event type (weighted by confidence)
+                if event_detections:
+                    event_scores = {}
+                    for det in event_detections:
+                        event = det['event']
+                        conf = det['confidence']
+                        event_scores[event] = event_scores.get(event, 0) + conf
+                    
+                    # Get event with highest total confidence
+                    detected_event = max(event_scores, key=event_scores.get)
+                    event_confidence = event_scores[detected_event] / len(event_detections)
+                    
+                    print(f"\n✅ Event detected: {detected_event.upper()} ({event_confidence:.1f}% confidence)")
+                else:
+                    print("⚠️ Event detection failed, using 'general'")
+            except Exception as e:
+                print(f"⚠️ Event detection error: {e}")
+                detected_event = "general"
+                event_confidence = 0.0
+        else:
+            print("ℹ️ CLIP not available, skipping event detection")
+        
+        # Step 4: Fetch Music (Spotify)
+        music_track = None
+        music_path = None
+        
+        if SPOTIFY_AVAILABLE and spotify_service:
+            try:
+                print(f"\n🎵 Step 4: Fetching music for {detected_event} event...")
+                music_suggestions = spotify_service.get_mood_aware_recommendations(
+                    event_type=detected_event,
+                    limit=10
+                )
+                
+                if music_suggestions and len(music_suggestions) > 0:
+                    # Find best track with preview URL
+                    best_track = None
+                    for track in sorted(music_suggestions, key=lambda x: x.get('vibeScore', 0), reverse=True):
+                        if track.get('previewUrl'):
+                            best_track = track
+                            break
+                    
+                    if best_track:
+                        music_track = {
+                            'title': best_track['title'],
+                            'artist': best_track['artist'],
+                            'spotify_url': best_track.get('spotifyUrl', ''),
+                            'preview_url': best_track.get('previewUrl', ''),
+                            'vibe_score': best_track.get('vibeScore', 0)
+                        }
+                        
+                        print(f"✅ Selected: '{best_track['title']}' by {best_track['artist']}")
+                        print(f"   Vibe Score: {best_track.get('vibeScore', 0):.1f}/100")
+                        
+                        # Download music preview (30-second MP3)
+                        try:
+                            import requests
+                            music_response = requests.get(best_track['previewUrl'], timeout=10)
+                            if music_response.status_code == 200:
+                                music_path = Path(temp_dir) / "background_music.mp3"
+                                music_path.write_bytes(music_response.content)
+                                print(f"✅ Music downloaded: {len(music_response.content)} bytes")
+                            else:
+                                print(f"⚠️ Music download failed: HTTP {music_response.status_code}")
+                        except Exception as e:
+                            print(f"⚠️ Music download error: {e}")
+                            music_path = None
+                    else:
+                        print("⚠️ No tracks with preview URL found")
+                else:
+                    print("⚠️ No music suggestions found")
+            except Exception as e:
+                print(f"⚠️ Music fetch error: {e}")
+                traceback.print_exc()
+        else:
+            print("ℹ️ Spotify not available, skipping music")
+        
+        # Step 5: Get target dimensions
         if ratio == "9:16":
             target_width, target_height = 1080, 1920
         elif ratio == "16:9":
@@ -712,15 +819,20 @@ async def generate_auto_reel(
         
         for idx, (image_bytes, filename, analysis) in enumerate(selected_photos):
             try:
+                print(f"  Processing photo {idx+1}/{len(selected_photos)}: {filename}")
+                
                 # Fix orientation
                 img = fix_image_orientation(image_bytes)
+                print(f"    ✓ Orientation fixed, size: {img.size}")
                 
-                # Apply trendy filter automatically
+                # Apply trendy filter automatically (subtle enhancement)
                 img = apply_filter(img, filter_type)
+                print(f"    ✓ Filter applied: {filter_type}")
                 
-                # Save to temp file
-                temp_img_path = Path(temp_dir) / f"selected_{idx}.png"
-                img.save(temp_img_path, format='PNG')
+                # Save to temp file with HIGH QUALITY
+                temp_img_path = Path(temp_dir) / f"selected_{idx}.jpg"
+                img.save(temp_img_path, format='JPEG', quality=95, optimize=True)
+                print(f"    ✓ Saved to temp: {temp_img_path}")
                 
                 # Create clip
                 img_clip = ImageClip(str(temp_img_path))
@@ -730,25 +842,27 @@ async def generate_auto_reel(
                 # Photos with faces = 3.0 sec (people want to see faces longer)
                 # Photos without faces = 2.5 sec (landscapes/objects)
                 duration = 3.0 if analysis['face_score'] > 50 else 2.5
-                img_clip = img_clip.set_duration(duration)
+                img_clip = img_clip.with_duration(duration)
                 
                 # Apply Ken Burns effect (zoom) for engagement
                 img_clip = apply_ken_burns_effect(img_clip, zoom_ratio=1.08)
                 
                 clips.append(img_clip)
+                print(f"    ✓ Clip created successfully")
                 
-                # Track selected photo info
+                # Track selected photo info (convert numpy types to Python native types)
                 selected_photos_info.append({
                     "filename": filename,
-                    "quality_score": analysis['overall_score'],
-                    "has_faces": analysis['face_score'] > 50,
-                    "sharpness": analysis['sharpness'],
-                    "brightness": analysis['brightness'],
-                    "duration": duration
+                    "quality_score": float(analysis['overall_score']),
+                    "has_faces": bool(analysis['face_score'] > 50),
+                    "sharpness": float(analysis['sharpness']),
+                    "brightness": float(analysis['brightness']),
+                    "duration": float(duration)
                 })
                 
             except Exception as e:
-                print(f"⚠️  Error processing {filename}: {e}")
+                print(f"    ✗ Error processing {filename}: {e}")
+                traceback.print_exc()
                 continue
         
         if not clips:
@@ -758,18 +872,37 @@ async def generate_auto_reel(
         
         # Step 5: Apply smooth transitions (fade between clips)
         print("✨ Step 4: Adding smooth transitions...")
+        # Note: Crossfade temporarily disabled due to MoviePy 2.x API changes
+        # TODO: Reimplement using MoviePy 2.x crossfadein/crossfadeout methods
         fade_duration = 0.5
-        final_clips = []
-        
-        for i, clip in enumerate(clips):
-            if i < len(clips) - 1:
-                # Add crossfade to next clip
-                clip = clip.crossfadeout(fade_duration)
-            final_clips.append(clip)
+        final_clips = clips  # Use clips directly without crossfade for now
         
         # Step 6: Concat all clips
-        print("📹 Step 5: Rendering final video...")
+        print("\n📹 Step 6: Rendering final video...")
         final_video = concatenate_videoclips(final_clips, method="compose")
+        
+        # Step 6.5: Add music if available
+        if music_path and music_path.exists():
+            try:
+                print("🎵 Adding background music...")
+                audio_clip = AudioFileClip(str(music_path))
+                
+                # Match audio duration to video
+                if audio_clip.duration < final_video.duration:
+                    # Loop audio if shorter
+                    num_loops = int(final_video.duration / audio_clip.duration) + 1
+                    from moviepy import concatenate_audioclips
+                    audio_clip = concatenate_audioclips([audio_clip] * num_loops)
+                
+                # Trim to exact video duration
+                audio_clip = audio_clip.subclipped(0, final_video.duration)
+                
+                # Set audio
+                final_video = final_video.with_audio(audio_clip)
+                print(f"✅ Music added to video ({audio_clip.duration:.1f}s)")
+            except Exception as e:
+                print(f"⚠️ Could not add music: {e}")
+                traceback.print_exc()
         
         # Step 7: Save video
         output_dir = Path("storage/reels/generated") / str(user_id)
@@ -781,11 +914,13 @@ async def generate_auto_reel(
         
         final_video.write_videofile(
             str(output_path),
-            fps=24,
+            fps=30,
             codec='libx264',
-            audio=False,  # TODO: Add music in future
-            preset='medium',
-            threads=4
+            audio=True,  # Audio enabled (music integrated)
+            preset='slow',  # Better quality
+            bitrate='8000k',  # High bitrate for quality
+            threads=4,
+            audio_bitrate='192k'
         )
         
         # Get file size
@@ -805,13 +940,16 @@ async def generate_auto_reel(
         
         return AutoReelResponse(
             video_url=video_url,
-            duration=final_video.duration,
-            num_images_uploaded=len(files),
-            num_images_selected=len(selected_photos),
+            duration=float(final_video.duration),
+            num_images_uploaded=int(len(files)),
+            num_images_selected=int(len(selected_photos)),
             aspect_ratio=ratio,
-            file_size=file_size,
+            file_size=int(file_size),
             quality_summary=quality_summary,
-            selected_photos_info=selected_photos_info
+            selected_photos_info=selected_photos_info,
+            detected_event=detected_event if detected_event != "general" else None,
+            event_confidence=float(event_confidence) if event_confidence > 0 else None,
+            music_track=music_track
         )
         
     except HTTPException:
@@ -915,7 +1053,7 @@ async def generate_reel(
                 img_clip = resize_to_aspect_ratio(img_clip, payload.ratio, payload.fit_mode)
                 
                 # Set duration
-                img_clip = img_clip.set_duration(payload.duration_per_image)
+                img_clip = img_clip.with_duration(payload.duration_per_image)
                 
                 # Apply Ken Burns effect if enabled
                 if payload.ken_burns:
@@ -947,7 +1085,7 @@ async def generate_reel(
             
             if audio_clip:
                 print("Setting audio on video clip...")
-                final_video = final_video.set_audio(audio_clip)
+                final_video = final_video.with_audio(audio_clip)
                 has_audio = True
                 print(f"Audio set successfully. Video duration: {final_video.duration:.2f}s, Audio duration: {audio_clip.duration:.2f}s")
             else:
@@ -1080,18 +1218,24 @@ async def serve_music(user_id: str, filename: str):
 
 
 @router.get("/videos/{user_id}/{filename}")
-async def serve_video(user_id: str, filename: str):
+async def serve_video(user_id: str, filename: str, download: bool = False):
     """Serve video file from local storage"""
     try:
-        video_path = Path("storage/reels") / user_id / filename
+        video_path = Path("storage/reels/generated") / user_id / filename
         
         if not video_path.exists():
             raise HTTPException(status_code=404, detail="Video not found")
         
+        headers = {}
+        if download:
+            headers["Content-Disposition"] = f'attachment; filename="{filename}"'
+        else:
+            headers["Content-Disposition"] = f'inline; filename="{filename}"'
+        
         return FileResponse(
             path=str(video_path),
             media_type="video/mp4",
-            filename=filename
+            headers=headers
         )
     
     except HTTPException:

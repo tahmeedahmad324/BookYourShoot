@@ -10,7 +10,6 @@ from pathlib import Path
 from backend.supabase_client import supabase
 from backend.auth import get_current_user
 from backend.services.album_processor import AlbumProcessor, get_album_structure
-from backend.services.reel_generator import ReelGenerator
 
 router = APIRouter(prefix="/albums", tags=["Albums"])
 
@@ -379,83 +378,6 @@ def get_smart_albums(current_user: dict = Depends(get_current_user)):
                 },
                 "total_albums": len(structure["persons"]) + (1 if structure["highlights"] else 0) + (1 if structure["groups"] else 0)
             }
-        }
-        
-    except Exception as e:
-        return {"success": False, "error": str(e)}
-
-
-class GenerateReelRequest(BaseModel):
-    music_file: Optional[str] = None
-    duration_per_image: float = 2.0
-    transition_type: str = "crossfade"  # crossfade, slide, zoom
-
-
-@router.post("/smart/generate-reel")
-async def generate_reel(
-    payload: GenerateReelRequest,
-    background_tasks: BackgroundTasks,
-    current_user: dict = Depends(get_current_user)
-):
-    """
-    Generate video reel from highlights
-    Uses photos from Highlights folder created during processing
-    """
-    try:
-        user_id = current_user.get("id") or current_user.get("sub")
-        if not user_id:
-            raise HTTPException(status_code=401, detail="Unauthorized")
-
-        output_folder = str(STORAGE_BASE / user_id / "organized")
-        
-        # Check if highlights are ready
-        generator = ReelGenerator(output_folder)
-        status = generator.check_highlights_ready()
-        
-        if not status["ready"]:
-            raise HTTPException(status_code=400, detail=status["message"])
-        
-        # Generate reel (this might take a while, consider background task for production)
-        result = generator.generate_reel(
-            output_filename=f"reel_{user_id}.mp4",
-            music_file=payload.music_file,
-            duration_per_image=payload.duration_per_image
-        )
-        
-        if not result["success"]:
-            raise HTTPException(status_code=500, detail=result["error"])
-        
-        return {
-            "success": True,
-            "message": "Reel generated successfully",
-            "data": {
-                "video_path": result["output_path"],
-                "duration": result["duration"],
-                "image_count": result["image_count"]
-            }
-        }
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
-
-
-@router.get("/smart/reel/status")
-def check_reel_readiness(current_user: dict = Depends(get_current_user)):
-    """Check if highlights are ready for reel generation"""
-    try:
-        user_id = current_user.get("id") or current_user.get("sub")
-        if not user_id:
-            raise HTTPException(status_code=401, detail="Unauthorized")
-
-        output_folder = str(STORAGE_BASE / user_id / "organized")
-        generator = ReelGenerator(output_folder)
-        status = generator.check_highlights_ready()
-        
-        return {
-            "success": True,
-            "data": status
         }
         
     except Exception as e:

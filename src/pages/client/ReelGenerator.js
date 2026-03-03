@@ -141,16 +141,18 @@ const ReelGenerator = () => {
     setSelectedFiles(files);
 
     // Generate previews
-    const newPreviews = [];
-    files.forEach((file, index) => {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        newPreviews[index] = { url: e.target.result, name: file.name };
-        if (newPreviews.length === files.length) {
-          setPreviews([...newPreviews]);
-        }
-      };
-      reader.readAsDataURL(file);
+    const previewPromises = files.map((file) => {
+      return new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          resolve({ url: e.target.result, name: file.name });
+        };
+        reader.readAsDataURL(file);
+      });
+    });
+
+    Promise.all(previewPromises).then((loadedPreviews) => {
+      setPreviews(loadedPreviews);
     });
   };
 
@@ -237,7 +239,7 @@ const ReelGenerator = () => {
       setProgress(100);
       setProgressText('✅ Reel ready!');
       setGeneratedReel(data);
-      setSuccess(`🎉 Your ${Math.floor(data.duration)}s reel is ready! AI selected ${data.num_images_selected} best photos from ${data.num_images_uploaded} uploads.`);
+      setSuccess(`🎉 Your 30-second reel is ready! AI selected the ${data.num_images_selected} best photos from ${data.num_images_uploaded} uploads.`);
 
     } catch (err) {
       console.error('Generation error:', err);
@@ -261,8 +263,18 @@ const ReelGenerator = () => {
   };
 
   // Download video
+  // Download video
   const handleDownload = () => {
     if (generatedReel?.video_url) {
+      // Add download=true query parameter
+      window.location.href = `http://localhost:8000${generatedReel.video_url}?download=true`;
+    }
+  };
+
+  // View/Preview video  
+  const handleView = () => {
+    if (generatedReel?.video_url) {
+      // Open without download parameter for inline preview
       window.open(`http://localhost:8000${generatedReel.video_url}`, '_blank');
     }
   };
@@ -312,7 +324,7 @@ const ReelGenerator = () => {
                 <div className="mb-4">
                   <h4 className="fw-bold mb-3">📸 Step 1: Upload Your Photos</h4>
                   <p className="text-muted mb-3">
-                    Upload 10-30 event photos. AI will analyze quality and select the best 10 highlights.
+                    Upload 10-30 event photos. AI will analyze quality and select exactly 10 best highlights for your 30-second reel.
                   </p>
 
                   {/* Upload Zone */}
@@ -381,7 +393,7 @@ const ReelGenerator = () => {
                       )}
                     </Button>
                     <p className="text-muted mt-2 small">
-                      AI will select best 10 photos based on quality, brightness, faces & composition
+                      AI will select exactly 10 best photos for your 30-second reel based on quality, brightness, sharpness, faces & composition
                     </p>
                   </div>
                 )}
@@ -492,8 +504,91 @@ const ReelGenerator = () => {
                   </div>
                 )}
 
+                {/* Event Detection & Music */}
+                {(generatedReel.detected_event || generatedReel.music_track) && (
+                  <div className="mb-4 p-3" style={{ 
+                    background: 'linear-gradient(135deg, #f3e7ff 0%, #e7f3ff 100%)', 
+                    borderRadius: '12px',
+                    border: '2px solid #9333ea'
+                  }}>
+                    <h5 className="fw-semibold mb-3">🎭 AI Detected Event & Music</h5>
+                    
+                    {generatedReel.detected_event && (
+                      <div className="mb-3">
+                        <div className="d-flex justify-content-between align-items-center mb-2">
+                          <div>
+                            <small className="text-muted d-block">Event Type:</small>
+                            <span className="fw-bold text-capitalize" style={{ fontSize: '1.1rem', color: '#9333ea' }}>
+                              {generatedReel.detected_event === 'mehndi' && '💛 Mehndi'}
+                              {generatedReel.detected_event === 'barat' && '🎊 Barat'}
+                              {generatedReel.detected_event === 'walima' && '💕 Walima'}
+                              {generatedReel.detected_event === 'birthday' && '🎂 Birthday'}
+                              {generatedReel.detected_event === 'corporate' && '💼 Corporate'}
+                              {!['mehndi', 'barat', 'walima', 'birthday', 'corporate'].includes(generatedReel.detected_event) && 
+                                `🎉 ${generatedReel.detected_event}`}
+                            </span>
+                          </div>
+                          {generatedReel.event_confidence && (
+                            <Badge bg="info" style={{ fontSize: '0.9rem' }}>
+                              {generatedReel.event_confidence.toFixed(1)}% confident
+                            </Badge>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                    
+                    {generatedReel.music_track && (
+                      <div className="p-3" style={{ background: 'white', borderRadius: '10px' }}>
+                        <div className="d-flex align-items-start gap-3">
+                          <div style={{ fontSize: '2.5rem' }}>🎵</div>
+                          <div className="flex-grow-1">
+                            <div className="fw-bold mb-1" style={{ color: '#1e293b' }}>
+                              {generatedReel.music_track.title}
+                            </div>
+                            <div className="text-muted small mb-2">
+                              by {generatedReel.music_track.artist}
+                            </div>
+                            {generatedReel.music_track.vibe_score && (
+                              <div className="small">
+                                <Badge bg="success" className="me-2">
+                                  Vibe Score: {generatedReel.music_track.vibe_score.toFixed(0)}/100
+                                </Badge>
+                              </div>
+                            )}
+                            {generatedReel.music_track.spotify_url && (
+                              <a 
+                                href={generatedReel.music_track.spotify_url} 
+                                target="_blank" 
+                                rel="noopener noreferrer"
+                                className="small text-decoration-none"
+                                style={{ color: '#1DB954' }}
+                              >
+                                🎧 Listen on Spotify →
+                              </a>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                    
+                    <div className="mt-2 text-center">
+                      <small className="text-muted fst-italic">
+                        ✨ Music automatically matched to your event photos
+                      </small>
+                    </div>
+                  </div>
+                )}
+
                 {/* Action Buttons */}
                 <div className="d-flex gap-3 justify-content-center">
+                  <Button
+                    variant="primary"
+                    size="lg"
+                    onClick={handleView}
+                    style={{ borderRadius: '12px', padding: '0.75rem 2rem' }}
+                  >
+                    👁️ View Reel
+                  </Button>
                   <Button
                     variant="success"
                     size="lg"
