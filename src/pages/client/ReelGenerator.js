@@ -3,7 +3,7 @@ import { useAuth } from '../../context/AuthContext';
 import { Container, Card, Button, Alert, ProgressBar, Badge } from 'react-bootstrap';
 
 /**
- * AUTO-REEL GENERATOR
+ * REEL MAKER
  * 
  * Simple workflow:
  * 1. Upload 10-30 photos
@@ -298,7 +298,7 @@ const ReelGenerator = () => {
         {/* Header */}
         <Card style={styles.card} className="mb-4">
           <div style={styles.header}>
-            <h1 className="mb-2">🎬 Auto-Reel Generator</h1>
+            <h1 className="mb-2">🎬 Reel Maker</h1>
             <p className="mb-0">Upload photos → AI creates professional reel → Download</p>
           </div>
         </Card>
@@ -504,81 +504,6 @@ const ReelGenerator = () => {
                   </div>
                 )}
 
-                {/* Event Detection & Music */}
-                {(generatedReel.detected_event || generatedReel.music_track) && (
-                  <div className="mb-4 p-3" style={{ 
-                    background: 'linear-gradient(135deg, #f3e7ff 0%, #e7f3ff 100%)', 
-                    borderRadius: '12px',
-                    border: '2px solid #9333ea'
-                  }}>
-                    <h5 className="fw-semibold mb-3">🎭 AI Detected Event & Music</h5>
-                    
-                    {generatedReel.detected_event && (
-                      <div className="mb-3">
-                        <div className="d-flex justify-content-between align-items-center mb-2">
-                          <div>
-                            <small className="text-muted d-block">Event Type:</small>
-                            <span className="fw-bold text-capitalize" style={{ fontSize: '1.1rem', color: '#9333ea' }}>
-                              {generatedReel.detected_event === 'mehndi' && '💛 Mehndi'}
-                              {generatedReel.detected_event === 'barat' && '🎊 Barat'}
-                              {generatedReel.detected_event === 'walima' && '💕 Walima'}
-                              {generatedReel.detected_event === 'birthday' && '🎂 Birthday'}
-                              {generatedReel.detected_event === 'corporate' && '💼 Corporate'}
-                              {!['mehndi', 'barat', 'walima', 'birthday', 'corporate'].includes(generatedReel.detected_event) && 
-                                `🎉 ${generatedReel.detected_event}`}
-                            </span>
-                          </div>
-                          {generatedReel.event_confidence && (
-                            <Badge bg="info" style={{ fontSize: '0.9rem' }}>
-                              {generatedReel.event_confidence.toFixed(1)}% confident
-                            </Badge>
-                          )}
-                        </div>
-                      </div>
-                    )}
-                    
-                    {generatedReel.music_track && (
-                      <div className="p-3" style={{ background: 'white', borderRadius: '10px' }}>
-                        <div className="d-flex align-items-start gap-3">
-                          <div style={{ fontSize: '2.5rem' }}>🎵</div>
-                          <div className="flex-grow-1">
-                            <div className="fw-bold mb-1" style={{ color: '#1e293b' }}>
-                              {generatedReel.music_track.title}
-                            </div>
-                            <div className="text-muted small mb-2">
-                              by {generatedReel.music_track.artist}
-                            </div>
-                            {generatedReel.music_track.vibe_score && (
-                              <div className="small">
-                                <Badge bg="success" className="me-2">
-                                  Vibe Score: {generatedReel.music_track.vibe_score.toFixed(0)}/100
-                                </Badge>
-                              </div>
-                            )}
-                            {generatedReel.music_track.spotify_url && (
-                              <a 
-                                href={generatedReel.music_track.spotify_url} 
-                                target="_blank" 
-                                rel="noopener noreferrer"
-                                className="small text-decoration-none"
-                                style={{ color: '#1DB954' }}
-                              >
-                                🎧 Listen on Spotify →
-                              </a>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                    
-                    <div className="mt-2 text-center">
-                      <small className="text-muted fst-italic">
-                        ✨ Music automatically matched to your event photos
-                      </small>
-                    </div>
-                  </div>
-                )}
-
                 {/* Action Buttons */}
                 <div className="d-flex gap-3 justify-content-center">
                   <Button
@@ -666,7 +591,7 @@ const ReelGenerator = () => {
                   <div style={{ fontSize: '2rem', marginRight: '1rem' }}>🎬</div>
                   <div>
                     <h6 className="fw-semibold mb-1">Auto-Editing</h6>
-                    <small className="text-muted">Smooth transitions & zoom effects</small>
+                    <small className="text-muted">Smooth fades and smart pacing</small>
                   </div>
                 </div>
               </div>

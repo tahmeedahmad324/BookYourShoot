@@ -43,7 +43,6 @@ function AlbumBuilderFresh() {
   const [selectedAlbum, setSelectedAlbum] = useState(null);
   const [albumPhotos, setAlbumPhotos] = useState([]);
   const [loadingPhotos, setLoadingPhotos] = useState(false);
-  const [photosToRemove, setPhotosToRemove] = useState([]);
   
   // UI State
   const [loading, setLoading] = useState(false);
@@ -639,7 +638,6 @@ function AlbumBuilderFresh() {
       if (response.data.success) {
         setAlbumPhotos(response.data.photos);
         setSelectedAlbum(personName);
-        setPhotosToRemove([]);
       }
     } catch (err) {
       showError(err.response?.data?.detail || 'Failed to load album photos');
@@ -649,42 +647,61 @@ function AlbumBuilderFresh() {
     }
   };
   
-  const togglePhotoRemoval = (filename) => {
-    setPhotosToRemove(prev => {
-      if (prev.includes(filename)) {
-        return prev.filter(f => f !== filename);
-      } else {
-        return [...prev, filename];
-      }
-    });
-  };
-  
-  const downloadAlbums = async () => {
+  const downloadAlbums = async (personName = null) => {
     try {
       setLoading(true);
       setProgressText('Preparing download...');
       
+      // If called directly from onClick, React may pass the click event as first argument.
+      // Treat non-string values as "download all albums".
+      if (typeof personName !== 'string') {
+        personName = null;
+      }
+
       const token = await getToken();
-      const response = await axios.get(
-        `${API_BASE}/download-albums/${sessionId}`,
-        {
-          headers: { 'Authorization': `Bearer ${token}` },
-          responseType: 'blob'
-        }
-      );
+      let response;
+      let downloadName;
+
+      if (personName) {
+        // Download only one album
+        response = await axios.post(
+          `${API_BASE}/download-album/${sessionId}/${encodeURIComponent(personName)}`,
+          {},
+          {
+            headers: { 'Authorization': `Bearer ${token}` },
+            responseType: 'blob'
+          }
+        );
+        downloadName = `${personName}_Album.zip`;
+      } else {
+        // Download all albums in one ZIP
+        response = await axios.get(
+          `${API_BASE}/download-albums/${sessionId}`,
+          {
+            headers: { 'Authorization': `Bearer ${token}` },
+            responseType: 'blob'
+          }
+        );
+        downloadName = `My_AI_Albums.zip`;
+      }
       
       const url = window.URL.createObjectURL(new Blob([response.data]));
       const link = document.createElement('a');
       link.href = url;
-      link.setAttribute('download', `My_AI_Albums.zip`);
+      link.setAttribute('download', downloadName);
       document.body.appendChild(link);
       link.click();
       link.remove();
+      window.URL.revokeObjectURL(url);
       
-      showSuccess('Albums downloaded!');
+      if (personName) {
+        showSuccess(`${personName} album downloaded successfully!`);
+      } else {
+        showSuccess('All albums downloaded!');
+      }
       
     } catch (err) {
-      showError(err.response?.data?.detail || 'Download failed');
+      showError('Download failed. Please try again.');
     } finally {
       setLoading(false);
       setProgressText('');
@@ -764,7 +781,6 @@ function AlbumBuilderFresh() {
     setIsProcessingInBackground(false);
     setProcessingNotification(null);
     setSelectedAlbum(null);
-    setPhotosToRemove([]);
     setLoading(false);
     clearMessages();
   };
@@ -1424,7 +1440,6 @@ function AlbumBuilderFresh() {
                                       if (selectedAlbum === person) {
                                         setSelectedAlbum(null);
                                         setAlbumPhotos([]);
-                                        setPhotosToRemove([]);
                                       } else {
                                         fetchAlbumPhotos(person);
                                       }
@@ -1464,10 +1479,9 @@ function AlbumBuilderFresh() {
                                       }}>
                                         <div className="fw-semibold" style={{ color: '#059669' }}>
                                           ✅ {albumPhotos.length} photos organized
-                                          {photosToRemove.length > 0 && ` (${photosToRemove.length} marked for removal)`}
                                         </div>
                                         <small className="text-muted">
-                                          Click photos to mark for removal before downloading
+                                          Preview photos before downloading
                                         </small>
                                       </div>
                                     </div>
@@ -1482,18 +1496,16 @@ function AlbumBuilderFresh() {
                                       <>
                                         <div className="row g-3 mb-3" style={{ maxHeight: '600px', overflowY: 'auto' }}>
                                           {albumPhotos.map((photo, idx) => {
-                                            const isMarkedForRemoval = photosToRemove.includes(photo.filename);
                                             return (
                                               <div className="col-6 col-sm-4 col-md-3" key={idx}>
                                                 <div 
-                                                  onClick={() => togglePhotoRemoval(photo.filename)}
                                                   style={{
                                                     position: 'relative',
-                                                    cursor: 'pointer',
+                                                    cursor: 'default',
                                                     borderRadius: '8px',
                                                     overflow: 'hidden',
-                                                    border: isMarkedForRemoval ? '3px solid #ef4444' : '2px solid #e5e7eb',
-                                                    opacity: isMarkedForRemoval ? 0.5 : 1,
+                                                    border: '2px solid #e5e7eb',
+                                                    opacity: 1,
                                                     transition: 'all 0.3s'
                                                   }}
                                                 >
@@ -1506,56 +1518,24 @@ function AlbumBuilderFresh() {
                                                       objectFit: 'cover'
                                                     }}
                                                   />
-                                                  {isMarkedForRemoval && (
-                                                    <div style={{
-                                                      position: 'absolute',
-                                                      top: '50%',
-                                                      left: '50%',
-                                                      transform: 'translate(-50%, -50%)',
-                                                      background: 'rgba(239, 68, 68, 0.9)',
-                                                      color: 'white',
-                                                      padding: '5px 10px',
-                                                      borderRadius: '6px',
-                                                      fontSize: '12px',
-                                                      fontWeight: 'bold'
-                                                    }}>
-                                                      ✕ REMOVE
-                                                    </div>
-                                                  )}
                                                 </div>
                                               </div>
                                             );
                                           })}
                                         </div>
                                         
-                                        {photosToRemove.length > 0 && (
-                                          <div className="alert alert-warning mb-3">
-                                            <strong>⚠️ Warning:</strong> {photosToRemove.length} photo(s) marked for removal. 
-                                            These will NOT be included in the download.
-                                            <Button 
-                                              variant="link" 
-                                              size="sm" 
-                                              onClick={() => setPhotosToRemove([])}
-                                              className="ms-2"
-                                            >
-                                              Clear All
-                                            </Button>
-                                          </div>
-                                        )}
-                                        
                                         <div className="d-flex gap-2">
                                           <Button
                                             style={{...styles.successBtn, flex: 1}}
                                             onClick={() => downloadAlbums(person)}
                                           >
-                                            ⬇️ Download Album ({albumPhotos.length - photosToRemove.length} photos)
+                                            ⬇️ Download Album ({albumPhotos.length} photos)
                                           </Button>
                                           <Button
                                             variant="secondary"
                                             onClick={() => {
                                               setSelectedAlbum(null);
                                               setAlbumPhotos([]);
-                                              setPhotosToRemove([]);
                                             }}
                                           >
                                             Close
@@ -1578,7 +1558,7 @@ function AlbumBuilderFresh() {
                     <Button
                       style={styles.successBtn}
                       size="lg"
-                      onClick={downloadAlbums}
+                      onClick={() => downloadAlbums()}
                       disabled={loading}
                     >
                       {loading ? (

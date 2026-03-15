@@ -3,7 +3,7 @@ Album Builder Router - FastAPI endpoints for AI face recognition album creation
 Provides 3-step upload flow: References → Events → Build Album
 """
 
-from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Depends, BackgroundTasks
+from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Depends, BackgroundTasks, Body, Query
 from fastapi.responses import StreamingResponse, FileResponse
 import os
 import tempfile
@@ -19,6 +19,10 @@ import logging
 from backend.auth import get_current_user
 from backend.services.album_preprocessing import ImagePreprocessor
 from backend.services.album_face_recognition import FaceRecognitionService
+
+
+def _is_image_file(filename: str) -> bool:
+    return filename.lower().endswith(('.jpg', '.jpeg', '.png', '.gif', '.bmp'))
 
 logger = logging.getLogger(__name__)
 
@@ -493,6 +497,103 @@ async def download_albums(
         raise HTTPException(status_code=500, detail=f"Download preparation failed: {str(e)}")
 
 
+@router.post("/download-album/{session_id}/{person_name}")
+async def download_single_album(
+    session_id: str,
+    person_name: str,
+    payload: Optional[Dict] = Body(default=None),
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Download one person's album as ZIP.
+    Optional payload:
+      {
+        "exclude_filenames": ["img1.jpg", "img2.jpg"]
+      }
+    """
+    # Validate session
+    if session_id not in sessions:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    session = sessions[session_id]
+    if session["user_id"] != current_user["id"]:
+        raise HTTPException(status_code=403, detail="Access denied")
+
+    if session["status"] != "completed":
+        raise HTTPException(status_code=400, detail="Albums not ready for download")
+
+    albums_dir = session.get("albums_dir")
+    if not albums_dir or not os.path.exists(albums_dir):
+        raise HTTPException(status_code=404, detail="Albums directory not found")
+
+    person_album_dir = os.path.join(albums_dir, person_name)
+    if not os.path.exists(person_album_dir):
+        raise HTTPException(status_code=404, detail=f"Album for {person_name} not found")
+
+    exclude_filenames = set()
+    if payload and isinstance(payload, dict):
+        raw_exclusions = payload.get("exclude_filenames", [])
+        if isinstance(raw_exclusions, list):
+            exclude_filenames = {str(name) for name in raw_exclusions}
+
+    try:
+        zip_filename = f"AI_Album_{person_name}_{session_id}.zip"
+        zip_path = os.path.join(tempfile.gettempdir(), zip_filename)
+
+        files_added = 0
+        with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zip_file:
+            for filename in os.listdir(person_album_dir):
+                if filename in exclude_filenames:
+                    continue
+                if not _is_image_file(filename):
+                    continue
+
+                file_path = os.path.join(person_album_dir, filename)
+                if os.path.isfile(file_path):
+                    # Keep person folder in archive
+                    archive_name = os.path.join(person_name, filename)
+                    zip_file.write(file_path, archive_name)
+                    files_added += 1
+
+        if files_added == 0:
+            raise HTTPException(status_code=400, detail="No photos left to download after exclusions")
+
+        logger.info(
+            f"✅ Single album ZIP created: {zip_filename} (files={files_added}, excluded={len(exclude_filenames)})"
+        )
+
+        return FileResponse(
+            path=zip_path,
+            filename=zip_filename,
+            media_type='application/zip'
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ Single album ZIP creation failed: {e}")
+        raise HTTPException(status_code=500, detail=f"Download preparation failed: {str(e)}")
+
+
+@router.get("/download-album/{session_id}/{person_name}")
+async def download_single_album_get(
+    session_id: str,
+    person_name: str,
+    exclude_filenames: List[str] = Query(default=[]),
+    current_user: dict = Depends(get_current_user)
+):
+    """Download one person's album as ZIP via GET.
+    Query example:
+      /download-album/{session_id}/{person_name}?exclude_filenames=a.jpg&exclude_filenames=b.jpg
+    """
+    return await download_single_album(
+        session_id=session_id,
+        person_name=person_name,
+        payload={"exclude_filenames": exclude_filenames},
+        current_user=current_user
+    )
+
+
 @router.get("/session-status/{session_id}")
 async def get_session_status(
     session_id: str,
@@ -573,7 +674,7 @@ async def get_album_photos(
     photos = []
     for filename in os.listdir(person_album_dir):
         file_path = os.path.join(person_album_dir, filename)
-        if os.path.isfile(file_path) and filename.lower().endswith(('.jpg', '.jpeg', '.png', '.gif', '.bmp')):
+        if os.path.isfile(file_path) and _is_image_file(filename):
             try:
                 # Create thumbnail
                 with Image.open(file_path) as img:

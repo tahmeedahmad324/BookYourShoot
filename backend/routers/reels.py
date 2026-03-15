@@ -19,14 +19,13 @@ import numpy as np
 # MoviePy imports - Direct from moviepy module
 MOVIEPY_AVAILABLE = False
 ImageClip = None
-TextClip = None
 concatenate_videoclips = None
 ColorClip = None
 CompositeVideoClip = None
 AudioFileClip = None
 
 try:
-    from moviepy import ImageClip, TextClip, concatenate_videoclips, ColorClip, CompositeVideoClip, AudioFileClip
+    from moviepy import ImageClip, concatenate_videoclips, ColorClip, CompositeVideoClip, AudioFileClip
     MOVIEPY_AVAILABLE = True
     print("✅ MoviePy loaded successfully")
 except ImportError as e:
@@ -38,7 +37,6 @@ except ImportError as e:
         print("Install with: pip install moviepy")
 
 from PIL import Image, ImageDraw, ImageFont, ImageEnhance
-from PIL.ExifTags import TAGS as ExifTags
 
 # Supabase - fix import path
 from backend.supabase_client import supabase
@@ -46,24 +44,6 @@ from backend.auth import get_current_user
 
 # Import photo selector for auto-generation
 from backend.services.reel_photo_selector import analyze_and_select_photos
-
-# Import CLIP for event detection
-try:
-    from backend.services.clip_analysis_service import clip_analysis_service
-    CLIP_AVAILABLE = True
-except ImportError:
-    print("⚠️ CLIP service not available - event detection disabled")
-    CLIP_AVAILABLE = False
-    clip_analysis_service = None
-
-# Import Spotify service for music
-try:
-    from backend.services.spotify_service import spotify_service
-    SPOTIFY_AVAILABLE = True
-except ImportError:
-    print("⚠️ Spotify service not available - music disabled")
-    SPOTIFY_AVAILABLE = False
-    spotify_service = None
 
 router = APIRouter(prefix="/reels", tags=["Reel Generator"])
 
@@ -101,10 +81,6 @@ class AutoReelResponse(BaseModel):
     file_size: Optional[int] = None
     quality_summary: Dict
     selected_photos_info: List[Dict]
-    # Music integration
-    detected_event: Optional[str] = None
-    event_confidence: Optional[float] = None
-    music_track: Optional[Dict] = None  # {title, artist, spotify_url, preview_url}
 
 
 def apply_filter(img: Image.Image, filter_name: str) -> Image.Image:
@@ -328,20 +304,32 @@ def apply_ken_burns_effect(clip, zoom_ratio=1.2):
 
 def apply_fade_transition(clips, fade_duration=0.5):
     """Apply fade in/out transitions between clips"""
-    faded_clips = []
-    
-    for i, clip in enumerate(clips):
-        if i == 0:
-            # First clip: fade in only
-            faded_clips.append(clip.with_fadein(fade_duration))
-        elif i == len(clips) - 1:
-            # Last clip: fade out only
-            faded_clips.append(clip.with_fadeout(fade_duration))
-        else:
-            # Middle clips: fade in and out
-            faded_clips.append(clip.with_fadein(fade_duration).with_fadeout(fade_duration))
-    
-    return faded_clips
+    if not clips:
+        return clips
+
+    try:
+        # MoviePy APIs vary by version; if fade methods are missing, keep slideshow stable.
+        if not hasattr(clips[0], "with_fadein") or not hasattr(clips[0], "with_fadeout"):
+            print("ℹ️ Fade transitions unavailable in current MoviePy version, using plain slideshow")
+            return clips
+
+        faded_clips = []
+
+        for i, clip in enumerate(clips):
+            if i == 0:
+                # First clip: fade in only
+                faded_clips.append(clip.with_fadein(fade_duration))
+            elif i == len(clips) - 1:
+                # Last clip: fade out only
+                faded_clips.append(clip.with_fadeout(fade_duration))
+            else:
+                # Middle clips: fade in and out
+                faded_clips.append(clip.with_fadein(fade_duration).with_fadeout(fade_duration))
+
+        return faded_clips
+    except Exception as e:
+        print(f"ℹ️ Fade transition skipped due to MoviePy compatibility issue: {e}")
+        return clips
 
 
 def process_audio(music_url: str, video_duration: float, volume: int, temp_dir: str):
@@ -701,107 +689,8 @@ async def generate_auto_reel(
         print(f"   Average quality: {quality_summary['average_quality']:.1f}/100")
         print(f"   Photos with faces: {quality_summary['photos_with_faces']}")
         
-        # Step 3: Event Detection (CLIP AI) - Sample 3 photos
-        detected_event = "general"
-        event_confidence = 0.0
-        
-        if CLIP_AVAILABLE and clip_analysis_service:
-            try:
-                print("\n🎭 Step 3: Detecting event type from photos...")
-                event_detections = []
-                
-                # Sample up to 3 photos for event detection (faster, good accuracy)
-                sample_size = min(3, len(selected_photos))
-                for idx in range(sample_size):
-                    image_bytes, filename, analysis = selected_photos[idx]
-                    detection = clip_analysis_service.detect_event_and_mood(
-                        image_file=image_bytes,
-                        is_base64=False
-                    )
-                    
-                    if detection.get('success', False):
-                        event_detections.append({
-                            'event': detection.get('detected_event', 'general'),
-                            'confidence': detection.get('event_confidence', 0.0)
-                        })
-                        print(f"   Photo {idx+1}: {detection.get('detected_event')} ({detection.get('event_confidence', 0):.1f}%)")
-                
-                # Aggregate event type (weighted by confidence)
-                if event_detections:
-                    event_scores = {}
-                    for det in event_detections:
-                        event = det['event']
-                        conf = det['confidence']
-                        event_scores[event] = event_scores.get(event, 0) + conf
-                    
-                    # Get event with highest total confidence
-                    detected_event = max(event_scores, key=event_scores.get)
-                    event_confidence = event_scores[detected_event] / len(event_detections)
-                    
-                    print(f"\n✅ Event detected: {detected_event.upper()} ({event_confidence:.1f}% confidence)")
-                else:
-                    print("⚠️ Event detection failed, using 'general'")
-            except Exception as e:
-                print(f"⚠️ Event detection error: {e}")
-                detected_event = "general"
-                event_confidence = 0.0
-        else:
-            print("ℹ️ CLIP not available, skipping event detection")
-        
-        # Step 4: Fetch Music (Spotify)
-        music_track = None
-        music_path = None
-        
-        if SPOTIFY_AVAILABLE and spotify_service:
-            try:
-                print(f"\n🎵 Step 4: Fetching music for {detected_event} event...")
-                music_suggestions = spotify_service.get_mood_aware_recommendations(
-                    event_type=detected_event,
-                    limit=10
-                )
-                
-                if music_suggestions and len(music_suggestions) > 0:
-                    # Find best track with preview URL
-                    best_track = None
-                    for track in sorted(music_suggestions, key=lambda x: x.get('vibeScore', 0), reverse=True):
-                        if track.get('previewUrl'):
-                            best_track = track
-                            break
-                    
-                    if best_track:
-                        music_track = {
-                            'title': best_track['title'],
-                            'artist': best_track['artist'],
-                            'spotify_url': best_track.get('spotifyUrl', ''),
-                            'preview_url': best_track.get('previewUrl', ''),
-                            'vibe_score': best_track.get('vibeScore', 0)
-                        }
-                        
-                        print(f"✅ Selected: '{best_track['title']}' by {best_track['artist']}")
-                        print(f"   Vibe Score: {best_track.get('vibeScore', 0):.1f}/100")
-                        
-                        # Download music preview (30-second MP3)
-                        try:
-                            import requests
-                            music_response = requests.get(best_track['previewUrl'], timeout=10)
-                            if music_response.status_code == 200:
-                                music_path = Path(temp_dir) / "background_music.mp3"
-                                music_path.write_bytes(music_response.content)
-                                print(f"✅ Music downloaded: {len(music_response.content)} bytes")
-                            else:
-                                print(f"⚠️ Music download failed: HTTP {music_response.status_code}")
-                        except Exception as e:
-                            print(f"⚠️ Music download error: {e}")
-                            music_path = None
-                    else:
-                        print("⚠️ No tracks with preview URL found")
-                else:
-                    print("⚠️ No music suggestions found")
-            except Exception as e:
-                print(f"⚠️ Music fetch error: {e}")
-                traceback.print_exc()
-        else:
-            print("ℹ️ Spotify not available, skipping music")
+        # Step 3: Photo-only mode (no event/music)
+        print("\n🎞️  Step 3: Photo-only reel mode enabled (no event detection, no music)")
         
         # Step 5: Get target dimensions
         if ratio == "9:16":
@@ -872,37 +761,12 @@ async def generate_auto_reel(
         
         # Step 5: Apply smooth transitions (fade between clips)
         print("✨ Step 4: Adding smooth transitions...")
-        # Note: Crossfade temporarily disabled due to MoviePy 2.x API changes
-        # TODO: Reimplement using MoviePy 2.x crossfadein/crossfadeout methods
-        fade_duration = 0.5
-        final_clips = clips  # Use clips directly without crossfade for now
+        fade_duration = 0.35
+        final_clips = apply_fade_transition(clips, fade_duration=fade_duration)
         
         # Step 6: Concat all clips
         print("\n📹 Step 6: Rendering final video...")
         final_video = concatenate_videoclips(final_clips, method="compose")
-        
-        # Step 6.5: Add music if available
-        if music_path and music_path.exists():
-            try:
-                print("🎵 Adding background music...")
-                audio_clip = AudioFileClip(str(music_path))
-                
-                # Match audio duration to video
-                if audio_clip.duration < final_video.duration:
-                    # Loop audio if shorter
-                    num_loops = int(final_video.duration / audio_clip.duration) + 1
-                    from moviepy import concatenate_audioclips
-                    audio_clip = concatenate_audioclips([audio_clip] * num_loops)
-                
-                # Trim to exact video duration
-                audio_clip = audio_clip.subclipped(0, final_video.duration)
-                
-                # Set audio
-                final_video = final_video.with_audio(audio_clip)
-                print(f"✅ Music added to video ({audio_clip.duration:.1f}s)")
-            except Exception as e:
-                print(f"⚠️ Could not add music: {e}")
-                traceback.print_exc()
         
         # Step 7: Save video
         output_dir = Path("storage/reels/generated") / str(user_id)
@@ -916,7 +780,7 @@ async def generate_auto_reel(
             str(output_path),
             fps=30,
             codec='libx264',
-            audio=True,  # Audio enabled (music integrated)
+            audio=False,
             preset='slow',  # Better quality
             bitrate='8000k',  # High bitrate for quality
             threads=4,
@@ -946,10 +810,7 @@ async def generate_auto_reel(
             aspect_ratio=ratio,
             file_size=int(file_size),
             quality_summary=quality_summary,
-            selected_photos_info=selected_photos_info,
-            detected_event=detected_event if detected_event != "general" else None,
-            event_confidence=float(event_confidence) if event_confidence > 0 else None,
-            music_track=music_track
+            selected_photos_info=selected_photos_info
         )
         
     except HTTPException:

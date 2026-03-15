@@ -133,7 +133,7 @@ const ClientDashboard = () => {
     },
     {
       id: "reel",
-      title: "Reel Generator",
+      title: "Reel Maker",
       description: "Turn your photos into stunning video reels",
       icon: Video,
       link: "/client/reel-generator",
